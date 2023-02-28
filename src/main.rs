@@ -2,6 +2,8 @@
 #![allow(clippy::result_large_err)] // shut the fuck up clippy Lmao
 #![allow(clippy::type_complexity)] // shut the fuck up clippy Lmao
 #![allow(clippy::unit_arg)] // shut the fuck up clippy Lmao
+#![allow(clippy::too_many_arguments)] // shut the fuck up clippy Lmao
+#![recursion_limit = "512"]
 
 mod cli;
 mod compiling;
@@ -17,7 +19,9 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::fs;
 use std::io::Read;
+use std::ops::ControlFlow;
 use std::path::PathBuf;
+use std::process::exit;
 use std::rc::Rc;
 
 use clap::Parser as _;
@@ -28,6 +32,7 @@ use lasso::Rodeo;
 use slotmap::SecondaryMap;
 use spinoff::spinners::SpinnerFrames;
 use spinoff::{Spinner as SSpinner, *};
+use spwn_codegen::def_type;
 
 use crate::cli::{Arguments, Command};
 use crate::compiling::compiler::{Compiler, TypeDefMap};
@@ -36,8 +41,12 @@ use crate::parsing::ast::Spannable;
 use crate::parsing::parser::Parser;
 use crate::sources::{BytecodeMap, SpwnSource};
 use crate::util::{BasicError, HexColorize, RandomState};
+use crate::vm::context::{CallInfo, Context};
 use crate::vm::interpreter::{FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
+use crate::vm::value::ValueType;
+
+const CORE_PATH: &str = "./libraries/core/";
 
 struct Spinner {
     frames: SpinnerFrames,
@@ -185,10 +194,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             objects.extend(gd_object::apply_triggers(triggers));
 
-            println!(
-                "\n{} objects added",
-                (objects.len()).to_string().bright_white().bold()
-            );
+            println!("\n{} objects added", (objects.len()).to_string().bright_white().bold());
 
             let (new_ls, used_ids) = gd_object::append_objects(objects, &level_string)?;
 
@@ -252,10 +258,7 @@ fn run_spwn(
 ) -> Result<SpwnOutput, Box<dyn Error>> {
     let interner = Rc::new(RefCell::new(Rodeo::with_hasher(RandomState::new())));
 
-    spinner.start(format!(
-        "{:20}",
-        "Parsing...".color_hex(PARSING_COLOR).bold()
-    ));
+    spinner.start(format!("{:20}", "Parsing...".color_hex(PARSING_COLOR).bold()));
 
     let src = SpwnSource::File(file);
     let code = src
@@ -268,21 +271,13 @@ fn run_spwn(
 
     spinner.complete(None);
 
-    spinner.start(format!(
-        "{:20}",
-        "Compiling...".color_hex(COMPILING_COLOR).bold()
-    ));
+    spinner.start(format!("{:20}", "Compiling...".color_hex(COMPILING_COLOR).bold()));
 
     let mut map = BytecodeMap::default();
     let mut typedefs = TypeDefMap::default();
 
-    let mut compiler = Compiler::new(
-        Rc::clone(&interner),
-        parser.src.clone(),
-        settings,
-        &mut map,
-        &mut typedefs,
-    );
+    let mut compiler =
+        Compiler::new(Rc::clone(&interner), parser.src.clone(), settings, &mut map, &mut typedefs);
 
     compiler
         .compile(ast.statements)
@@ -302,13 +297,20 @@ fn run_spwn(
     let key = vm.src_map[&parser.src];
     let start = FuncCoord::new(0, key);
 
-    vm.push_call_stack(start, 0, false, None);
-
     println!("{:20}", "Building...".color_hex(RUNNING_COLOR).bold());
 
-    println!("\n{}", "════ Output ══════════════════════".dimmed().bold(),);
+    println!("\n{}", "════ Output ══════════════════════".dimmed().bold());
 
-    vm.run_program().map_err(|e| e.to_report(&vm))?;
+    vm.run_function(
+        Context::new(),
+        CallInfo {
+            func: start,
+            return_dest: None,
+            call_area: None,
+        },
+        Box::new(|_| Ok(())),
+    )
+    .map_err(|e| e.to_report(&vm))?;
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());
 

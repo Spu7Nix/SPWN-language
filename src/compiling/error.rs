@@ -200,5 +200,29 @@ error_maker! {
             area: CodeArea,
             type_name: String,
         },
+
+        /////////
+        #[
+            Message: "Invalid overload", Note: None;
+            Labels: [
+                area => "Overload expected {}": expected;
+            ]
+        ]
+        InvalidOverload {
+            expected: String,
+
+            area: CodeArea,
+        },
+
+        /////
+        #[
+            Message: "Expected constant expression", Note: None;
+            Labels: [
+                area => "Only constant expressions are allowed here";
+            ]
+        ]
+        ExpectedConstantExpr {
+            area: CodeArea,
+        },
     }
 }

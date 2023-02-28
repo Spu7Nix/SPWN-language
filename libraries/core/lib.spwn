@@ -1,0 +1,89 @@
+
+
+impl @builtins {
+    print: (self, ...args, end: @string = "\n", sep: @string = " ") {
+        /* compiler built-in */ 
+    },
+
+    add: (self, object: @object, ignore_context: @bool = false) { 
+        /* compiler built-in */ 
+    },
+
+    epsilon: (self) -> @epsilon { 
+        /* compiler built-in */ 
+    },
+
+    trigger_fn_context: (self) -> @group { 
+        /* compiler built-in */ 
+    },
+}
+
+impl @float {
+    sin: (self) -> @float {
+        /* compiler built-in */ 
+    },
+}
+
+impl @array {
+    push: (self, value) {
+        /* compiler built-in */ 
+    },
+
+    pop: (self) {
+        /* compiler built-in */ 
+    },
+
+    map: (self, cb: @macro) -> @array {
+        $.assert(false, "implement me")
+        // let out = []
+        // for el in self {
+        //     out.push(cb(el))
+        // }
+        // return out
+    },
+
+    iter: (self) -> @iterator {
+        /* compiler built-in */ 
+    },
+
+    reversed: (self) -> @array {
+        /* compiler built-in */ 
+    },
+
+
+}
+
+impl @iterator {
+    next: (self) {
+        /* compiler built-in */ 
+    },
+}
+
+impl @dict {
+    insert: (self, key: @string, value) {
+        /* compiler built-in */ 
+    },
+}
+
+impl @range {
+    reversed: (self) -> @range {
+        /* compiler built-in */ 
+    },
+    contains: (self, n: @int) -> @bool {
+        /* compiler built-in */ 
+    },
+}
+
+type @error
+impl @error {
+    
+}
+
+// impl @block {}
+// impl @group {}
+// impl @item {}
+// impl @channel {}
+// impl @counter {}
+// impl @object {}
+// impl @string {}
+// impl @int {}

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
+use crate::parsing::utils::operators::Operator;
 
 struct OpcodeVisitor;
 
@@ -50,6 +51,7 @@ pub type Register = u8;
 pub type UnoptRegister = usize;
 
 pub type ConstID = u16;
+pub type ConstPatternID = u16;
 pub type JumpPos = u16;
 pub type AllocSize = u16;
 pub type FunctionID = u16;
@@ -168,6 +170,14 @@ opcodes! {
     #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d}"))]
     PushDictElem { => elem, => key, => dest },
 
+    #[delve(display = |e: &R, d: &R| format!("push R{e} into R{d} by key"))]
+    PushArrayElemByKey { => elem, => dest },
+    #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d} by key"))]
+    PushDictElemByKey { => elem, => key, => dest },
+
+    #[delve(display = |s: &R, k: &R| format!("R{s}[R{k}] private"))]
+    MakeDictElemPrivate { => dest, => key },
+
     #[delve(display = |e: &R, k: &ObjectKey, d: &R| format!("insert {}:R{e} into R{d}", <&ObjectKey as Into<&'static str>>::into(k)))]
     PushObjectElemKey { => elem, obj_key: ObjectKey, => dest },
     #[delve(display = |e: &R, k: &u8, d: &R| format!("insert {k}:R{e} into R{d}"))]
@@ -182,8 +192,8 @@ opcodes! {
     PushMacroArg { => name, => dest, is_ref: bool },
     #[delve(display = |s: &R, d: &R| format!("set default to R{s} for R{d}"))]
     SetMacroArgDefault { => src, => dest },
-    #[delve(display = |s: &R, d: &R| format!("set pattern to R{s} for R{d}"))]
-    SetMacroArgPattern { => src, => dest },
+    #[delve(display = |i: &ConstPatternID, d: &R| format!("set pattern to id {i} for R{d}"))]
+    SetMacroArgPattern { id: ConstPatternID, => dest },
     #[delve(display = |n: &R, d: &R| format!("insert arg ...R{n} into R{d}"))]
     PushMacroSpreadArg { => name, => dest },
 
@@ -228,8 +238,6 @@ opcodes! {
     BinAndEq { => left, => right },
     #[delve(display = |a: &R, b: &R| format!("R{a} |= R{b}"))]
     BinOrEq { => left, => right },
-    #[delve(display = |a: &R, b: &R| format!("R{a} ~= R{b}"))]
-    BinNotEq { => left, => right },
 
     #[delve(display = |s: &R, d: &R| format!("!R{s} -> R{d}"))]
     Not { => src, => dest },
@@ -237,6 +245,25 @@ opcodes! {
     Negate { => src, => dest },
     #[delve(display = |s: &R, d: &R| format!("~R{s} -> R{d}"))]
     BinNot { => src, => dest },
+
+    // UnaryOp::Eq => todo!(),
+    // UnaryOp::Neq => todo!(),
+    // UnaryOp::Gt => todo!(),
+    // UnaryOp::Gte => todo!(),
+    // UnaryOp::Lt => todo!(),
+    // UnaryOp::Lte => todo!(),
+    // #[delve(display = |s: &R, d: &R| format!("==R{s} -> R{d}"))]
+    // PatEq { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!("!=R{s} -> R{d}"))]
+    // PatNeq { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!(">R{s} -> R{d}"))]
+    // PatGt { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!(">=R{s} -> R{d}"))]
+    // PatGte { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!("<R{s} -> R{d}"))]
+    // PatLt { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!("<=R{s} -> R{d}"))]
+    // PatLte { => src, => dest },
 
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} == R{b} -> R{x}"))]
     Eq { => left, => right, => dest },
@@ -258,8 +285,8 @@ opcodes! {
     In { => left, => right, => dest },
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} as R{b} -> R{x}"))]
     As { => left, => right, => dest },
-    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} is R{b} -> R{x}"))]
-    Is { => left, => right, => dest },
+    // #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} is R{b} -> R{x}"))]
+    // Is { => left, => right, => dest },
 
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} && R{b} -> R{x}"))]
     And { => left, => right, => dest },
@@ -275,6 +302,16 @@ opcodes! {
         => src,
         to: JumpPos,
     },
+    #[delve(display = |s: &R, to: &JumpPos| format!("if R{s} == ?, to {to}"))]
+    UnwrapOrJump {
+        => src,
+        to: JumpPos,
+    },
+
+    #[delve(display = |s: &R, d: &R| format!("R{s}.iter() -> R{d}"))]
+    WrapIterator { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!("R{s}.next() -> R{d}"))]
+    IterNext { => src, => dest },
 
     #[delve(display = |s: &R, m: &bool| format!("{} R{s}", if *module_ret { "export" } else { "return" }))]
     Ret { => src, module_ret: bool },
@@ -293,6 +330,8 @@ opcodes! {
     #[delve(display = |c: &IDClass, d: &R| format!("?{} -> R{d}", c.letter()))]
     LoadArbitraryId { class: IDClass, => dest },
 
+    #[delve(display = |s: &R, d: &R| format!("R{s}.type -> R{d}"))]
+    TypeOf { => src, => dest },
 
     #[delve(display = |src: &R| format!("change to R{src}"))]
     PushContextGroup { => src },
@@ -325,9 +364,16 @@ opcodes! {
     Export { => src },
     #[delve(display = |s: &ImportID, d: &R| format!("import id {s} -> R{d}"))]
     Import { src: ImportID => dest },
+    #[delve(display = |e: &R| format!("throw R{e}"))]
+    Throw { => err },
 
     #[delve(display = |b: &R, d: &R, t: &R| format!("@R{b}::R{d} -> R{t}"))]
     CreateInstance { => base, => dict, => dest },
     #[delve(display = |b: &R, d: &R| format!("impl @R{b} {{R{d}}}"))]
     Impl { => base, => dict },
+    #[delve(display = |a: &R, o: &Operator| format!("overload {} with {{R{a}}}", o.to_str()))]
+    Overload { => array, op: Operator },
+
+    #[delve(display = |reg: &R| format!("convert R{reg} to byte array"))]
+    MakeByteArray { => reg },
 }

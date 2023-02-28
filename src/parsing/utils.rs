@@ -12,19 +12,28 @@ macro_rules! operators {
         pub mod operators {
             use crate::lexing::tokens::Token;
 
-            #[derive(Debug, Clone, Copy)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            pub enum Operator {
+                Bin(BinOp),
+                Unary(UnaryOp),
+                Assign(AssignOp),
+            }
+
+            impl Operator {
+                pub fn to_str(self) -> &'static str {
+                    match self {
+                        Self::Bin(b) => b.to_str(),
+                        Self::Unary(u) => u.to_str(),
+                        Self::Assign(a) => a.to_str(),
+                    }
+                }
+            }
+
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub enum AssignOp {
                 $(
                     $a_tok,
                 )+
-            }
-            pub fn is_assign_op(op: Token) -> bool {
-                match op {
-                    $(
-                        Token::$a_tok => true,
-                    )+
-                    _ => false,
-                }
             }
 
 
@@ -35,14 +44,14 @@ macro_rules! operators {
                 Unary,
             }
 
-            #[derive(Debug, Clone, Copy)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub enum BinOp {
                 $(
                     $($($l_tok,)+)?
                     $($($r_tok,)+)?
                 )+
             }
-            #[derive(Debug, Clone, Copy)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub enum UnaryOp {
                 $(
                     $($($u_tok,)+)?
@@ -74,32 +83,41 @@ macro_rules! operators {
                     }
                 }
             }
+            impl AssignOp {
+                pub fn to_str(self) -> &'static str {
+                    match self {
+                        $(
+                            AssignOp::$a_tok => Token::$a_tok.to_str(),
+                        )+
+                    }
+                }
+            }
 
             impl Token {
-                pub fn to_bin_op(self) -> BinOp {
-                    match self {
+                pub fn to_bin_op(self) -> Option<BinOp> {
+                    Some(match self {
                         $(
                             $($(Token::$l_tok => BinOp::$l_tok,)+)?
                             $($(Token::$r_tok => BinOp::$r_tok,)+)?
                         )+
-                        _ => unreachable!(),
-                    }
+                        _ => return None,
+                    })
                 }
-                pub fn to_unary_op(self) -> UnaryOp {
-                    match self {
+                pub fn to_unary_op(self) -> Option<UnaryOp> {
+                    Some(match self {
                         $(
                             $($(Token::$u_tok => UnaryOp::$u_tok,)+)?
                         )+
-                        _ => unreachable!(),
-                    }
+                        _ => return None,
+                    })
                 }
-                pub fn to_assign_op(self) -> AssignOp {
-                    match self {
+                pub fn to_assign_op(self) -> Option<AssignOp> {
+                    Some(match self {
                         $(
                             Token::$a_tok => AssignOp::$a_tok,
                         )+
-                        _ => unreachable!(),
-                    }
+                        _ => return None,
+                    })
                 }
             }
 
@@ -147,17 +165,17 @@ macro_rules! operators {
 }
 
 operators! {
-    Assign: [Assign, PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];
+    Assign: [Assign, PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, ShiftLeftEq, ShiftRightEq];
     // lowest precedence
     // Right => [Assign];
     // Right => [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];
     Left => [Range];
     Left => [In];
-    Left => [Is];
+    // Left => [Is];
     Left => [BinOr, Or];
     Left => [BinAnd, And];
     Unary => [BinNot];
-    Unary => [Eq, Neq, Gt, Gte, Lt, Lte];
+    // Unary => [Eq, Neq, Gt, Gte, Lt, Lte];
     Unary => [ExclMark];
     Left => [Eq, Neq, Gt, Gte, Lt, Lte];
     Left => [ShiftLeft, ShiftRight];

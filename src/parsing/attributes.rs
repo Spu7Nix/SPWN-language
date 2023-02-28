@@ -22,7 +22,7 @@ pub trait IsValidOn<T: Into<&'static str>> {
 #[allow(unused_macros)]
 macro_rules! parse_string {
     ($parser:ident) => {
-        $parser.parse_string($parser.slice(), $parser.span())?
+        $parser.resolve(&$parser.parse_plain_string($parser.slice(), $parser.span())?)
     };
 }
 
@@ -278,8 +278,11 @@ attributes! {
 attributes! {
     #[check_validity(Statement)]
     pub enum StmtAttribute {
-        // #[valid_on(Arrow)]
-        // Doc(String),
+        #[valid_on(Arrow)]
+        Doc(String),
+
+        // #[valid_on(Macro)]
+        // Constructor,
 
         #[valid_on(Let, TypeDef)]
         Deprecated { since: String, note: String, },

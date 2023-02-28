@@ -1,7 +1,8 @@
 use std::string::ToString;
 
-use super::context::CallStackItem;
+use super::context::CallInfo;
 use super::interpreter::Vm;
+use super::pattern::ConstPattern;
 use super::value::ValueType;
 use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
@@ -58,6 +59,35 @@ error_maker! {
             v: (ValueType, CodeArea),
             area: CodeArea,
             expected: ValueType,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Cannot convert between types", Note: None;
+            Labels: [
+                area => "Cannot convert {} to {}": v.0.runtime_display(vm), to.runtime_display(vm);
+                v.1 => "This is of type {}": v.0.runtime_display(vm);
+            ]
+        ]
+        CannotConvertType {
+            v: (ValueType, CodeArea),
+            to: ValueType,
+            area: CodeArea,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Cannot iterator", Note: None;
+            Labels: [
+                area => "Cannot iterate over {}": v.0.runtime_display(vm);
+                v.1 => "Value defined as {} here": v.0.runtime_display(vm);
+            ]
+        ]
+        CannotIterate {
+            v: (ValueType, CodeArea),
+            area: CodeArea,
             [call_stack]
         },
 
@@ -136,6 +166,24 @@ error_maker! {
 
         /////////
         #[
+            Message: "Argument pattern mismatch", Note: None;
+            Labels: [
+                call_area => "Call occurred here";
+                macro_def_area => "Argument `{}` was defined as taking {} here": arg_name, pattern.runtime_display(vm);
+                v.1 => "This `{}` is not {}": v.0.runtime_display(vm), pattern.runtime_display(vm);
+            ]
+        ]
+        ArgumentPatternMismatch {
+            call_area: CodeArea,
+            macro_def_area: CodeArea,
+            arg_name: String,
+            pattern: ConstPattern,
+            v: (ValueType, CodeArea),
+            [call_stack]
+        },
+
+        /////////
+        #[
             Message: "Nonexistent member", Note: None;
             Labels: [
                 area => "Member `{}` does not exist on this {}": member, base_type.runtime_display(vm);
@@ -145,6 +193,19 @@ error_maker! {
             area: CodeArea,
             member: String,
             base_type: ValueType,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Tried to access private member", Note: None;
+            Labels: [
+                area => "Member `{}` is private": member;
+            ]
+        ]
+        PrivateMemberAccess {
+            area: CodeArea,
+            member: String,
             [call_stack]
         },
 
@@ -210,6 +271,19 @@ error_maker! {
 
         /////////
         #[
+            Message: "Tried to access private type", Note: None;
+            Labels: [
+                area => "Type {} is private": format!("@{type_name}");
+            ]
+        ]
+        PrivateType {
+            area: CodeArea,
+            type_name: String,
+            [call_stack]
+        },
+
+        /////////
+        #[
             Message: "Invalid index", Note: None;
             Labels: [
                 area => "{} cannot be indexed by {}": base.0.runtime_display(vm), index.0.runtime_display(vm);
@@ -265,6 +339,7 @@ error_maker! {
             [call_stack]
         },
 
+        /////////
         #[
             Message: "Added object in runtime context", Note: Some("TODO (link to docs)".into());
             Labels: [
@@ -276,46 +351,17 @@ error_maker! {
             [call_stack]
         },
 
-        // /////////
-        // #[
-        //     Message: "Too few arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
-        //     Labels: [
-        //         call_area => "Builtin called here";
-        //     ]
-        // ]
-        // TooFewBuiltinArguments {
-        //     call_area: CodeArea,
-        //     //builtin: Builtin,
-        //     [call_stack]
-        // },
-
-        // /////////
-        // #[
-        //     Message: "Too many arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
-        //     Labels: [
-        //         call_area => "Builtin called here";
-        //     ]
-        // ]
-        // TooManyBuiltinArguments {
-        //     call_area: CodeArea,
-        //     //builtin: Builtin,
-        //     [call_stack]
-        // },
-
-        // /////////
-        // #[
-        //     Message: "Invalid builtin argument type", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
-        //     Labels: [
-        //         call_area => "Builtin expected type {} here": expected;
-        //         def_area => "Value defined as {} here": found.runtime_display(vm);
-        //     ]
-        // ]
-        // InvalidBuiltinArgumentType {
-        //     call_area: CodeArea,
-        //     def_area: CodeArea,
-        //     expected: BuiltinValueType,
-        //     found: ValueType,
-        //     [call_stack]
-        // },
+        /////////
+        #[
+            Message: "Runtime Error", Note: None;
+            Labels: [
+                area => "{}": message;
+            ]
+        ]
+        ThrownError {
+            area: CodeArea,
+            message: String,
+            [call_stack]
+        },
     }
 }

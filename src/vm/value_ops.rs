@@ -18,6 +18,7 @@ pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm, code: BytecodeKey) -> R
         }
     })
 }
+
 pub fn to_obj_param(
     v: &StoredValue,
     span: CodeSpan,
@@ -35,7 +36,7 @@ pub fn to_obj_param(
             Value::Item(id) => Some(ObjParam::Item(*id)),
 
             Value::Bool(b) => Some(ObjParam::Bool(*b)),
-            Value::String(s) => Some(ObjParam::Text(s.clone())),
+            Value::String(s) => Some(ObjParam::Text(s.iter().collect())),
 
             Value::Epsilon => Some(ObjParam::Epsilon),
 
@@ -84,7 +85,7 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
                 for (k, k1) in v1 {
                     match v2.get(k) {
                         Some(k2) => {
-                            if !equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm) {
+                            if !equality(&vm.memory[k1.0].value, &vm.memory[k2.0].value, vm) {
                                 return false;
                             }
                         }
@@ -101,6 +102,37 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
     }
 }
 
+// pub fn is_op(
+//     a: &StoredValue,
+//     b: &StoredValue,
+//     span: CodeSpan,
+//     vm: &mut Vm,
+//     code: BytecodeKey,
+// ) -> RuntimeResult<Value> {
+//     let pat = to_pattern(b, span, vm, code)?;
+
+//     Ok(Value::Bool(pat.value_matches(&a.value, vm)?))
+// }
+
+pub fn as_op(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &mut Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
+    Ok(if let Value::Type(b) = &b.value {
+        vm.convert_type(a, *b, span, code)?
+    } else {
+        return Err(RuntimeError::TypeMismatch {
+            v: (b.value.get_type(), b.area.clone()),
+            area: vm.make_area(span, code),
+            expected: ValueType::Type,
+            call_stack: vm.get_call_stack(),
+        });
+    })
+}
+
 pub fn add(
     a: &StoredValue,
     b: &StoredValue,
@@ -114,7 +146,7 @@ pub fn add(
         (Value::Int(a), Value::Float(b)) => Value::Float(*a as f64 + *b),
         (Value::Float(a), Value::Int(b)) => Value::Float(*a + *b as f64),
 
-        (Value::String(a), Value::String(b)) => Value::String(a.clone() + b),
+        (Value::String(a), Value::String(b)) => Value::String([a.clone(), b.clone()].concat()),
         _ => {
             return Err(RuntimeError::InvalidOperands {
                 a: (a.value.get_type(), a.area.clone()),
@@ -441,6 +473,13 @@ pub fn range(
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Range(*a, *b, 1),
+        (Value::Range(start, end, step), Value::Int(b)) => {
+            if *step == 1 {
+                Value::Range(*start, *b, *end as usize)
+            } else {
+                todo!()
+            }
+        }
         // (Value::Int(a), Value::Float(b)) => Value::Range(*a, *b as i64, 1),
         // (Value::Float(a), Value::Int(b)) => Value::Range(*a as i64, *b, 1),
         // (Value::Float(a), Value::Float(b)) => Value::Range(*a as i64, *b as i64, 1),
@@ -546,4 +585,24 @@ pub fn shift_right(
             })
         }
     })
+}
+
+pub fn eq_op(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
+    Ok(Value::Bool(equality(&a.value, &b.value, vm)))
+}
+
+pub fn neq_op(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
+    Ok(Value::Bool(!equality(&a.value, &b.value, vm)))
 }

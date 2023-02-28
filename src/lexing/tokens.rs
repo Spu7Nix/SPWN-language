@@ -1,6 +1,7 @@
 use crate::lexer;
 
 lexer! {
+    Any: text("_"),
     ["int literal"]
     Int: regex(r#"0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[\d_]+"#),
     ["float literal"]
@@ -13,9 +14,6 @@ lexer! {
     Id: regex(r"([0-9]+|\?)[gbci]"),
     ["type indicator"]
     TypeIndicator: regex(r"@[a-zA-Z_]\w*"),
-
-    // ["attribute"]
-    //Attribute: regex(r"#\[.*?\]"),
 
     Let: text("let"),
 
@@ -31,6 +29,7 @@ lexer! {
     In: text("in"),
     Try: text("try"),
     Catch: text("catch"),
+    Throw: text("throw"),
 
     Return: text("return"),
     Break: text("break"),
@@ -38,9 +37,12 @@ lexer! {
 
     Type: text("type"),
     Impl: text("impl"),
+    Overload: text("overload"),
+    Unary: text("unary"),
 
     Dbg: text("dbg"),
 
+    Private: text("private"),
     Extract: text("extract"),
     Import: text("import"),
     Dollar: text("$"),

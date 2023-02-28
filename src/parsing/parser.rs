@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::os::windows::raw;
 use std::rc::Rc;
 use std::str::Chars;
 
@@ -8,15 +9,16 @@ use unindent::unindent;
 
 use super::ast::{
     Ast, DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjectType, Spannable,
-    Spanned, Statement, Statements, StmtNode,
+    Spanned, Statement, Statements, StmtNode, StringType, StringContent, PatternNode, Pattern,
 };
 use super::attributes::{ExprAttribute, IsValidOn, ParseAttribute, ScriptAttribute, StmtAttribute};
 use super::error::SyntaxError;
-use super::utils::operators::{self, is_assign_op, unary_prec};
+use super::utils::operators::{self, unary_prec};
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::OBJECT_KEYS;
 use crate::lexing::tokens::{Lexer, Token};
 use crate::parsing::ast::ObjKeyType;
+use crate::parsing::utils::operators::Operator;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 
@@ -198,34 +200,37 @@ impl Parser<'_> {
         (class, value)
     }
 
-    pub fn parse_string(&self, s: &str, span: CodeSpan) -> ParseResult<String> {
+    pub fn parse_string(&self, s: &str, span: CodeSpan) -> ParseResult<StringType> {
         let mut chars = s.chars();
 
         // Remove trailing "
         chars.next_back();
 
-        let flags = chars
+        let raw_flags = chars
             .by_ref()
             .take_while(|c| !matches!(c, '"' | '\''))
             .collect::<String>();
+
         let mut out: String = chars.collect();
 
-        if flags.is_empty() {
-            return self.parse_escapes(&mut out.chars());
-        }
-
-        let mut flags = flags.split('_').collect::<Vec<_>>();
+        let mut flags = raw_flags.split('_').collect::<Vec<_>>();
         let last = flags.pop().unwrap();
 
         if matches!(last, "r" | "r#" | "r##") {
             out = out[0..(out.len() - last.len() + 1)].into();
         } else {
-            flags.push(last);
+            out = self.parse_escapes(&mut out.chars())?;
+
+            if !raw_flags.is_empty() {
+                flags.push(last);
+            }
         }
+
+        let mut is_bytes = false;
 
         for flag in flags {
             match flag {
-                "b" => todo!("byte string"),
+                "b" => is_bytes = true,
                 "u" => out = unindent(&out),
                 "b64" => {
                     out = base64::engine::general_purpose::STANDARD.encode(out);
@@ -239,11 +244,31 @@ impl Parser<'_> {
             }
         }
 
-        Ok(out)
+        Ok(StringType {
+            s: StringContent::Normal(self.intern_string(out)),
+            bytes: is_bytes,
+        })
+    }
+
+    pub fn parse_plain_string(&self, s: &str, span: CodeSpan) -> ParseResult<Spur> {
+        let st = self.parse_string(s, span)?;
+
+        let s = match st {
+            StringType { s: StringContent::Normal(s), bytes: false } => s,
+            _ => return Err(SyntaxError::InvalidStringType {
+                typ: "plain",
+                area: self.make_area(span)
+            })
+        };
+
+        Ok(s)
     }
 
     fn intern_string<T: AsRef<str>>(&self, string: T) -> Spur {
         self.interner.borrow_mut().get_or_intern(string)
+    }
+    pub fn resolve(&self, s: &Spur) -> String {
+        self.interner.borrow_mut().resolve(s).into()
     }
 
     fn parse_escapes(&self, chars: &mut Chars) -> ParseResult<String> {
@@ -334,14 +359,22 @@ impl Parser<'_> {
         .unwrap_or('\u{FFFD}'))
     }
 
-    pub fn parse_dictlike(&mut self) -> ParseResult<DictItems> {
+    pub fn parse_dictlike(&mut self, allow_vis: bool) -> ParseResult<DictItems> {
         let mut items = vec![];
 
         list_helper!(self, RBracket {
+
+            let private = if allow_vis && self.next_is(Token::Private) {
+                self.next();
+                true
+            } else {
+                false
+            };
+
             let key = match self.next() {
-                Token::Int => self.parse_int(self.slice()).to_string(),
-                Token::String => self.parse_string(self.slice(), self.span())?,
-                Token::Ident => self.slice().to_string(),
+                Token::Int => self.intern_string(self.parse_int(self.slice()).to_string()),
+                Token::String => self.parse_plain_string(self.slice(), self.span())?,
+                Token::Ident => self.intern_string(self.slice()),
                 other => {
                     return Err(SyntaxError::UnexpectedToken {
                         expected: "key".into(),
@@ -350,7 +383,6 @@ impl Parser<'_> {
                     })
                 }
             };
-            let key = self.intern_string(key);
 
             let key_span = self.span();
 
@@ -361,7 +393,7 @@ impl Parser<'_> {
                 None
             };
 
-            items.push((key.spanned(key_span), elem));
+            items.push((key.spanned(key_span), elem, private));
         });
 
         Ok(items)
@@ -383,7 +415,7 @@ impl Parser<'_> {
         Ok(match self.peek() {
             Token::String => {
                 self.next();
-                ImportType::Module(self.parse_string(self.slice(), self.span())?)
+                ImportType::Module(self.resolve(&self.parse_plain_string(self.slice(), self.span())?))
             }
             Token::Ident => {
                 self.next();
@@ -397,6 +429,88 @@ impl Parser<'_> {
                 })
             }
         })
+    }
+
+    pub fn parse_pattern(&mut self) -> ParseResult<PatternNode> {
+        let start = self.peek_span();
+
+        let mut pat = match self.next() {
+            Token::TypeIndicator => {
+                let name = self.slice()[1..].to_string();
+
+                Pattern::Type(self.intern_string(name))
+            }
+            Token::Any => {
+                Pattern::Any
+            }
+            Token::Eq => {
+                let val = self.parse_value(true)?;
+                Pattern::Eq(val)
+            }
+            Token::Neq => {
+                let val = self.parse_value(true)?;
+                Pattern::Neq(val)
+            }
+            Token::Gt => {
+                let val = self.parse_value(true)?;
+                Pattern::Gt(val)
+            }
+            Token::Gte => {
+                let val = self.parse_value(true)?;
+                Pattern::Gte(val)
+            }
+            Token::Lt => {
+                let val = self.parse_value(true)?;
+                Pattern::Lt(val)
+            }
+            Token::Lte => {
+                let val = self.parse_value(true)?;
+                Pattern::Lte(val)
+            }
+            Token::LParen => {
+                let pat = self.parse_pattern()?;
+                self.expect_tok(Token::RParen)?;
+                *pat.pat
+            }
+            other => {
+                return Err(SyntaxError::UnexpectedToken {
+                    expected: "pattern".into(),
+                    found: other,
+                    area: self.make_area(start),
+                });
+            }
+        };
+
+        match self.peek() {
+            Token::BinOr => {
+                let left = PatternNode {
+                    pat: Box::new(pat),
+                    span: start.extend(self.span()),
+                };
+    
+                self.next();
+                let right = self.parse_pattern()?;
+                pat = Pattern::Either(left, right);
+            }
+            Token::BinAnd => {
+                let left = PatternNode {
+                    pat: Box::new(pat),
+                    span: start.extend(self.span()),
+                };
+    
+                self.next();
+                let right = self.parse_pattern()?;
+                pat = Pattern::Both(left, right);
+            }
+            _ => (),
+        }
+
+
+        Ok(PatternNode {
+            pat: Box::new(pat),
+            span: start.extend(self.span()),
+        })
+
     }
 
     pub fn parse_unit(&mut self, allow_macros: bool) -> ParseResult<ExprNode> {
@@ -427,7 +541,7 @@ impl Parser<'_> {
                 Token::String => {
                     self.next();
                     Expression::String(
-                        self.intern_string(self.parse_string(self.slice(), self.span())?),
+                        self.parse_string(self.slice(), self.span())?,
                     )
                     .spanned(start)
                 }
@@ -517,131 +631,212 @@ impl Parser<'_> {
                         }
                     };
 
-                    let is_macro = match after_close {
-                        Token::FatArrow | Token::LBracket if allow_macros => true,
-                        Token::Arrow if allow_macros => {
-                            check.parse_expr(allow_macros)?;
-
-                            matches!(check.peek(), Token::FatArrow | Token::LBracket)
-                        }
+                    match after_close {
+                        Token::FatArrow | Token::LBracket if allow_macros => (),
                         _ => {
                             if self.next_is(Token::RParen) {
                                 self.next();
                                 break 'out_expr Expression::Empty
                                     .spanned(start.extend(self.span()));
                             }
-                            let inner = self.parse_expr(true)?;
+                            let mut inner = self.parse_expr(true)?;
                             self.expect_tok(Token::RParen)?;
-                            return Ok(inner.extended(self.span()));
+                            inner.span = start.extend(self.span());
+                            return Ok(inner);
                         }
+                    }
+
+                    let mut args = vec![];
+
+                    let mut first_spread_span = None;
+
+                    list_helper!(self, is_first, RParen {
+                        if is_first && self.next_is(Token::Slf) {
+                            self.next();
+                            let span = self.span();
+
+                            let pattern = if self.next_is(Token::Colon) {
+                                self.next();
+                                Some(self.parse_pattern()?)
+                            } else {
+                                None
+                            };
+
+                            args.push(MacroArg::Single { name: self.intern_string("self").spanned(span), pattern, default: None, is_ref: true })
+                        } else {
+                            let is_spread = if self.next_is(Token::Spread) {
+                                self.next();
+                                true
+                            } else {
+                                false
+                            };
+                            
+
+                            let is_ref = if !is_spread && self.next_is(Token::BinAnd) {
+                                self.next();
+                                true
+                            } else {
+                                false
+                            };
+
+                            self.expect_tok_named(Token::Ident, "argument name")?;
+                            let arg_name = self.slice_interned().spanned(self.span());
+
+                            if is_spread {
+                                if let Some(prev_s) = first_spread_span {
+                                    return Err(SyntaxError::MultipleSpreadArguments { area: self.make_area(self.span()), prev_area: self.make_area(prev_s) })
+                                }
+                                first_spread_span = Some(self.span())
+                            }
+
+                            let pattern = if self.next_is(Token::Colon) {
+                                self.next();
+                                Some(self.parse_pattern()?)
+                            } else {
+                                None
+                            };
+
+                            if !is_spread {
+                                let default = if self.next_is(Token::Assign) {
+                                    self.next();
+                                    Some(self.parse_expr(true)?)
+                                } else {
+                                    None
+                                };
+                                args.push(MacroArg::Single { name: arg_name, pattern, default, is_ref });
+                            } else {
+                                args.push(MacroArg::Spread { name: arg_name, pattern });
+                            }
+                        }
+                    });
+
+                    let ret_type = if self.next_is(Token::Arrow) {
+                        self.next();
+                        Some(self.parse_expr(allow_macros)?)
+                    } else {
+                        None
                     };
 
-                    if is_macro && allow_macros {
-                        let mut args = vec![];
+                    let code = if self.next_is(Token::FatArrow) {
+                        self.next();
+                        MacroCode::Lambda(self.parse_expr(allow_macros)?)
+                    } else {
+                        MacroCode::Normal(self.parse_block()?)
+                    };
 
-                        let mut first_spread_span = None;
+                    Expression::Macro {
+                        args,
+                        code,
+                        ret_type,
+                    }
+                    .spanned(start.extend(self.span()))
 
-                        list_helper!(self, is_first, RParen {
-                            if is_first && self.next_is(Token::Slf) {
-                                self.next();
-                                let span = self.span();
+                    // if is_macro && allow_macros {
+                    //     let mut args = vec![];
 
-                                let pattern = if self.next_is(Token::Colon) {
-                                    self.next();
-                                    Some(self.parse_expr(true)?)
-                                } else {
-                                    None
-                                };
+                    //     let mut first_spread_span = None;
 
-                                args.push(MacroArg::Single { name: self.intern_string("self").spanned(span), pattern, default: None, is_ref: true })
-                            } else {
-                                let is_spread = if self.next_is(Token::Spread) {
-                                    self.next();
-                                    true
-                                } else {
-                                    false
-                                };
+                    //     list_helper!(self, is_first, RParen {
+                    //         if is_first && self.next_is(Token::Slf) {
+                    //             self.next();
+                    //             let span = self.span();
+
+                    //             let pattern = if self.next_is(Token::Colon) {
+                    //                 self.next();
+                    //                 Some(self.parse_expr(true)?)
+                    //             } else {
+                    //                 None
+                    //             };
+
+                    //             args.push(MacroArg::Single { name: self.intern_string("self").spanned(span), pattern, default: None, is_ref: true })
+                    //         } else {
+                    //             let is_spread = if self.next_is(Token::Spread) {
+                    //                 self.next();
+                    //                 true
+                    //             } else {
+                    //                 false
+                    //             };
                                 
 
-                                let is_ref = if !is_spread && self.next_is(Token::BinAnd) {
-                                    self.next();
-                                    true
-                                } else {
-                                    false
-                                };
+                    //             let is_ref = if !is_spread && self.next_is(Token::BinAnd) {
+                    //                 self.next();
+                    //                 true
+                    //             } else {
+                    //                 false
+                    //             };
 
-                                self.expect_tok_named(Token::Ident, "argument name")?;
-                                let arg_name = self.slice_interned().spanned(self.span());
+                    //             self.expect_tok_named(Token::Ident, "argument name")?;
+                    //             let arg_name = self.slice_interned().spanned(self.span());
     
-                                if is_spread {
-                                    if let Some(prev_s) = first_spread_span {
-                                        return Err(SyntaxError::MultipleSpreadArguments { area: self.make_area(self.span()), prev_area: self.make_area(prev_s) })
-                                    }
-                                    first_spread_span = Some(self.span())
-                                }
+                    //             if is_spread {
+                    //                 if let Some(prev_s) = first_spread_span {
+                    //                     return Err(SyntaxError::MultipleSpreadArguments { area: self.make_area(self.span()), prev_area: self.make_area(prev_s) })
+                    //                 }
+                    //                 first_spread_span = Some(self.span())
+                    //             }
     
-                                let pattern = if self.next_is(Token::Colon) {
-                                    self.next();
-                                    Some(self.parse_expr(true)?)
-                                } else {
-                                    None
-                                };
+                    //             let pattern = if self.next_is(Token::Colon) {
+                    //                 self.next();
+                    //                 Some(self.parse_expr(true)?)
+                    //             } else {
+                    //                 None
+                    //             };
     
-                                if !is_spread {
-                                    let default = if self.next_is(Token::Assign) {
-                                        self.next();
-                                        Some(self.parse_expr(true)?)
-                                    } else {
-                                        None
-                                    };
-                                    args.push(MacroArg::Single { name: arg_name, pattern, default, is_ref });
-                                } else {
-                                    args.push(MacroArg::Spread { name: arg_name, pattern });
-                                }
-                            }
-                        });
+                    //             if !is_spread {
+                    //                 let default = if self.next_is(Token::Assign) {
+                    //                     self.next();
+                    //                     Some(self.parse_expr(true)?)
+                    //                 } else {
+                    //                     None
+                    //                 };
+                    //                 args.push(MacroArg::Single { name: arg_name, pattern, default, is_ref });
+                    //             } else {
+                    //                 args.push(MacroArg::Spread { name: arg_name, pattern });
+                    //             }
+                    //         }
+                    //     });
 
-                        let ret_type = if self.next_is(Token::Arrow) {
-                            self.next();
-                            Some(self.parse_expr(allow_macros)?)
-                        } else {
-                            None
-                        };
+                    //     let ret_type = if self.next_is(Token::Arrow) {
+                    //         self.next();
+                    //         Some(self.parse_expr(allow_macros)?)
+                    //     } else {
+                    //         None
+                    //     };
 
-                        let code = if self.next_is(Token::FatArrow) {
-                            self.next();
-                            MacroCode::Lambda(self.parse_expr(allow_macros)?)
-                        } else {
-                            MacroCode::Normal(self.parse_block()?)
-                        };
+                    //     let code = if self.next_is(Token::FatArrow) {
+                    //         self.next();
+                    //         MacroCode::Lambda(self.parse_expr(allow_macros)?)
+                    //     } else {
+                    //         MacroCode::Normal(self.parse_block()?)
+                    //     };
 
-                        Expression::Macro {
-                            args,
-                            code,
-                            ret_type,
-                        }
-                        .spanned(start.extend(self.span()))
-                    } else {
-                        let mut args = vec![];
+                    //     Expression::Macro {
+                    //         args,
+                    //         code,
+                    //         ret_type,
+                    //     }
+                    //     .spanned(start.extend(self.span()))
+                    // } else {
+                    //     let mut args = vec![];
 
-                        list_helper!(self, RParen {
-                            args.push(self.parse_expr(true)?);
-                        });
+                    //     list_helper!(self, RParen {
+                    //         args.push(self.parse_expr(true)?);
+                    //     });
 
-                        let next = self.next_or_newline();
-                        if next != Token::Arrow {
-                            return Err(SyntaxError::UnexpectedToken {
-                                found: next,
-                                expected: Token::Arrow.to_str().to_string(),
-                                area: self.make_area(self.span()),
-                            });
-                        }
+                    //     let next = self.next_or_newline();
+                    //     if next != Token::Arrow {
+                    //         return Err(SyntaxError::UnexpectedToken {
+                    //             found: next,
+                    //             expected: Token::Arrow.to_str().to_string(),
+                    //             area: self.make_area(self.span()),
+                    //         });
+                    //     }
 
-                        let ret_type = self.parse_expr(allow_macros)?;
+                    //     let ret_type = self.parse_expr(allow_macros)?;
 
-                        Expression::MacroPattern { args, ret_type }
-                            .spanned(start.extend(self.span()))
-                    }
+                    //     Expression::MacroPattern { args, ret_type }
+                    //         .spanned(start.extend(self.span()))
+                    // }
                 }
                 Token::LSqBracket => {
                     self.next();
@@ -693,7 +888,7 @@ impl Parser<'_> {
                 Token::LBracket => {
                     self.next();
 
-                    Expression::Dict(self.parse_dictlike()?).spanned(start.extend(self.span()))
+                    Expression::Dict(self.parse_dictlike(false)?).spanned(start.extend(self.span()))
                 }
                 Token::QMark => {
                     self.next();
@@ -733,7 +928,7 @@ impl Parser<'_> {
                         None => self.parse_value(allow_macros)?,
                     };
 
-                    Expression::Unary(unary_op.to_unary_op(), val)
+                    Expression::Unary(unary_op.to_unary_op().unwrap(), val)
                         .spanned(start.extend(self.span()))
                 }
 
@@ -796,19 +991,12 @@ impl Parser<'_> {
                         if_false,
                     }
                 }
-                Token::Arrow => {
-                    if self.peek_or_newline() == Token::Newline {
-                        break;
-                    }
 
+                Token::Is => {
                     self.next();
+                    let typ = self.parse_pattern()?;
 
-                    let ret_type = self.parse_expr(allow_macros)?;
-
-                    Expression::MacroPattern {
-                        args: vec![value],
-                        ret_type,
-                    }
+                    Expression::Is(value, typ)
                 }
                 Token::LParen => {
                     self.next();
@@ -886,7 +1074,7 @@ impl Parser<'_> {
                                 }
                             }
                             Token::LBracket => {
-                                let items = self.parse_dictlike()?;
+                                let items = self.parse_dictlike(true)?;
                                 Expression::Instance { base: value, items }
                             }
                             other => {
@@ -929,7 +1117,7 @@ impl Parser<'_> {
                 self.parse_op(prec, allow_macros)?
             };
             let new_span = left.span.extend(right.span);
-            left = Expression::Op(left, op.to_bin_op(), right).into_node(vec![], new_span)
+            left = Expression::Op(left, op.to_bin_op().unwrap(), right).into_node(vec![], new_span)
         }
 
         Ok(left)
@@ -947,9 +1135,53 @@ impl Parser<'_> {
         let start = self.peek_span();
 
         let attrs = if self.next_is(Token::Hashtag) {
-            self.next();
+            let mut check = self.clone();
 
-            self.parse_attributes::<StmtAttribute>()?
+            check.next();
+            check.expect_tok(Token::LSqBracket)?;
+            
+            let mut indent = 1;
+
+            let after_close = loop {
+                match check.next() {
+                    Token::LSqBracket => indent += 1,
+                    Token::Eof => {
+                        return Err(SyntaxError::UnmatchedToken {
+                            not_found: Token::RSqBracket,
+                            for_char: Token::LSqBracket,
+                            area: self.make_area(start),
+                        })
+                    }
+                    Token::RSqBracket => {
+                        indent -= 1;
+                        if indent == 0 {
+                            break check.next();
+                        }
+                    }
+                    _ => (),
+                }
+            };
+
+            if matches!(after_close,
+                Token::Let |
+                Token::If |
+                Token::While |
+                Token::For |
+                Token::Try |
+                Token::Return |
+                Token::Continue |
+                Token::Break |
+                Token::Type |
+                Token::Impl |
+                Token::Overload |
+                Token::Extract |
+                Token::Dbg
+            ) {
+                self.next();
+                self.parse_attributes::<StmtAttribute>()?
+            } else {
+                vec![]
+            }
         } else {
             vec![]
         };
@@ -1012,14 +1244,14 @@ impl Parser<'_> {
             }
             Token::For => {
                 self.next();
-                let iter = self.parse_unit(true)?;
+                let iter_var = self.parse_unit(true)?;
                 self.expect_tok(Token::In)?;
                 let iterator = self.parse_expr(false)?;
 
                 let code = self.parse_block()?;
 
                 Statement::For {
-                    iter,
+                    iter_var,
                     iterator,
                     code,
                 }
@@ -1071,17 +1303,60 @@ impl Parser<'_> {
                 self.next();
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
-                Statement::TypeDef(self.intern_string(name))
+                Statement::TypeDef { name: self.intern_string(name), private: false }
+            }
+            Token::Private => {
+                self.next();
+                self.expect_tok(Token::Type)?;
+                self.expect_tok(Token::TypeIndicator)?;
+                let name = self.slice()[1..].to_string();
+                Statement::TypeDef { name: self.intern_string(name), private: true }
             }
             Token::Impl => {
                 self.next();
                 let base = self.parse_expr(true)?;
                 self.expect_tok(Token::LBracket)?;
-                let items = self.parse_dictlike()?;
-                // todo!()
-                // self.next();
+                let items = self.parse_dictlike(true)?;
 
                 Statement::Impl { base, items }
+            }
+            Token::Overload => {
+                self.next();
+
+                let tok = self.next();
+
+                let op = if tok == Token::Unary {
+                    let tok = self.next();
+                    if let Some(op) = tok.to_unary_op() {
+                        Operator::Unary(op)
+                    } else {
+                        return Err(SyntaxError::UnexpectedToken {
+                            found: tok,
+                            expected: "unary operator".to_string(),
+                            area: self.make_area(self.span()),
+                        });
+                    }
+                } else if let Some(op) = tok.to_bin_op() {
+                    Operator::Bin(op)
+                } else if let Some(op) = tok.to_assign_op() {
+                    Operator::Assign(op)
+                } else {
+                    return Err(SyntaxError::UnexpectedToken {
+                        found: tok,
+                        expected: "binary operator".to_string(),
+                        area: self.make_area(self.span()),
+                    });
+                };
+                
+                self.expect_tok(Token::LBracket)?;
+
+                let mut macros = vec![];
+
+                list_helper!(self, RBracket {
+                    macros.push(self.parse_expr(true)?);
+                });
+
+                Statement::Overload { op, macros }
             }
             Token::Extract => {
                 self.next();
@@ -1097,13 +1372,21 @@ impl Parser<'_> {
 
                 Statement::Dbg(v)
             }
+            Token::Throw => {
+                self.next();
+                self.expect_tok(Token::String)?;
+
+                Statement::Throw(
+                    self.parse_plain_string(self.slice(), self.span())?,
+                )
+            }
             _ => {
                 let left = self.parse_expr(true)?;
                 let peek = self.peek();
-                if is_assign_op(peek) {
+                if let Some(op) = peek.to_assign_op() {
                     self.next();
                     let right = self.parse_expr(true)?;
-                    Statement::AssignOp(left, peek.to_assign_op(), right)
+                    Statement::AssignOp(left, op, right)
                 } else {
                     Statement::Expr(left)
                 }
@@ -1150,8 +1433,11 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> ParseResult<Ast> {
-        let file_attributes = if self.next_is(Token::Hashtag) {
+        let file_attributes = if self.next_are(&[Token::Hashtag, Token::ExclMark])  {
             self.next();
+            self.next();
+
+            println!("lesex");
 
             self.parse_attributes::<ScriptAttribute>()?
         } else {

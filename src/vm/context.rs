@@ -10,25 +10,31 @@ use crate::gd::ids::Id;
 use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CallStackItem {
+pub struct CallInfo {
     pub func: FuncCoord,
-    pub ip: usize,
-    pub return_dest: Register,
-    pub call_key: CallKey,
+    // is Some in all cases except assign operator overloading because bukny
+    pub return_dest: Option<Register>,
     pub call_area: Option<CodeArea>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
-    pub recursion_depth: usize,
-    pub memory: usize,
+    pub ip: usize,
 
-    pub pos_stack: Vec<CallStackItem>,
     group_stack: Vec<Id>,
     pub registers: Vec<Vec<ValueKey>>,
 }
-// yore sot sitnky 😍😍😍😍😍😍😍😂😂😂😂😻😻😻😻😻❤️❤️❤️❤️❤️❤️😭💷💷💷💷💵💵🚘🚘🚘😉😉😉
-// sort by pos, then by recursion depth
+
+impl Context {
+    pub fn new() -> Self {
+        Self {
+            registers: vec![],
+            ip: 0,
+            group_stack: vec![Id::Specific(0)],
+        }
+    }
+}
+
 impl PartialOrd for Context {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -37,41 +43,27 @@ impl PartialOrd for Context {
 
 impl Ord for Context {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.recursion_depth.cmp(&other.recursion_depth).then(
-            self.pos_stack
-                .last()
-                .unwrap()
-                .ip
-                .cmp(&other.pos_stack.last().unwrap().ip)
-                .reverse(),
-        )
+        self.ip.cmp(&other.ip).reverse()
     }
-}
-
-new_key_type! {
-    pub struct CallKey;
 }
 
 /// all the contexts!!!pub
 #[derive(Debug)]
 pub struct FullContext {
-    contexts: BinaryHeap<Context>,
-    pub have_not_returned: SlotMap<CallKey, ()>,
+    pub contexts: BinaryHeap<Context>,
+
+    pub call_info: CallInfo,
+    pub have_returned: bool,
 }
 
 impl FullContext {
-    pub fn new() -> Self {
+    pub fn new(initial: Context, call_info: CallInfo) -> Self {
         let mut contexts = BinaryHeap::new();
-        contexts.push(Context {
-            recursion_depth: 0,
-            memory: 0,
-            registers: vec![],
-            pos_stack: vec![],
-            group_stack: vec![Id::Specific(0)],
-        });
+        contexts.push(initial);
         Self {
             contexts,
-            have_not_returned: SlotMap::default(),
+            have_returned: false,
+            call_info,
         }
     }
 
@@ -79,23 +71,23 @@ impl FullContext {
         self.contexts.peek().unwrap()
     }
 
-    pub fn increment_current(&mut self, func_len: usize) {
-        {
-            let mut current = self.current_mut();
-            let ip = &mut current.pos_stack.last_mut().unwrap().ip;
-            *ip += 1;
+    // pub fn increment_current(&mut self, func_len: usize) {
+    //     {
+    //         let mut current = self.current_mut();
+    //         let ip = &mut current.ip;
+    //         *ip += 1;
 
-            if *ip >= func_len {
-                current.pos_stack.pop();
-            }
-        }
-        if self.current().pos_stack.is_empty() {
-            self.contexts.pop();
-        }
-    }
+    //         if *ip >= func_len {
+    //             current.pos_stack.pop();
+    //         }
+    //     }
+    //     if self.current().pos_stack.is_empty() {
+    //         self.contexts.pop();
+    //     }
+    // }
 
     pub fn jump_current(&mut self, pos: usize) {
-        self.current_mut().pos_stack.last_mut().unwrap().ip = pos
+        self.current_mut().ip = pos
     }
 
     pub fn current_mut(&mut self) -> PeekMut<Context> {
@@ -103,15 +95,15 @@ impl FullContext {
     }
 
     pub fn ip(&self) -> usize {
-        self.current().pos_stack.last().unwrap().ip
+        self.current().ip
     }
 
     pub fn valid(&self) -> bool {
         !self.contexts.is_empty()
     }
 
-    pub fn yeet_current(&mut self) {
-        self.contexts.pop();
+    pub fn yeet_current(&mut self) -> Option<Context> {
+        self.contexts.pop()
     }
 
     pub fn set_group_and_push(&mut self, group: Id) {
@@ -158,6 +150,63 @@ impl<'a> super::interpreter::Vm<'a> {
                 *reg = k;
             }
         }
-        self.contexts.contexts.push(new);
+        self.contexts.last_mut().contexts.push(new);
+    }
+}
+
+#[derive(Debug)]
+pub struct ContextStack(pub Vec<FullContext>);
+
+impl ContextStack {
+    pub fn last(&self) -> &FullContext {
+        self.0.last().unwrap()
+    }
+
+    pub fn last_mut(&mut self) -> &mut FullContext {
+        self.0.last_mut().unwrap()
+    }
+
+    pub fn current(&self) -> &Context {
+        self.last().current()
+    }
+
+    // pub fn increment_current(&mut self, func_len: usize) {
+    //     self.last_mut().increment_current(func_len)
+    // }
+
+    pub fn jump_current(&mut self, pos: usize) {
+        self.last_mut().jump_current(pos)
+    }
+
+    pub fn current_mut(&mut self) -> PeekMut<Context> {
+        self.last_mut().current_mut()
+    }
+
+    pub fn ip(&self) -> usize {
+        self.last().ip()
+    }
+
+    pub fn valid(&self) -> bool {
+        self.last().valid()
+    }
+
+    pub fn yeet_current(&mut self) {
+        self.last_mut().yeet_current();
+    }
+
+    pub fn set_group_and_push(&mut self, group: Id) {
+        self.last_mut().set_group_and_push(group)
+    }
+
+    pub fn pop_group(&mut self) -> Id {
+        self.last_mut().pop_group()
+    }
+
+    pub fn pop_groups_until(&mut self, group: Id) {
+        self.last_mut().pop_groups_until(group)
+    }
+
+    pub fn group(&self) -> Id {
+        self.last().group()
     }
 }

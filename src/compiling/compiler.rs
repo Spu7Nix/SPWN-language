@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::str::FromStr;
 
 use ahash::AHashMap;
 use delve::VariantNames;
@@ -8,19 +9,20 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
-use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
+use super::bytecode::{Bytecode, BytecodeBuilder, Constant, FuncBuilder, Function};
 use super::error::CompilerError;
 use crate::cli::Settings;
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
-    ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjKeyType, Spannable, Spanned,
-    Statement, StmtNode,
+    DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjKeyType, Pattern,
+    PatternNode, Spannable, Spanned, Statement, StmtNode, StringContent,
 };
 use crate::parsing::parser::Parser;
-use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
+use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
-use crate::vm::opcodes::Register;
+use crate::vm::opcodes::{Register, UnoptRegister};
+use crate::vm::pattern::ConstPattern;
 use crate::vm::value::ValueType;
 
 pub type CompileResult<T> = Result<T, CompilerError>;
@@ -56,6 +58,7 @@ pub struct Scope {
 pub struct TypeDef {
     pub def_src: SpwnSource,
     pub name: Spur,
+    pub private: bool,
 }
 
 pub type TypeDefMap = AHashMap<TypeDef, Spanned<CustomTypeKey>>;
@@ -121,17 +124,17 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn redef_var(&mut self, var: Spur, span: CodeSpan, scope: ScopeKey) {
-        let scope = &mut self.scopes[scope];
-        match scope.variables.get_mut(&var) {
-            Some(v) => v.def_span = span,
-            None => {
-                if let Some(k) = scope.parent {
-                    self.redef_var(var, span, k)
-                }
-            }
-        }
-    }
+    // pub fn redef_var(&mut self, var: Spur, span: CodeSpan, scope: ScopeKey) {
+    //     let scope = &mut self.scopes[scope];
+    //     match scope.variables.get_mut(&var) {
+    //         Some(v) => v.def_span = span,
+    //         None => {
+    //             if let Some(k) = scope.parent {
+    //                 self.redef_var(var, span, k)
+    //             }
+    //         }
+    //     }
+    // }
 
     pub fn new_var(&mut self, var: Spur, data: Variable, scope: ScopeKey) {
         self.scopes[scope].variables.insert(var, data);
@@ -293,7 +296,7 @@ impl<'a> Compiler<'a> {
 
                 // f.load_empty(reg, span)
 
-                Ok(vec![])
+                Ok((vec![], vec![]))
             },
             0,
         )?;
@@ -339,6 +342,7 @@ impl<'a> Compiler<'a> {
                         .iter()
                         .map(|(from, to)| (*from as Register, *to as Register))
                         .collect(),
+                    ref_arg_regs: f.ref_arg_regs.iter().map(|r| *r as Register).collect(),
                 }
             })
             .collect();
@@ -347,9 +351,11 @@ impl<'a> Compiler<'a> {
             self.src.clone(),
             Bytecode {
                 import_paths: unopt_code.import_paths,
+                spwn_ver: unopt_code.spwn_ver,
                 custom_types: unopt_code.custom_types,
                 source_hash: unopt_code.source_hash,
                 consts: unopt_code.consts,
+                const_patterns: unopt_code.const_patterns,
                 functions,
                 opcode_span_map: unopt_code.opcode_span_map,
                 export_names: unopt_code.export_names,
@@ -402,15 +408,18 @@ impl<'a> Compiler<'a> {
                     }
                 };
 
-                if bytecode.source_hash == hash.into() {
+                if bytecode.source_hash == hash.into()
+                    && bytecode.spwn_ver == env!("CARGO_PKG_VERSION")
+                {
                     for import in &bytecode.import_paths {
                         self.compile_import(&import.value, import.span, import_src.clone())?;
                     }
-                    for (k, name) in &bytecode.custom_types {
+                    for (k, (name, private)) in &bytecode.custom_types {
                         self.custom_type_defs.insert(
                             TypeDef {
                                 def_src: import_src.clone(),
                                 name: self.intern(&name.value),
+                                private: *private,
                             },
                             k.spanned(name.span),
                         );
@@ -478,19 +487,6 @@ impl<'a> Compiler<'a> {
         scope: ScopeKey,
         builder: &mut FuncBuilder,
     ) -> CompileResult<()> {
-        // for attr in &stmt.attributes {
-        //     match &attr.value {
-        //         StmtAttribute::Deprecated { since, note } => Warning::UseOfDeprecatedValue {
-        //             since: since.clone(),
-        //             note: note.clone(),
-        //             area: self.make_area(stmt.span),
-        //         }
-        //         .to_report()
-        //         .display(),
-        //         _ => todo!(),
-        //     }
-        // }
-
         match &*stmt.stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder, ExprType::Normal)?;
@@ -594,11 +590,6 @@ impl<'a> Compiler<'a> {
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.bin_or_eq(a, b, stmt.span)
                 }
-                AssignOp::BinNotEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
-                    builder.bin_not_eq(a, b, stmt.span)
-                }
             },
 
             Statement::While { cond, code } => {
@@ -608,6 +599,48 @@ impl<'a> Compiler<'a> {
 
                     let cond_reg = self.compile_expr(cond, scope, b, ExprType::Normal)?;
                     b.exit_if_false(cond_reg, cond.span);
+
+                    self.compile_stmts(code, inner_scope, b)?;
+
+                    b.repeat_block();
+                    Ok(())
+                })?;
+            }
+
+            Statement::For {
+                iter_var,
+                iterator,
+                code,
+            } => {
+                let iter_exec = self.compile_expr(iterator, scope, builder, ExprType::Normal)?;
+                let iter_reg = builder.next_reg();
+                builder.wrap_iterator(iter_exec, iter_reg, iterator.span);
+
+                builder.block(|b| {
+                    let inner_scope =
+                        self.derive_scope(scope, Some(ScopeType::Loop(b.block_path.clone())));
+
+                    let next_reg = b.next_reg();
+                    b.iter_next(iter_reg, next_reg, iter_var.span);
+
+                    b.unwrap_or_exit(next_reg, iterator.span);
+
+                    match &*iter_var.expr {
+                        Expression::Var(s) => {
+                            let var_reg = b.next_reg();
+                            self.new_var(
+                                *s,
+                                Variable {
+                                    mutable: false,
+                                    def_span: iter_var.span,
+                                    reg: var_reg,
+                                },
+                                inner_scope,
+                            );
+                            b.copy(next_reg, var_reg, iter_var.span);
+                        }
+                        _ => todo!("haha 😂😂😂😂"),
+                    }
 
                     self.compile_stmts(code, inner_scope, b)?;
 
@@ -667,16 +700,69 @@ impl<'a> Compiler<'a> {
                     })
                 }
             },
-            Statement::For {
-                iter,
-                iterator,
-                code,
-            } => todo!(),
             Statement::TryCatch {
                 try_code,
                 error_var,
                 catch_code,
-            } => todo!(),
+            } => {
+                /*
+
+                #[
+                    Message: "Type mismatch", Note: None;
+                    Labels: [
+                        area => "Expected {}, found {}": expected.runtime_display(vm), v.0.runtime_display(vm);
+                        v.1 => "Value defined as {} here": v.0.runtime_display(vm);
+                    ]
+                ]
+                TypeMismatch {
+                    v: (ValueType, CodeArea),
+                    area: CodeArea,
+                    expected: ValueType,
+                    [call_stack]
+                },
+
+                class NameError(Exception)
+
+                type @error
+
+                impl @error {
+                    TYPE_MISMATCH: 0
+                }
+
+                try {
+
+                } catch @error::TYPE_MISMATCH {
+
+                } catch
+
+                .to_error() -> Value
+
+                Error(@error::TYPE_MISMATCH)
+
+
+                try {
+
+                    type @error
+
+                    impl @error {
+                        TYPE_MISMATCH: @error::new()
+
+                        code:
+                        message:
+                        description:
+                        ...
+
+                        new: () {}
+                    }
+
+                    <!!! 😡 TYPE_MISMATCH 😡 !!!>
+
+                } catch is @error::TYPE_MISMATCH {
+                    @error >SEX< >.< OwO :() :)))))))))))))))) :( :) )))) ) :(  : ) P : : )) )))) ) ) )
+                }
+
+                */
+            }
             Statement::Arrow(statement) => {
                 builder.block(|b| {
                     let inner_scope = self
@@ -737,7 +823,7 @@ impl<'a> Compiler<'a> {
                     });
                 }
             }
-            Statement::TypeDef(t) => {
+            Statement::TypeDef { name, private } => {
                 if !matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
                     return Err(CompilerError::TypeDefNotGlobal {
                         area: self.make_area(stmt.span),
@@ -746,10 +832,11 @@ impl<'a> Compiler<'a> {
 
                 let info = TypeDef {
                     def_src: self.src.clone(),
-                    name: *t,
+                    name: *name,
+                    private: *private,
                 };
 
-                if ValueType::VARIANT_NAMES.contains(&self.resolve(t).as_str()) {
+                if ValueType::VARIANT_NAMES.contains(&self.resolve(name).as_str()) {
                     return Err(CompilerError::BuiltinTypeOverride {
                         area: self.make_area(stmt.span),
                     });
@@ -758,17 +845,17 @@ impl<'a> Compiler<'a> {
                         area: self.make_area(stmt.span),
                         prev_area: self.make_area(self.custom_type_defs[&info].span),
                     });
-                } else if self.available_custom_types.contains_key(t) {
+                } else if self.available_custom_types.contains_key(name) {
                     // TODO test
                     return Err(CompilerError::DuplicateImportedType {
                         area: self.make_area(stmt.span),
                     });
                 }
 
-                let k = builder.create_type(self.resolve(t), stmt.span);
+                let k = builder.create_type(self.resolve(name), *private, stmt.span);
 
                 self.custom_type_defs.insert(info, k.spanned(stmt.span));
-                self.available_custom_types.insert(*t, k);
+                self.available_custom_types.insert(*name, k);
             }
             Statement::Impl { base, items } => {
                 let dict_reg = builder.next_reg();
@@ -778,13 +865,287 @@ impl<'a> Compiler<'a> {
 
                 builder.do_impl(base_reg, dict_reg, stmt.span);
             }
+            Statement::Overload { op, macros } => {
+                let array_reg = builder.next_reg();
+
+                builder.new_array(
+                    macros.len() as u16,
+                    array_reg,
+                    |builder, elems| {
+                        for e in macros {
+                            match &*e.expr {
+                                Expression::Macro { args, .. } => {
+                                    match op {
+                                        Operator::Bin(_) | Operator::Assign(_) => {
+                                            if args.len() != 2 {
+                                                return Err(CompilerError::InvalidOverload {
+                                                    expected: "macro with 2 arguments".into(),
+                                                    area: self.make_area(e.span),
+                                                });
+                                            }
+                                        }
+                                        Operator::Unary(_) => {
+                                            if args.len() != 1 {
+                                                return Err(CompilerError::InvalidOverload {
+                                                    expected: "macro with 1 argument".into(),
+                                                    area: self.make_area(e.span),
+                                                });
+                                            }
+                                        }
+                                    }
+                                    for arg in args {
+                                        let err = match arg {
+                                            MacroArg::Spread { .. } => {
+                                                Some("macro with no spreads")
+                                            }
+                                            MacroArg::Single {
+                                                default: Some(_), ..
+                                            } => Some("macro with no defaults"),
+                                            MacroArg::Single { pattern: None, .. } => {
+                                                Some("macro with explicit patterns")
+                                            }
+                                            _ => None,
+                                        };
+                                        if let Some(msg) = err {
+                                            return Err(CompilerError::InvalidOverload {
+                                                expected: msg.into(),
+                                                area: self.make_area(e.span),
+                                            });
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(CompilerError::InvalidOverload {
+                                        expected: "macro expression".into(),
+                                        area: self.make_area(e.span),
+                                    })
+                                }
+                            }
+
+                            elems.push((
+                                self.compile_expr(e, scope, builder, ExprType::Normal)?,
+                                false,
+                            ));
+                        }
+
+                        Ok(())
+                    },
+                    stmt.span,
+                )?;
+
+                builder.do_overload(array_reg, *op, stmt.span);
+            }
             Statement::ExtractImport(_) => todo!(),
             Statement::Dbg(v) => {
                 let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
                 builder.dbg(v);
             }
+            Statement::Throw(err) => {
+                let out_reg = builder.next_reg();
+
+                builder.load_string(self.resolve(err), out_reg, stmt.span);
+                builder.throw(out_reg, stmt.span);
+            }
         }
         Ok(())
+    }
+
+    pub fn compile_pattern_check(
+        &mut self,
+        expr_reg: UnoptRegister,
+        pattern: &PatternNode,
+        scope: ScopeKey,
+        builder: &mut FuncBuilder,
+    ) -> CompileResult<UnoptRegister> {
+        let out_reg = builder.next_reg();
+
+        match &*pattern.pat {
+            Pattern::Any => builder.load_bool(true, out_reg, pattern.span),
+            Pattern::Type(t) => {
+                let t_reg = self.compile_expr(
+                    &ExprNode {
+                        expr: Box::new(Expression::Type(*t)),
+                        attributes: vec![],
+                        span: pattern.span,
+                    },
+                    scope,
+                    builder,
+                    ExprType::Normal,
+                )?;
+                let typeof_reg = builder.next_reg();
+                builder.type_of(expr_reg, typeof_reg, pattern.span);
+
+                builder.eq(t_reg, typeof_reg, out_reg, pattern.span);
+            }
+            Pattern::Either(a, b) => {
+                let left = self.compile_pattern_check(expr_reg, a, scope, builder)?;
+                let right = self.compile_pattern_check(expr_reg, b, scope, builder)?;
+
+                builder.or(left, right, out_reg, pattern.span);
+            }
+            Pattern::Both(a, b) => {
+                let left = self.compile_pattern_check(expr_reg, a, scope, builder)?;
+                let right = self.compile_pattern_check(expr_reg, b, scope, builder)?;
+
+                builder.and(left, right, out_reg, pattern.span);
+            }
+            Pattern::Eq(val) => {
+                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                builder.eq(expr_reg, val, out_reg, pattern.span);
+            }
+            Pattern::Neq(val) => {
+                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                builder.neq(expr_reg, val, out_reg, pattern.span);
+            }
+            Pattern::Lt(val) => {
+                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                builder.lt(expr_reg, val, out_reg, pattern.span);
+            }
+            Pattern::Lte(val) => {
+                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                builder.lte(expr_reg, val, out_reg, pattern.span);
+            }
+            Pattern::Gt(val) => {
+                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                builder.gt(expr_reg, val, out_reg, pattern.span);
+            }
+            Pattern::Gte(val) => {
+                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                builder.gte(expr_reg, val, out_reg, pattern.span);
+            }
+            Pattern::MacroPattern { args, ret_type } => {
+                // for pattern in args {
+                // let p = self.compile_pattern_check(expr_reg, pattern, scope, builder)?;
+                todo!()
+                // }
+
+                // let ret = self.compile_pattern_check(expr_reg, ret_type, scope, builder)?;
+            }
+        };
+
+        Ok(out_reg)
+    }
+
+    pub fn convert_const_expr(&mut self, expr: &ExprNode) -> CompileResult<Constant> {
+        Ok(match &*expr.expr {
+            Expression::Int(v) => Constant::Int(*v),
+            Expression::Float(v) => Constant::Float(*v),
+            Expression::String(v) => {
+                let content = match v.s {
+                    StringContent::Normal(s) => self.resolve(&s),
+                };
+                if v.bytes {
+                    Constant::Array(content.bytes().map(|b| Constant::Int(b as i64)).collect())
+                } else {
+                    Constant::String(content)
+                }
+            }
+            Expression::Bool(v) => Constant::Bool(*v),
+            Expression::Id(class, Some(id)) => Constant::Id(*class, *id),
+            Expression::Type(t) => {
+                let name = self.resolve(t);
+                if ValueType::VARIANT_NAMES.contains(&name.as_str()) {
+                    Constant::Type(ValueType::from_str(&name).unwrap())
+                } else {
+                    match self.available_custom_types.get(t) {
+                        Some(k) => Constant::Type(ValueType::Custom(*k)),
+                        None => {
+                            return Err(CompilerError::NonexistentType {
+                                area: self.make_area(expr.span),
+                                type_name: name,
+                            })
+                        }
+                    }
+                }
+            }
+            Expression::Array(arr) => {
+                let mut v = vec![];
+                for i in arr {
+                    v.push(self.convert_const_expr(i)?)
+                }
+                Constant::Array(v)
+            }
+            Expression::Dict(map) if map.iter().all(|(_, v, _)| v.is_some()) => {
+                let mut m = AHashMap::new();
+                for (k, v, _) in map {
+                    m.insert(self.resolve(&k.value), self.convert_const_expr(&v.clone().unwrap())?);
+                }
+                Constant::Dict(m)
+            }
+            Expression::Maybe(o) => Constant::Maybe(match o {
+                Some(e) => Some(Box::new(self.convert_const_expr(e)?)),
+                None => None,
+            }),
+            Expression::Builtins => Constant::Builtins,
+            Expression::Empty => Constant::Empty,
+            Expression::Instance { base, items } => {
+                let t = self.convert_const_expr(base)?;
+                let t = match t {
+                    Constant::Type(t) => t,
+                    _ => todo!(),
+                };
+                let k = if let ValueType::Custom(k) = t {
+                    k
+                } else {
+                    todo!()
+                };
+
+                let mut m = AHashMap::new();
+                for (k, v, _) in items {
+                    m.insert(
+                        self.resolve(&k.value),
+                        Box::new(self.convert_const_expr(&v.clone().unwrap())?),
+                    );
+                }
+                Constant::Instance(k, m)
+            }
+            Expression::Obj(..) => todo!(),
+            _ => {
+                return Err(CompilerError::ExpectedConstantExpr {
+                    area: self.make_area(expr.span),
+                })
+            }
+        })
+    }
+
+    pub fn convert_const_pattern(&mut self, pat: &PatternNode) -> CompileResult<ConstPattern> {
+        Ok(ConstPattern {
+            pat: match &*pat.pat {
+                Pattern::Any => Pattern::Any,
+                Pattern::Type(t) => {
+                    let name = self.resolve(t);
+                    let t = if ValueType::VARIANT_NAMES.contains(&name.as_str()) {
+                        ValueType::from_str(&name).unwrap()
+                    } else {
+                        match self.available_custom_types.get(t) {
+                            Some(k) => ValueType::Custom(*k),
+                            None => {
+                                return Err(CompilerError::NonexistentType {
+                                    area: self.make_area(pat.span),
+                                    type_name: name,
+                                })
+                            }
+                        }
+                    };
+                    Pattern::Type(t)
+                }
+                Pattern::Either(a, b) => Pattern::Either(
+                    Box::new(self.convert_const_pattern(a)?),
+                    Box::new(self.convert_const_pattern(b)?),
+                ),
+                Pattern::Both(a, b) => Pattern::Both(
+                    Box::new(self.convert_const_pattern(a)?),
+                    Box::new(self.convert_const_pattern(b)?),
+                ),
+                Pattern::Eq(v) => Pattern::Eq(self.convert_const_expr(v)?),
+                Pattern::Neq(v) => Pattern::Neq(self.convert_const_expr(v)?),
+                Pattern::Lt(v) => Pattern::Lt(self.convert_const_expr(v)?),
+                Pattern::Lte(v) => Pattern::Lte(self.convert_const_expr(v)?),
+                Pattern::Gt(v) => Pattern::Gt(self.convert_const_expr(v)?),
+                Pattern::Gte(v) => Pattern::Gte(self.convert_const_expr(v)?),
+                Pattern::MacroPattern { args, ret_type } => todo!(),
+            },
+        })
     }
 
     pub fn compile_expr(
@@ -793,7 +1154,7 @@ impl<'a> Compiler<'a> {
         scope: ScopeKey,
         builder: &mut FuncBuilder,
         expr_type: ExprType,
-    ) -> CompileResult<usize> {
+    ) -> CompileResult<UnoptRegister> {
         let out_reg = builder.next_reg();
 
         macro_rules! bin_op {
@@ -808,7 +1169,16 @@ impl<'a> Compiler<'a> {
             Expression::Int(v) => builder.load_int(*v, out_reg, expr.span),
             Expression::Float(v) => builder.load_float(*v, out_reg, expr.span),
             Expression::Bool(v) => builder.load_bool(*v, out_reg, expr.span),
-            Expression::String(v) => builder.load_string(self.resolve(v), out_reg, expr.span),
+            Expression::String(v) => {
+                match v.s {
+                    StringContent::Normal(s) => {
+                        builder.load_string(self.resolve(&s), out_reg, expr.span);
+                    }
+                }
+                if v.bytes {
+                    builder.make_byte_array(out_reg, expr.span);
+                }
+            }
             Expression::Id(class, value) => builder.load_id(*value, *class, out_reg, expr.span),
             Expression::Op(left, op, right) => match op {
                 BinOp::Plus => bin_op!(left add right),
@@ -856,11 +1226,8 @@ impl<'a> Compiler<'a> {
                 BinOp::As => {
                     bin_op!(left as_op right)
                 }
-                BinOp::Is => {
-                    bin_op!(left is_op right)
-                }
-                BinOp::Or => todo!(),
-                BinOp::And => todo!(),
+                BinOp::Or => bin_op!(left or right),
+                BinOp::And => bin_op!(left and right),
             },
             Expression::Unary(op, value) => {
                 let v = self.compile_expr(value, scope, builder, ExprType::Normal)?;
@@ -868,12 +1235,12 @@ impl<'a> Compiler<'a> {
                     UnaryOp::BinNot => builder.unary_bin_not(v, out_reg, expr.span),
                     UnaryOp::ExclMark => builder.unary_not(v, out_reg, expr.span),
                     UnaryOp::Minus => builder.unary_negate(v, out_reg, expr.span),
-                    UnaryOp::Eq => todo!(),
-                    UnaryOp::Neq => todo!(),
-                    UnaryOp::Gt => todo!(),
-                    UnaryOp::Gte => todo!(),
-                    UnaryOp::Lt => todo!(),
-                    UnaryOp::Lte => todo!(),
+                    // UnaryOp::Eq => builder.unary_pat_eq(v, out_reg, expr.span),
+                    // UnaryOp::Neq => builder.unary_pat_neq(v, out_reg, expr.span),
+                    // UnaryOp::Gt => builder.unary_pat_gt(v, out_reg, expr.span),
+                    // UnaryOp::Gte => builder.unary_pat_gte(v, out_reg, expr.span),
+                    // UnaryOp::Lt => builder.unary_pat_lt(v, out_reg, expr.span),
+                    // UnaryOp::Lte => builder.unary_pat_lte(v, out_reg, expr.span),
                 }
             }
             Expression::Var(name) => match self.get_var(*name, scope) {
@@ -919,12 +1286,10 @@ impl<'a> Compiler<'a> {
                     out_reg,
                     |builder, elems| {
                         for item in items {
-                            elems.push(self.compile_expr(
-                                item,
-                                scope,
-                                builder,
-                                ExprType::Normal,
-                            )?);
+                            elems.push((
+                                self.compile_expr(item, scope, builder, ExprType::Normal)?,
+                                false,
+                            ));
                         }
                         Ok(())
                     },
@@ -981,6 +1346,11 @@ impl<'a> Compiler<'a> {
                     expr.span,
                 )
             }
+            Expression::Is(val, pat) => {
+                let reg = self.compile_expr(val, scope, builder, expr_type)?;
+                let out = self.compile_pattern_check(reg, pat, scope, builder)?;
+                builder.copy(out, out_reg, expr.span);
+            }
             Expression::Macro {
                 args,
                 ret_type,
@@ -990,15 +1360,26 @@ impl<'a> Compiler<'a> {
                     |f| {
                         let mut variables = AHashMap::new();
 
+                        let mut ref_arg_regs = vec![];
+
                         for a in args {
+                            let reg = f.next_reg();
+                            let name = a.name().value;
+
+                            let is_by_ref = name == self.intern("self")
+                                || matches!(a, MacroArg::Single { is_ref: true, .. });
+
                             variables.insert(
-                                a.name().value,
+                                name,
                                 Variable {
-                                    mutable: false,
+                                    mutable: is_by_ref,
                                     def_span: a.name().span,
-                                    reg: f.next_reg(),
+                                    reg,
                                 },
                             );
+                            if is_by_ref {
+                                ref_arg_regs.push(reg)
+                            }
                         }
 
                         let to_capture = self.get_accessible_vars(scope);
@@ -1027,7 +1408,7 @@ impl<'a> Compiler<'a> {
                             }
                         }
 
-                        Ok(capture_regs)
+                        Ok((capture_regs, ref_arg_regs))
                     },
                     args.len(),
                 )?;
@@ -1047,12 +1428,7 @@ impl<'a> Compiler<'a> {
                                     let n = self.resolve(&name.value).spanned(name.span);
 
                                     let p = if let Some(p) = pattern {
-                                        Some(self.compile_expr(
-                                            p,
-                                            scope,
-                                            builder,
-                                            ExprType::Normal,
-                                        )?)
+                                        Some(self.convert_const_pattern(p)?.spanned(p.span))
                                     } else {
                                         None
                                     };
@@ -1078,12 +1454,7 @@ impl<'a> Compiler<'a> {
                                     let n = self.resolve(&name.value).spanned(name.span);
 
                                     let p = if let Some(p) = pattern {
-                                        Some(self.compile_expr(
-                                            p,
-                                            scope,
-                                            builder,
-                                            ExprType::Normal,
-                                        )?)
+                                        Some(self.convert_const_pattern(p)?.spanned(p.span))
                                     } else {
                                         None
                                     };
@@ -1117,12 +1488,10 @@ impl<'a> Compiler<'a> {
                             params_reg,
                             |builder, elems| {
                                 for i in params {
-                                    elems.push(self.compile_expr(
-                                        i,
-                                        scope,
-                                        builder,
-                                        ExprType::Normal,
-                                    )?);
+                                    elems.push((
+                                        self.compile_expr(i, scope, builder, ExprType::Normal)?,
+                                        true,
+                                    ));
                                 }
                                 Ok(())
                             },
@@ -1141,6 +1510,8 @@ impl<'a> Compiler<'a> {
                                     elems.push((
                                         self.resolve(&name.value).spanned(name.span),
                                         value_reg,
+                                        true,
+                                        false,
                                     ));
                                 }
                                 Ok(())
@@ -1148,8 +1519,8 @@ impl<'a> Compiler<'a> {
                             expr.span,
                         )?;
 
-                        elems.push(params_reg);
-                        elems.push(named_params_reg);
+                        elems.push((params_reg, true));
+                        elems.push((named_params_reg, true));
 
                         Ok(())
                     },
@@ -1157,7 +1528,7 @@ impl<'a> Compiler<'a> {
                 )?;
                 builder.call(base_reg, out_reg, args_reg, expr.span);
             }
-            Expression::MacroPattern { args, ret_type } => todo!(),
+            // Expression::MacroPattern { args, ret_type } => todo!(),
             Expression::TriggerFunc { attributes, code } => {
                 use crate::gd::ids::IDClass::Group;
                 let group_reg = builder.next_reg();
@@ -1199,13 +1570,19 @@ impl<'a> Compiler<'a> {
                     Ok(())
                 })?;
             }
-            Expression::Typeof(_) => todo!(),
+            Expression::Typeof(e) => {
+                let reg = self.compile_expr(e, scope, builder, ExprType::Normal)?;
+                builder.type_of(reg, out_reg, expr.span);
+            }
             Expression::Builtins => {
                 builder.load_builtins(out_reg, expr.span);
             }
             Expression::Empty => {
                 builder.load_empty(out_reg, expr.span);
             }
+            // Expression::AnyPattern => {
+            //     builder.load_any(out_reg, expr.span);
+            // }
             Expression::Import(t) => {
                 self.compile_import(t, expr.span, self.src.clone())?;
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
@@ -1237,7 +1614,7 @@ impl<'a> Compiler<'a> {
     fn build_dict(
         &mut self,
         builder: &mut FuncBuilder,
-        items: &Vec<(Spanned<Spur>, Option<ExprNode>)>,
+        items: &DictItems,
         out_reg: usize,
         scope: ScopeKey,
         span: CodeSpan,
@@ -1246,7 +1623,7 @@ impl<'a> Compiler<'a> {
             items.len() as u16,
             out_reg,
             |builder, elems| {
-                for (key, item) in items {
+                for (key, item, private) in items {
                     let value_reg = match item {
                         Some(e) => self.compile_expr(e, scope, builder, ExprType::Normal)?,
                         None => match self.get_var(key.value, scope) {
@@ -1260,7 +1637,12 @@ impl<'a> Compiler<'a> {
                         },
                     };
 
-                    elems.push((self.resolve(&key.value).spanned(key.span), value_reg));
+                    elems.push((
+                        self.resolve(&key.value).spanned(key.span),
+                        value_reg,
+                        false,
+                        *private,
+                    ));
                 }
                 Ok(())
             },

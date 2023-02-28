@@ -172,7 +172,7 @@ error_maker! {
 
         /////////
         #[
-            Message: "Invalid numnber of arguments", Note: None;
+            Message: "Invalid number of arguments", Note: None;
             Labels: [
                 area => "Attribute `{}` expected {} arguments": attribute, expected;
             ]
@@ -184,23 +184,15 @@ error_maker! {
             area: CodeArea,
         },
 
-    }
-}
-
-error_maker! {
-    Title: "Warning"
-    Extra: {}
-    pub enum Warning {
         /////////
         #[
-            Message: "Use of deprecated value", Note: Some(note.to_string());
+            Message: "Invalid string type", Note: None;
             Labels: [
-                area => "Value deprecated since {}": since;
+                area => "Expected {} string": typ;
             ]
         ]
-        UseOfDeprecatedValue {
-            since: String,
-            note: String,
+        InvalidStringType {
+            typ: &'static str,
             area: CodeArea,
         },
     }

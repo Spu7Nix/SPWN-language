@@ -13,9 +13,11 @@ use super::compiler::{CompileResult, CustomTypeKey, TypeDef};
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
 use crate::parsing::ast::{ImportType, MacroArg, ObjKeyType, ObjectType, Spannable, Spanned};
+use crate::parsing::utils::operators::Operator;
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
 use crate::vm::opcodes::{FunctionID, ImportID, Opcode, Register, UnoptOpcode, UnoptRegister};
+use crate::vm::pattern::ConstPattern;
 use crate::vm::value::ValueType;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,6 +26,7 @@ pub struct Function<R>
 where
     R: Display + Debug + Copy,
     for<'de3> Vec<(R, R)>: Serialize + Deserialize<'de3>,
+    for<'de3> Vec<R>: Serialize + Deserialize<'de3>,
 {
     pub opcodes: Vec<Opcode<R>>,
     // always 0 for unoptimised bytecode
@@ -33,6 +36,7 @@ where
     pub arg_amount: usize,
 
     pub capture_regs: Vec<(R, R)>,
+    pub ref_arg_regs: Vec<R>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,10 +45,13 @@ pub struct Bytecode<R>
 where
     R: Display + Debug + Copy,
     for<'de3> Vec<(R, R)>: Serialize + Deserialize<'de3>,
+    for<'de3> Vec<R>: Serialize + Deserialize<'de3>,
 {
     pub source_hash: Digest,
+    pub spwn_ver: String,
 
     pub consts: Vec<Constant>,
+    pub const_patterns: Vec<ConstPattern>,
 
     pub functions: Vec<Function<R>>,
     pub opcode_span_map: AHashMap<(usize, usize), CodeSpan>,
@@ -52,7 +59,7 @@ where
     pub export_names: Vec<String>,
     pub import_paths: Vec<Spanned<ImportType>>,
 
-    pub custom_types: SlotMap<CustomTypeKey, Spanned<String>>,
+    pub custom_types: SlotMap<CustomTypeKey, (Spanned<String>, bool)>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -61,8 +68,20 @@ pub enum Constant {
     Float(f64),
     String(String),
     Bool(bool),
+
     Id(IDClass, u16),
+
     Type(ValueType),
+
+    Array(Vec<Constant>),
+    Dict(AHashMap<String, Constant>),
+
+    Maybe(Option<Box<Constant>>),
+
+    Builtins,
+    Empty,
+
+    Instance(CustomTypeKey, AHashMap<String, Box<Constant>>),
 }
 
 impl std::fmt::Debug for Constant {
@@ -73,7 +92,16 @@ impl std::fmt::Debug for Constant {
             Constant::Bool(v) => write!(f, "{v}"),
             Constant::String(v) => write!(f, "{v:?}"),
             Constant::Id(class, n) => write!(f, "{}{}", n, class.letter()),
-            Constant::Type(_) => write!(f, "@<type>"),
+            Constant::Type(t) => write!(f, "@{}", <ValueType as Into<&'static str>>::into(*t)),
+            Constant::Array(arr) => write!(f, "{arr:?}"),
+            Constant::Dict(m) => write!(f, "{m:?}"),
+
+            Constant::Maybe(Some(c)) => write!(f, "{c:?}?"),
+            Constant::Maybe(None) => write!(f, "?"),
+
+            Constant::Builtins => write!(f, "$"),
+            Constant::Empty => write!(f, "()"),
+            Constant::Instance(_, items) => write!(f, "@<type>::{items:?}"),
         }
     }
 }
@@ -97,6 +125,23 @@ impl Hash for Constant {
                 c.hash(state);
             }
             Constant::Type(v) => v.hash(state),
+            Constant::Array(v) => v.hash(state),
+            Constant::Dict(v) => {
+                for (k, v) in v {
+                    k.hash(state);
+                    v.hash(state);
+                }
+            }
+            Constant::Maybe(v) => v.hash(state),
+            Constant::Builtins => "$".hash(state),
+            Constant::Empty => 0_u8.hash(state),
+            Constant::Instance(t, m) => {
+                t.hash(state);
+                for (k, v) in m {
+                    k.hash(state);
+                    v.hash(state);
+                }
+            }
         }
     }
 }
@@ -138,7 +183,10 @@ enum ProtoOpcode {
 
     Jump(JumpTo),
     JumpIfFalse(UnoptRegister, JumpTo),
+    UnwrapOrJump(UnoptRegister, JumpTo),
     LoadConst(UnoptRegister, ConstKey),
+
+    SetMacroArgPattern(ConstPatternKey, UnoptRegister),
 
     EnterArrowStatement(JumpTo),
 }
@@ -179,19 +227,22 @@ struct ProtoFunc {
     used_regs: usize,
     arg_amount: usize,
     capture_regs: Vec<(UnoptRegister, UnoptRegister)>,
+    ref_arg_regs: Vec<UnoptRegister>,
 }
 
 new_key_type! {
     pub struct ConstKey;
+    pub struct ConstPatternKey;
 }
 pub struct BytecodeBuilder {
     constants: UniqueRegister<ConstKey, Constant>,
+    const_patterns: UniqueRegister<ConstPatternKey, ConstPattern>,
 
     funcs: Vec<ProtoFunc>,
 
     import_paths: Vec<Spanned<ImportType>>,
 
-    custom_types: SlotMap<CustomTypeKey, Spanned<String>>,
+    custom_types: SlotMap<CustomTypeKey, (Spanned<String>, bool)>,
 }
 
 pub struct FuncBuilder<'a> {
@@ -205,6 +256,7 @@ impl BytecodeBuilder {
     pub fn new() -> Self {
         Self {
             constants: UniqueRegister::new(),
+            const_patterns: UniqueRegister::new(),
             funcs: vec![],
             import_paths: vec![],
             custom_types: SlotMap::default(),
@@ -213,7 +265,10 @@ impl BytecodeBuilder {
 
     pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
     where
-        F: FnOnce(&mut FuncBuilder) -> CompileResult<Vec<(UnoptRegister, UnoptRegister)>>,
+        F: FnOnce(
+            &mut FuncBuilder,
+        )
+            -> CompileResult<(Vec<(UnoptRegister, UnoptRegister)>, Vec<UnoptRegister>)>,
     {
         let new_func = ProtoFunc {
             code: Block {
@@ -223,6 +278,7 @@ impl BytecodeBuilder {
             used_regs: 0,
             arg_amount,
             capture_regs: vec![],
+            ref_arg_regs: vec![],
         };
         let func_id = self.funcs.len();
         self.funcs.push(new_func);
@@ -233,14 +289,16 @@ impl BytecodeBuilder {
             block_path: vec![],
         };
 
-        let capture_regs = f(&mut func_builder)?;
+        let (capture_regs, ref_arg_regs) = f(&mut func_builder)?;
         self.funcs[func_id].capture_regs = capture_regs;
+        self.funcs[func_id].ref_arg_regs = ref_arg_regs;
 
         Ok(func_id as FunctionID)
     }
 
     pub fn build(self, src: &SpwnSource, global_returns: Vec<String>) -> Bytecode<UnoptRegister> {
         let mut const_index_map = SecondaryMap::default();
+        let mut const_pattern_index_map = SecondaryMap::default();
 
         let consts = self
             .constants
@@ -249,6 +307,17 @@ impl BytecodeBuilder {
             .enumerate()
             .map(|(i, (k, c))| {
                 const_index_map.insert(k, i);
+                c
+            })
+            .collect::<Vec<_>>();
+
+        let const_patterns = self
+            .const_patterns
+            .slotmap
+            .into_iter()
+            .enumerate()
+            .map(|(i, (k, c))| {
+                const_pattern_index_map.insert(k, i);
                 c
             })
             .collect::<Vec<_>>();
@@ -291,7 +360,9 @@ impl BytecodeBuilder {
                 opcodes: &mut Vec<UnoptOpcode>,
                 opcode_span_map: &mut AHashMap<(usize, usize), CodeSpan>,
                 positions: &PositionMap<'_>,
+
                 const_index_map: &SecondaryMap<ConstKey, usize>,
+                const_pattern_index_map: &SecondaryMap<ConstPatternKey, usize>,
             ) {
                 let get_jump_pos = |jump: &JumpTo| -> usize {
                     match jump {
@@ -313,6 +384,10 @@ impl BytecodeBuilder {
                                         src: *r,
                                         to: get_jump_pos(to) as u16,
                                     },
+                                    ProtoOpcode::UnwrapOrJump(r, to) => UnoptOpcode::UnwrapOrJump {
+                                        src: *r,
+                                        to: get_jump_pos(to) as u16,
+                                    },
                                     ProtoOpcode::LoadConst(r, k) => UnoptOpcode::LoadConst {
                                         dest: *r,
                                         id: const_index_map[*k] as u16,
@@ -320,6 +395,12 @@ impl BytecodeBuilder {
                                     ProtoOpcode::EnterArrowStatement(to) => {
                                         UnoptOpcode::EnterArrowStatement {
                                             skip_to: get_jump_pos(to) as u16,
+                                        }
+                                    }
+                                    ProtoOpcode::SetMacroArgPattern(k, r) => {
+                                        UnoptOpcode::SetMacroArgPattern {
+                                            dest: *r,
+                                            id: const_pattern_index_map[*k] as u16,
                                         }
                                     }
                                 });
@@ -336,6 +417,7 @@ impl BytecodeBuilder {
                             opcode_span_map,
                             positions,
                             const_index_map,
+                            const_pattern_index_map,
                         ),
                     }
                 }
@@ -348,6 +430,7 @@ impl BytecodeBuilder {
                 &mut opcode_span_map,
                 &block_positions,
                 &const_index_map,
+                &const_pattern_index_map,
             );
 
             functions.push(Function {
@@ -355,6 +438,7 @@ impl BytecodeBuilder {
                 regs_used: f.used_regs,
                 arg_amount: f.arg_amount,
                 capture_regs: f.capture_regs.clone(),
+                ref_arg_regs: f.ref_arg_regs.clone(),
             })
         }
 
@@ -362,7 +446,9 @@ impl BytecodeBuilder {
 
         Bytecode {
             source_hash: hash.into(),
+            spwn_ver: env!("CARGO_PKG_VERSION").into(),
             consts,
+            const_patterns,
             functions,
             opcode_span_map,
             export_names: global_returns, //todo
@@ -443,7 +529,10 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
     where
-        F: FnOnce(&mut FuncBuilder) -> CompileResult<Vec<(UnoptRegister, UnoptRegister)>>,
+        F: FnOnce(
+            &mut FuncBuilder,
+        )
+            -> CompileResult<(Vec<(UnoptRegister, UnoptRegister)>, Vec<UnoptRegister>)>,
     {
         self.code_builder.new_func(f, arg_amount)
     }
@@ -456,7 +545,7 @@ impl<'a> FuncBuilder<'a> {
         span: CodeSpan,
     ) -> CompileResult<()>
     where
-        F: FnOnce(&mut FuncBuilder, &mut Vec<UnoptRegister>) -> CompileResult<()>,
+        F: FnOnce(&mut FuncBuilder, &mut Vec<(UnoptRegister, bool)>) -> CompileResult<()>,
     {
         self.push_opcode_spanned(
             ProtoOpcode::Raw(UnoptOpcode::AllocArray { size: len, dest }),
@@ -466,11 +555,15 @@ impl<'a> FuncBuilder<'a> {
         let mut items = vec![];
         f(self, &mut items)?;
 
-        for i in items {
-            self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushArrayElem {
-                elem: i,
-                dest,
-            }))
+        for (i, by_key) in items {
+            if by_key {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushArrayElemByKey {
+                    elem: i,
+                    dest,
+                }))
+            } else {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushArrayElem { elem: i, dest }))
+            }
         }
 
         Ok(())
@@ -486,7 +579,7 @@ impl<'a> FuncBuilder<'a> {
     where
         F: FnOnce(
             &mut FuncBuilder,
-            &mut Vec<(Spanned<String>, UnoptRegister)>,
+            &mut Vec<(Spanned<String>, UnoptRegister, bool, bool)>,
         ) -> CompileResult<()>,
     {
         self.push_opcode_spanned(
@@ -497,15 +590,30 @@ impl<'a> FuncBuilder<'a> {
         let mut items = vec![];
         f(self, &mut items)?;
 
-        for (k, r) in items {
+        for (k, r, by_key, private) in items {
             let key_reg = self.next_reg();
             self.load_string(k.value, key_reg, k.span);
 
-            self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushDictElem {
-                elem: r,
-                key: key_reg,
-                dest,
-            }))
+            if by_key {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushDictElemByKey {
+                    elem: r,
+                    key: key_reg,
+                    dest,
+                }))
+            } else {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushDictElem {
+                    elem: r,
+                    key: key_reg,
+                    dest,
+                }))
+            }
+
+            if private {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::MakeDictElemPrivate {
+                    dest,
+                    key: key_reg,
+                }))
+            }
         }
 
         Ok(())
@@ -567,13 +675,10 @@ impl<'a> FuncBuilder<'a> {
     where
         F: FnOnce(
             &mut FuncBuilder,
-            &mut Vec<MacroArg<Spanned<String>, UnoptRegister>>,
+            &mut Vec<MacroArg<Spanned<String>, UnoptRegister, Spanned<ConstPattern>>>,
         ) -> CompileResult<()>,
     {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::CreateMacro { id, dest }),
-            span,
-        );
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::CreateMacro { id, dest }), span);
 
         let mut items = vec![];
         f(self, &mut items)?;
@@ -599,10 +704,9 @@ impl<'a> FuncBuilder<'a> {
                     );
 
                     if let Some(p) = pattern {
-                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
-                            src: p,
-                            dest,
-                        }));
+                        let k = self.code_builder.const_patterns.insert(p.value);
+                        println!("balha");
+                        self.push_opcode_spanned(ProtoOpcode::SetMacroArgPattern(k, dest), p.span);
                     }
                     if let Some(d) = default {
                         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgDefault {
@@ -624,10 +728,8 @@ impl<'a> FuncBuilder<'a> {
                     );
 
                     if let Some(p) = pattern {
-                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
-                            src: p,
-                            dest,
-                        }));
+                        let k = self.code_builder.const_patterns.insert(p.value);
+                        self.push_opcode_spanned(ProtoOpcode::SetMacroArgPattern(k, dest), p.span);
                     }
                 }
             }
@@ -689,11 +791,6 @@ impl<'a> FuncBuilder<'a> {
                 span,
             ),
         }
-        // let k = self
-        //     .code_builder
-        //     .constants
-        //     .insert(Constant::Id(class, value));
-        // self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
 
     pub fn push_context_group(&mut self, group: UnoptRegister, span: CodeSpan) {
@@ -704,10 +801,7 @@ impl<'a> FuncBuilder<'a> {
     }
 
     pub fn pop_context_group(&mut self, fn_reg: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::PopGroupStack { fn_reg }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PopGroupStack { fn_reg }), span)
     }
 
     pub fn make_trigger_function(
@@ -716,10 +810,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::MakeTriggerFunc { src, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::MakeTriggerFunc { src, dest }), span)
     }
 
     pub fn add(
@@ -729,10 +820,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Add { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Add { left, right, dest }), span)
     }
 
     pub fn sub(
@@ -742,10 +830,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Sub { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Sub { left, right, dest }), span)
     }
 
     pub fn mult(
@@ -755,10 +840,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Mult { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Mult { left, right, dest }), span)
     }
 
     pub fn div(
@@ -768,10 +850,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Div { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Div { left, right, dest }), span)
     }
 
     pub fn modulo(
@@ -781,10 +860,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Mod { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Mod { left, right, dest }), span)
     }
 
     pub fn pow(
@@ -794,10 +870,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Pow { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Pow { left, right, dest }), span)
     }
 
     pub fn shl(
@@ -833,10 +906,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Eq { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Eq { left, right, dest }), span)
     }
 
     pub fn neq(
@@ -846,10 +916,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Neq { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Neq { left, right, dest }), span)
     }
 
     pub fn gt(
@@ -859,10 +926,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Gt { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Gt { left, right, dest }), span)
     }
 
     pub fn gte(
@@ -872,10 +936,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Gte { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Gte { left, right, dest }), span)
     }
 
     pub fn lt(
@@ -885,10 +946,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Lt { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Lt { left, right, dest }), span)
     }
 
     pub fn lte(
@@ -898,10 +956,27 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Lte { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Lte { left, right, dest }), span)
+    }
+
+    pub fn or(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Or { left, right, dest }), span)
+    }
+
+    pub fn and(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::And { left, right, dest }), span)
     }
 
     pub fn range(
@@ -911,10 +986,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Range { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Range { left, right, dest }), span)
     }
 
     pub fn in_op(
@@ -924,10 +996,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::In { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::In { left, right, dest }), span)
     }
 
     pub fn as_op(
@@ -937,24 +1006,18 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }), span)
     }
 
-    pub fn is_op(
-        &mut self,
-        left: UnoptRegister,
-        right: UnoptRegister,
-        dest: UnoptRegister,
-        span: CodeSpan,
-    ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }),
-            span,
-        )
-    }
+    // pub fn is_op(
+    //     &mut self,
+    //     left: UnoptRegister,
+    //     right: UnoptRegister,
+    //     dest: UnoptRegister,
+    //     span: CodeSpan,
+    // ) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Is { left, right, dest }), span)
+    // }
 
     pub fn bin_or(
         &mut self,
@@ -963,10 +1026,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::BinOr { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinOr { left, right, dest }), span)
     }
 
     pub fn bin_and(
@@ -976,10 +1036,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::BinAnd { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinAnd { left, right, dest }), span)
     }
 
     pub fn add_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
@@ -1007,35 +1064,19 @@ impl<'a> FuncBuilder<'a> {
     }
 
     pub fn shl_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::ShiftLeftEq { left, right }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::ShiftLeftEq { left, right }), span)
     }
 
     pub fn shr_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::ShiftRightEq { left, right }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::ShiftRightEq { left, right }), span)
     }
 
     pub fn bin_and_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::BinAndEq { left, right }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinAndEq { left, right }), span)
     }
 
     pub fn bin_or_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinOrEq { left, right }), span)
-    }
-
-    pub fn bin_not_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::BinNotEq { left, right }),
-            span,
-        )
     }
 
     pub fn unary_not(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
@@ -1049,6 +1090,30 @@ impl<'a> FuncBuilder<'a> {
     pub fn unary_bin_not(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinNot { src, dest }), span)
     }
+
+    // pub fn unary_pat_eq(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatEq { src, dest }), span)
+    // }
+
+    // pub fn unary_pat_neq(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatNeq { src, dest }), span)
+    // }
+
+    // pub fn unary_pat_gt(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatGt { src, dest }), span)
+    // }
+
+    // pub fn unary_pat_gte(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatGte { src, dest }), span)
+    // }
+
+    // pub fn unary_pat_lt(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatLt { src, dest }), span)
+    // }
+
+    // pub fn unary_pat_lte(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatLte { src, dest }), span)
+    // }
 
     pub fn copy(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Copy { from, to }), span)
@@ -1086,12 +1151,29 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::JumpIfFalse(reg, JumpTo::End(path)), span)
     }
 
+    pub fn unwrap_or_exit(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        let path = self.block_path.clone();
+        self.push_opcode_spanned(ProtoOpcode::UnwrapOrJump(reg, JumpTo::End(path)), span)
+    }
+
     pub fn load_none(&mut self, reg: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadNone { dest: reg }), span)
     }
 
     pub fn wrap_maybe(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::WrapMaybe { src, dest }), span)
+    }
+
+    pub fn wrap_iterator(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::WrapIterator { src, dest }), span)
+    }
+
+    pub fn iter_next(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::IterNext { src, dest }), span)
+    }
+
+    pub fn type_of(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::TypeOf { src, dest }), span)
     }
 
     pub fn create_instance(
@@ -1111,15 +1193,20 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Impl { base, dict }), span)
     }
 
+    pub fn do_overload(&mut self, array: UnoptRegister, op: Operator, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Overload { array, op }), span)
+    }
+
     pub fn load_empty(&mut self, reg: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }), span)
     }
 
+    // pub fn load_any(&mut self, reg: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadAnyPattern { dest: reg }), span)
+    // }
+
     pub fn load_empty_dict(&mut self, reg: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::LoadEmptyDict { dest: reg }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmptyDict { dest: reg }), span)
     }
 
     pub fn index(
@@ -1197,10 +1284,7 @@ impl<'a> FuncBuilder<'a> {
     }
 
     pub fn load_builtins(&mut self, to: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::LoadBuiltins { dest: to }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadBuiltins { dest: to }), span)
     }
 
     pub fn ret(&mut self, src: UnoptRegister, module_ret: bool) {
@@ -1218,10 +1302,7 @@ impl<'a> FuncBuilder<'a> {
         args: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Call { base, dest, args }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Call { base, dest, args }), span)
     }
 
     pub fn import(&mut self, dest: UnoptRegister, src: Spanned<ImportType>, span: CodeSpan) {
@@ -1239,8 +1320,18 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Dbg { reg }))
     }
 
-    pub fn create_type(&mut self, name: String, span: CodeSpan) -> CustomTypeKey {
-        self.code_builder.custom_types.insert(name.spanned(span))
+    pub fn throw(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Throw { err: reg }), span)
+    }
+
+    pub fn create_type(&mut self, name: String, private: bool, span: CodeSpan) -> CustomTypeKey {
+        self.code_builder
+            .custom_types
+            .insert((name.spanned(span), private))
+    }
+
+    pub fn make_byte_array(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::MakeByteArray { reg }), span)
     }
 }
 
@@ -1254,13 +1345,10 @@ impl Bytecode<Register> {
             .max()
             .unwrap_or(2);
 
-        println!(
-            "{0} {1} {0}",
-            "======".bright_yellow().bold(),
-            src.name().bright_yellow().bold()
-        );
+        println!("{0} {1} {0}", "======".bright_yellow().bold(), src.name().bright_yellow().bold());
 
         println!("{}: {:?}", "Constants".bright_cyan().bold(), self.consts);
+        println!("{}: {:?}", "Const patterns".bright_cyan().bold(), self.const_patterns);
         println!(
             "{}: {:?}\n",
             "Import paths".bright_cyan().bold(),
@@ -1274,7 +1362,7 @@ impl Bytecode<Register> {
             "Custom types".bright_cyan().bold(),
             self.custom_types
                 .iter()
-                .map(|(k, n)| format!("{:?}: @{}", k, &n.value))
+                .map(|(k, n)| format!("{:?}: @{}", k, &n.0.value))
                 .collect::<Vec<_>>()
         );
 
@@ -1432,7 +1520,7 @@ impl Bytecode<Register> {
             );
 
             println!(
-                "{}\n{}\n{}\n\n",
+                "{}\n{}\n{}\n{}\n\n",
                 format!("│ registers used: {}", func.regs_used).bright_yellow(),
                 format!(
                     "│ capture regs: {}",
@@ -1443,6 +1531,19 @@ impl Bytecode<Register> {
                             format!("R{from}").bright_red().bold(),
                             "~>".bright_green().bold(),
                             format!("R{to}").bright_red().bold(),
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+                .bright_yellow(),
+                format!(
+                    "│ args regs by ref: {}",
+                    func.ref_arg_regs
+                        .iter()
+                        .map(|r| format!(
+                            "{} {}",
+                            "~>".bright_green().bold(),
+                            format!("R{r}").bright_red().bold(),
                         ))
                         .collect::<Vec<_>>()
                         .join(", ")

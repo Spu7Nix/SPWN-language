@@ -6,10 +6,21 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::attributes::{ExprAttribute, ScriptAttribute, StmtAttribute};
-use super::utils::operators::{AssignOp, BinOp, UnaryOp};
+use super::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
 use crate::sources::CodeSpan;
+
+#[derive(Debug, Clone)]
+pub enum StringContent {
+    Normal(Spur),
+}
+
+#[derive(Debug, Clone)]
+pub struct StringType {
+    pub s: StringContent,
+    pub bytes: bool,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ImportType {
@@ -22,10 +33,7 @@ impl ImportType {
         match self {
             ImportType::Module(s) => {
                 let rel_path = PathBuf::from(s);
-                (
-                    rel_path.file_stem().unwrap().to_str().unwrap().to_string(),
-                    rel_path,
-                )
+                (rel_path.file_stem().unwrap().to_str().unwrap().to_string(), rel_path)
             }
             ImportType::Library(name) => {
                 let rel_path = PathBuf::from(format!("libraries/{name}/lib.spwn"));
@@ -65,56 +73,62 @@ pub struct StmtNode {
     pub span: CodeSpan,
 }
 
-pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>)>;
+#[derive(Debug, Clone)]
+pub struct PatternNode {
+    pub pat: Box<Pattern<Spur, PatternNode, ExprNode>>,
+    pub span: CodeSpan,
+}
+
+pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>, bool)>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MacroArg<N, E> {
+pub enum MacroArg<N, D, P> {
     Single {
         name: N,
-        pattern: Option<E>,
-        default: Option<E>,
+        pattern: Option<P>,
+        default: Option<D>,
         is_ref: bool,
     },
     Spread {
         name: N,
-        pattern: Option<E>,
+        pattern: Option<P>,
     },
 }
 
-impl<N, E> MacroArg<N, E> {
+impl<N, D, P> MacroArg<N, D, P> {
     pub fn name(&self) -> &N {
         match self {
             MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
         }
     }
 
-    pub fn name_mut(&mut self) -> &mut N {
-        match self {
-            MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
-        }
-    }
+    // pub fn name_mut(&mut self) -> &mut N {
+    //     match self {
+    //         MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
+    //     }
+    // }
 
-    pub fn default(&self) -> &Option<E> {
-        match self {
-            MacroArg::Single { default, .. } => default,
-            _ => panic!("bad"),
-        }
-    }
-
-    pub fn default_mut(&mut self) -> &mut Option<E> {
+    pub fn default(&self) -> &Option<D> {
         match self {
             MacroArg::Single { default, .. } => default,
-            _ => panic!("bad"),
+            _ => unreachable!(),
         }
     }
 
-    pub fn pattern(&self) -> &Option<E> {
+    pub fn default_mut(&mut self) -> &mut Option<D> {
+        match self {
+            MacroArg::Single { default, .. } => default,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn pattern(&self) -> &Option<P> {
         match self {
             MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
         }
     }
 
-    pub fn pattern_mut(&mut self) -> &mut Option<E> {
+    pub fn pattern_mut(&mut self) -> &mut Option<P> {
         match self {
             MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
         }
@@ -125,7 +139,7 @@ impl<N, E> MacroArg<N, E> {
 pub enum Expression {
     Int(i64),
     Float(f64),
-    String(Spur),
+    String(StringType),
     Bool(bool),
 
     Id(IDClass, Option<u16>),
@@ -140,6 +154,8 @@ pub enum Expression {
     Dict(DictItems),
 
     Maybe(Option<ExprNode>),
+
+    Is(ExprNode, PatternNode),
 
     Index {
         base: ExprNode,
@@ -165,13 +181,9 @@ pub enum Expression {
     },
 
     Macro {
-        args: Vec<MacroArg<Spanned<Spur>, ExprNode>>,
+        args: Vec<MacroArg<Spanned<Spur>, ExprNode, PatternNode>>,
         ret_type: Option<ExprNode>,
         code: MacroCode,
-    },
-    MacroPattern {
-        args: Vec<ExprNode>,
-        ret_type: ExprNode,
     },
 
     TriggerFunc {
@@ -209,7 +221,7 @@ pub enum ObjectType {
 
 #[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash, EnumDisplay)]
 pub enum ObjKeyType {
-    #[delve(display = |o: &ObjectKey| format!("{}", <&ObjectKey as Into<&'static str>>::into(o)))]
+    #[delve(display = |o: &ObjectKey| <&ObjectKey as Into<&'static str>>::into(o).to_string())]
     Name(ObjectKey),
     #[delve(display = |n: &u8| format!("{n}"))]
     Num(u8),
@@ -230,7 +242,7 @@ pub enum Statement {
         code: Statements,
     },
     For {
-        iter: ExprNode,
+        iter_var: ExprNode,
         iterator: ExprNode,
         code: Statements,
     },
@@ -246,7 +258,10 @@ pub enum Statement {
     Break,
     Continue,
 
-    TypeDef(Spur),
+    TypeDef {
+        name: Spur,
+        private: bool,
+    },
 
     ExtractImport(ImportType),
 
@@ -254,11 +269,40 @@ pub enum Statement {
         base: ExprNode,
         items: DictItems,
     },
+    Overload {
+        op: Operator,
+        macros: Vec<ExprNode>,
+    },
 
     Dbg(ExprNode),
+
+    Throw(Spur),
 }
 
 pub type Statements = Vec<StmtNode>;
+
+// T = type, P = pattern, E = expression
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Pattern<T, P, E> {
+    Any,
+
+    Type(T),
+    Either(P, P),
+    Both(P, P),
+
+    Eq(E),
+    Neq(E),
+    Lt(E),
+    Lte(E),
+    Gt(E),
+    Gte(E),
+
+    MacroPattern { args: Vec<P>, ret_type: P },
+}
+
+// impl<T, P, E> Pattern<T, P, E> {
+//     pub fn map_
+// }
 
 impl Expression {
     pub fn into_node(self, attributes: Vec<ExprAttribute>, span: CodeSpan) -> ExprNode {
