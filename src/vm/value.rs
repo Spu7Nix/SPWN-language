@@ -135,18 +135,18 @@ impl IteratorData {
 
 eager_macro_rules! { $eager_2
     #[macro_export]
-    macro_rules! _destructure_names {
-        ( ($t1:ty) ) => {
-            (a)
+    macro_rules! _populate_names {
+        ( ($t1:ty): $a:ident, $b:ident, $c: ident, $d: ident $([$($t:tt)*])? ) => {
+            ($a $($($t)*)? )
         };
-        ( ($t1:ty, $t2:ty) ) => {
-            (a, b)
+        ( ($t1:ty, $t2:ty): $a:ident, $b:ident, $c: ident, $d: ident $([$($t:tt)*])? ) => {
+            ($a, $b $($($t)*)? )
         };
-        ( ($t1:ty, $t2:ty, $t3:ty) ) => {
-            (a, b, c)
+        ( ($t1:ty, $t2:ty, $t3:ty): $a:ident, $b:ident, $c: ident, $d: ident $([$($t:tt)*])? ) => {
+            ($a, $b, $c $($($t)*)? )
         };
-        ( ($t1:ty, $t2:ty, $t3:ty, $t4:ty) ) => {
-            (a, b, c, d)
+        ( ($t1:ty, $t2:ty, $t3:ty, $t4:ty): $a:ident, $b:ident, $c: ident, $d: ident $([$($t:tt)*])? ) => {
+            ($a, $b, $c, $d $($($t)*)? )
         };
         ( { $( $n:ident: $t1:ty ,)* } ) => {
             {$($n,)*}
@@ -154,7 +154,7 @@ eager_macro_rules! { $eager_2
     }
 }
 #[doc(hidden)]
-pub use _destructure_names as destructure_names;
+pub use _populate_names as populate_names;
 
 #[rustfmt::skip]
 macro_rules! value {
@@ -222,15 +222,15 @@ macro_rules! value {
                         $v:vis struct $stname:ident : $_( $_($m:ident)? & $name )? $_(*$name)?
                     ) => {
                         $v struct $stname<'a> 
-                            $( ( $( $_(&'a $_($m)?)? $t0, )* std::marker::PhantomData<&'a ()>); )?
-                            $( { $( $n: $_(&'a $_($m)?)? $t1 ,)* _pd: std::marker::PhantomData<&'a ()> } )?
+                            $( ( $( pub $_(&'a $_($m)?)? $t0, )* pub std::marker::PhantomData<&'a ()>); )?
+                            $( { $( pub $n: $_(&'a $_($m)?)? $t1 ,)* pub _pd: std::marker::PhantomData<&'a ()> } )?
                     };
 
                     (
-                        @destruct $name
+                        @destruct $name: $a:ident, $b:ident, $c:ident, $d:ident $_([$_($extra:tt)*])?
                     ) => {
                         eager! {
-                            destructure_names! { $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
+                            populate_names! { $( ( $( $t0 ),* ): $a, $b, $c, $d )? $( { $( $n: $t1 ,)* } )? $_([$_($extra)*])? }
                         }
                     };
                 )*
@@ -292,6 +292,9 @@ macro_rules! value {
                 }
             }
         }
+
+        // pub mod 
+
     }
 }
 
