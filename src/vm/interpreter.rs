@@ -296,6 +296,9 @@ impl<'a> Vm<'a> {
     //     Some(item.call_key)
     // }
 
+    /// <img src="https://cdna.artstation.com/p/assets/images/images/056/833/046/original/lara-hughes-blahaj-spin-compressed.gif?1670214805" width=60 height=60>
+    /// <img src="https://cdna.artstation.com/p/assets/images/images/056/833/046/original/lara-hughes-blahaj-spin-compressed.gif?1670214805" width=60 height=60>
+    /// <img src="https://cdna.artstation.com/p/assets/images/images/056/833/046/original/lara-hughes-blahaj-spin-compressed.gif?1670214805" width=60 height=60>
     pub fn run_function(
         &mut self,
         mut context: Context,
@@ -325,7 +328,6 @@ impl<'a> Vm<'a> {
         }
 
         self.contexts.0.push(FullContext::new(context, call_info));
-        // dbg!(self.contexts.0.len(), return_dest);
 
         cb(self)?;
 
@@ -333,11 +335,24 @@ impl<'a> Vm<'a> {
 
         while self.contexts.valid() {
             let ip = self.contexts.ip();
-            println!("gagaba {}: {}", func.func, ip);
 
             if ip >= opcodes.len() {
                 if !self.contexts.last().have_returned {
-                    return Ok(());
+                    let return_dest = self.contexts.last().call_info.return_dest;
+                    {
+                        let mut current = self.contexts.current_mut();
+                        current.registers.pop();
+                    }
+
+                    let mut top = self.contexts.last_mut().yeet_current().unwrap();
+                    top.ip = original_ip + 1;
+
+                    if return_dest.is_some() {
+                        let idx = self.contexts.0.len() - 2;
+                        self.contexts.0[idx].contexts.push(top);
+                    }
+
+                    continue;
                 } else {
                     self.contexts.yeet_current();
                 }
@@ -357,7 +372,7 @@ impl<'a> Vm<'a> {
                     self.set_reg(*dest, StoredValue { value, area })
                 }
                 Opcode::Copy { from, to } => {
-                    println!("galha {} {} {}", self.contexts.0.len(), ip, func.func);
+                    // println!("galha {} {} {}", self.contexts.0.len(), ip, func.func);
                     let v = self.deep_clone_reg(*from);
                     self.set_reg(*to, v)
                 }
@@ -411,7 +426,7 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::PushArrayElemByKey { elem, dest } => {
                     let push = self.get_reg_key(*elem);
-                    println!("bavi {:?}", self.get_reg_mut(*dest).value);
+                    // println!("bavi {:?}", self.get_reg_mut(*dest).value);
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Array(v) => v.push(push),
                         _ => unreachable!(),
@@ -1142,9 +1157,11 @@ impl<'a> Vm<'a> {
                         let name = self.resolve(name);
 
                         if let Value::Macro(MacroData { target, .. }) = &mut self.memory[*k].value {
-                            if let Some(f) = typ.get_override(&name) {
-                                *target = MacroTarget::Builtin(f)
-                            }
+                            todo!()
+
+                            // if let Some(f) = typ.get_override(&name) {
+                            //     *target = MacroTarget::Builtin(f)
+                            // }
                         }
                     }
 
@@ -1644,16 +1661,16 @@ impl<'a> Vm<'a> {
                         call_area: Some(call_area),
                     },
                     Box::new(move |vm| {
-                        // for (i, k) in regs_keys {
-                        //     vm.change_reg_key(i as Register, k)
-                        // }
+                        for (i, k) in regs_keys {
+                            vm.change_reg_key(i as Register, k)
+                        }
 
-                        // for (k, (_, to)) in captured
-                        //     .iter()
-                        //     .zip(&vm.programs[func.code].1.functions[func.func].capture_regs)
-                        // {
-                        //     vm.change_reg_key(*to, *k);
-                        // }
+                        for (k, (_, to)) in captured
+                            .iter()
+                            .zip(&vm.programs[func.code].1.functions[func.func].capture_regs)
+                        {
+                            vm.change_reg_key(*to, *k);
+                        }
 
                         Ok(())
                     }),

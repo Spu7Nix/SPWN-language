@@ -3,7 +3,6 @@
 #![allow(clippy::type_complexity)] // shut the fuck up clippy Lmao
 #![allow(clippy::unit_arg)] // shut the fuck up clippy Lmao
 #![allow(clippy::too_many_arguments)] // shut the fuck up clippy Lmao
-#![allow(warnings)]
 
 mod cli;
 mod compiling;
@@ -44,7 +43,7 @@ use crate::util::{BasicError, HexColorize, RandomState};
 use crate::vm::context::{CallInfo, Context};
 use crate::vm::interpreter::{FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
-use crate::vm::value::{type_aliases, ValueType};
+use crate::vm::value::ValueType;
 
 const CORE_PATH: &str = "./libraries/core/";
 
@@ -95,8 +94,6 @@ const RUNNING_COLOR: u32 = 0xFF59C7;
 
 fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
-
-    exit(0);
 
     let args = Arguments::parse();
     let mut spinner = Spinner::new();
@@ -299,8 +296,6 @@ fn run_spwn(
     let key = vm.src_map[&parser.src];
     let start = FuncCoord::new(0, key);
 
-    // vm.push_call_stack(start, Some(0), false, None);
-
     println!("{:20}", "Building...".color_hex(RUNNING_COLOR).bold());
 
     println!("\n{}", "════ Output ══════════════════════".dimmed().bold());
@@ -315,8 +310,6 @@ fn run_spwn(
         Box::new(|_| Ok(())),
     )
     .map_err(|e| e.to_report(&vm))?;
-
-    // vm.run_program().map_err(|e| e.to_report(&vm))?;
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());
 

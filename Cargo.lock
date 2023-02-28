@@ -296,6 +296,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "eager"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abe71d579d1812060163dff96056261deb5bf6729b100fa2e36a68b9649ba3d3"
+
+[[package]]
 name = "errno"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -748,6 +754,7 @@ dependencies = [
  "concolor",
  "crc32fast",
  "delve",
+ "eager",
  "hex-serde",
  "indoc",
  "lasso",

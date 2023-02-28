@@ -5,11 +5,11 @@ use std::str::FromStr;
 
 use ahash::AHashMap;
 use delve::{FieldNames, ModifyField, VariantNames};
+use eager::*;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 use strum::EnumDiscriminants;
 
-use super::builtins::builtin_utils::IntoArg;
 use super::error::RuntimeError;
 use super::interpreter::{FuncCoord, RuntimeResult, ValueKey, Visibility, Vm};
 use super::pattern::ConstPattern;
@@ -20,7 +20,6 @@ use crate::gd::gd_object::ObjParam;
 use crate::gd::ids::*;
 use crate::parsing::ast::{MacroArg, ObjKeyType, ObjectType, Spanned};
 use crate::sources::CodeArea;
-use crate::vm::builtins::builtin_utils::{GetMutRefArg, GetRefArg};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -186,54 +185,46 @@ macro_rules! value {
             }
         }
 
-        // #[macro_export]
-        // macro_rules! make_wrapper {
-        //     // (
-        //     //     $stname:ident : $tyname:ident
-        //     // ) => {
-        //     //     struct make_wrapper!(@make_args $tyname);
-        //     // };
+        eager_macro_rules!{ $eager_1
+            #[macro_export]
+            macro_rules! _gen_wrapper {
+                $(
+                    (
+                        $name
+                    ) => {
+                        $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?
+                    };
 
+                    (
+                        $v:vis struct $stname:ident : $_( $_($m:ident)? & $name )? $_(*$name)?
+                    ) => {
+                        $v struct $stname<'a> 
+                            $( ( $( $_(&'a $_($m)?)? $t0, )* std::marker::PhantomData<&'a ()>); )?
+                            $( { $( $n: $_(&'a $_($m)?)? $t1 ,)* _pd: std::marker::PhantomData<&'a ()> } )?
+                    };
+                )*
 
-        //     $(
-        //         ($stname:ident : $name) => {
-        //             struct $stname $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?;
-        //         };
-        //     )*
-            
+                (
+                    $v:vis enum $ename:ident: $_( $tys:ident) |* $_(|)?; $_( $extra:ident( $_($t:tt)* ) ),* $_(,)?
+                ) => {
+                    use eager::*;
+                    eager! {
+                        // use $crate::vm::value::gen_wrapper as bonkle;
+                        $v enum $ename {
+                            $_ (
+                                $tys gen_wrapper!( $tys ),
+                            )*
 
-        //     (
-        //         $ename:ident : $_($tyname:ident)|+
-        //     ) => {
-
-        //         $_ (
-        //             make_wrapper!(@make_enum $_ ename $_ tyname);
-        //         )*
-
-        //         // enum GOck {
-        //         //     bob!(...)
-        //         // }
-
-        //         // enum $stname {
-        //         //     $_(
-        //         //         $tyname make_wrapper!(@make_args $tyname)
-        //         //     )+
-        //         // }
-        //     };
-        //     $(
-        //         (
-        //             @make_enum
-        //             $enum_name:ident
-        //             $name
-        //         ) => {
-        //             spwn_codegen::_make_wrapper_enum! {
-        //                 $enum_name $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?
-        //             }
-        //             // (i64)
-        //             //$name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?;
-        //         };
-        //     )*
-        // }
+                            $_(
+                                $extra ( $_($t)* ),
+                            )*
+                        }
+                    }
+                };
+            }
+        }
+        #[doc(hidden)]
+        pub use _gen_wrapper as gen_wrapper;
 
         pub mod type_aliases {
             use super::*;
@@ -246,7 +237,6 @@ macro_rules! value {
                     None
                 }
             }
-
 
             $(
                 pub struct $name;
@@ -271,196 +261,8 @@ macro_rules! value {
                     }
                 }
             }
-
         }
-        
-
-        pub mod arg_aliases {
-            use super::*;
-            
-            $(
-                value!{ @struct $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
-            )*
-            $(
-                value!{ @struct &mut $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
-            )*
-            $(
-                value!{ @struct & $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
-            )*
-
-            paste::paste! {
-                $(
-                    impl IntoArg<[<A $name>]> for ValueKey {
-                        fn into_arg(self, vm: &mut Vm) -> [<A $name>] {
-
-                            let val = vm.memory[self].value.clone();
-
-                            value! {@into_arg_empty val [Value::$name] [[<A $name>]] [] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
-
-                            $(
-                                value! {@tuple_match val [Value::$name] [[<A $name>]] $( $t0, )*}
-                            )?
-
-                            match val {
-                                $(
-                                    Value::$name {$($n,)*} => return [<A $name>] {$($n,)*},
-                                )?
-                                _ => (),
-                            }
-
-                            unreachable!();
- 
-                        }
-                    }
-                )*
-
-                $(
-                    impl<'a> GetMutRefArg<'a> for [<A $name>] {
-                        type Output = [<MutRefA $name>]<'a>;
-
-                        fn get_mut_ref_arg(key: ValueKey, vm: &'a mut Vm) -> Self::Output {
-                            let val = &mut vm.memory[key].value;
-
-                            value! {@into_arg_empty val [Value::$name] [[<MutRefA $name>]] [(PhantomData)] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
-
-                            $(
-                                value! {@tuple_match val [Value::$name] [[<MutRefA $name>]] $( $t0, )*}
-                            )?
-
-                            match val {
-                                $(
-                                    Value::$name {$($n,)*} => return [<MutRefA $name>] {$($n,)*},
-                                )?
-                                _ => (),
-                            }
-
-                            unreachable!();
-                        }
-                    }
-                )*
-
-                $(
-                    impl<'a> GetRefArg<'a> for [<A $name>] {
-                        type Output = [<RefA $name>]<'a>;
-
-                        fn get_ref_arg(key: ValueKey, vm: &'a Vm) -> Self::Output {
-                            let val = &vm.memory[key].value;
-
-                            value! {@into_arg_empty val [Value::$name] [[<RefA $name>]] [(PhantomData)] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
-
-                            $(
-                                value! {@tuple_match val [Value::$name] [[<RefA $name>]] $( $t0, )*}
-                            )?
-
-                            match val {
-                                $(
-                                    Value::$name {$($n,)*} => return [<RefA $name>] {$($n,)*},
-                                )?
-                                _ => (),
-                            }
-
-                            unreachable!();
-                        }
-                    }
-                )*
-            }
-
-        }
-    };
-
-    (@struct $name:ident) => {
-        paste::paste! {
-            #[derive(Debug)]
-            pub struct [<A $name>];
-        }
-    };
-    (@struct $name:ident ( $( $t0:ty ),* )) => {
-        paste::paste! {
-            #[derive(Debug)]
-            pub struct [<A $name>] ( $( pub $t0 ),* );
-        }
-    };
-    (@struct $name:ident { $( $n:ident: $t1:ty ,)* }) => {
-        paste::paste! {
-            #[derive(Debug)]
-            pub struct [<A $name>] { $( pub $n: $t1 ,)* }
-        }
-    };
-
-    (@struct &mut $name:ident) => {
-        paste::paste! {
-            pub struct [<MutRefA $name>]<'a>(PhantomData<&'a ()>);
-        }
-    };
-    (@struct &mut $name:ident ( $( $t0:ty ),* )) => {
-        paste::paste! {
-            pub struct [<MutRefA $name>]<'a> ( $( pub &'a mut $t0 ),* );
-        }
-    };
-    (@struct &mut $name:ident { $( $n:ident: $t1:ty ,)* }) => {
-        paste::paste! {
-            pub struct [<MutRefA $name>]<'a> { $( pub $n: &'a mut $t1 ,)* }
-        }
-    };
-
-    (@struct & $name:ident) => {
-        paste::paste! {
-            pub struct [<RefA $name>]<'a>(PhantomData<&'a ()>);
-        }
-    };
-    (@struct & $name:ident ( $( $t0:ty ),* )) => {
-        paste::paste! {
-            pub struct [<RefA $name>]<'a> ( $( pub &'a  $t0 ),* );
-        }
-    };
-    (@struct & $name:ident { $( $n:ident: $t1:ty ,)* }) => {
-        paste::paste! {
-            pub struct [<RefA $name>]<'a> { $( pub $n: &'a  $t1 ,)* }
-        }
-    };
-
-    (@tuple_match $self:ident [$($left:tt)*] [$($right:tt)*] $t1:ty, $t2:ty, $t3:ty, $t4:ty, ) => {
-        paste::paste! {
-            match $self {
-                $($left)* (a, b, c, d) => return $($right)* (a, b, c, d),
-                _ => (),
-            }
-        }
-    };
-    (@tuple_match $self:ident [$($left:tt)*] [$($right:tt)*] $t1:ty, $t2:ty, $t3:ty, ) => {
-        paste::paste! {
-            match $self {
-                $($left)* (a, b, c) => return $($right)* (a, b, c),
-                _ => (),
-            }
-        }
-    };
-    (@tuple_match $self:ident [$($left:tt)*] [$($right:tt)*] $t1:ty, $t2:ty, ) => {
-        paste::paste! {
-            match $self {
-                $($left)* (a, b) => return $($right)* (a, b),
-                _ => (),
-            }
-        }
-    };
-    (@tuple_match $self:ident [$($left:tt)*] [$($right:tt)*] $t1:ty, ) => {
-        paste::paste! {
-            match $self {
-                $($left)* (a) => return $($right)* (a),
-                _ => (),
-            }
-        }
-    };
-
-    (@into_arg_empty $self:ident [$($left:tt)*] [$($right:tt)*] [$($extra_args:tt)*]) => {
-        paste::paste! {
-            match $self {
-                $($left)* => return $($right)* $($extra_args)*,
-                _ => (),
-            }
-        }
-    };
-    (@into_arg_empty $self:ident [$($left:tt)*] [$($right:tt)*] [$($extra_args:tt)*] $($t:tt)+) => {};
+    }
 }
 
 impl ValueType {

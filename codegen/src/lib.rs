@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 use inflector::Inflector;
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
@@ -258,11 +256,19 @@ impl Parse for ArgType {
 struct MacroArg {
     ty: ArgType,
     cwhere: Option<MacroArgWhere>,
+    default: Option<Lit>,
 }
 
 impl Parse for MacroArg {
     fn parse(input: parse::ParseStream) -> syn::Result<Self> {
         let ty = input.parse()?;
+
+        let default = if input.peek(Token![=]) {
+            input.parse::<Token![=]>()?;
+            Some(input.parse()?)
+        } else {
+            None
+        };
 
         let cwhere = if input.peek(Token![where]) {
             Some(input.parse()?)
@@ -270,7 +276,11 @@ impl Parse for MacroArg {
             None
         };
 
-        Ok(Self { ty, cwhere })
+        Ok(Self {
+            ty,
+            default,
+            cwhere,
+        })
     }
 }
 
@@ -384,7 +394,7 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
         let raw = &c.attrs.raw;
         let docs = &c.attrs.docs;
         let name = &c.name;
-        let ty = format_ident!("{}", &c.ty.to_string().to_camel_case());
+        let ty = format_ident!("{}", &c.ty.to_string().to_snake_case());
         let val = "aa"; //&c.value;
         quote! {
             indoc::formatdoc!("\t{const_raw}
@@ -405,10 +415,10 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
     for m in &ty_impl.macros {
         let args = &m.args;
 
-        let arg_name = format!("{}", m.name.to_string().to_camel_case());
+        let arg_name = format!("{}", m.name.to_string().to_snake_case());
 
         for a in args {
-            let sdfsdf = match &a.ty {
+            let mod_arg = match &a.ty {
                 ArgType::Spread(_) => todo!(),
                 ArgType::Destructure {
                     binder,
@@ -416,14 +426,55 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
                     fields,
                 } => todo!(),
                 ArgType::Ref { binder, tys } => {
-                    todo!()
+                    let non_ref_tys = tys.pairs().map(|p| {
+                        let v = p.value();
+                        if !v.is_ref {
+                            let name = &v.name;
+                            let punc = if matches!(p.punct(), Some(_)) {
+                                quote! {|}
+                            } else {
+                                quote! {}
+                            };
+                            quote! {
+                                #name #punc
+                            }
+                        } else {
+                            quote! {}
+                        }
+                    });
+
+                    let ref_tys = tys.pairs().map(|p| {
+                        let v = p.value();
+                        if v.is_ref {
+                            let name = &v.name;
+                            let getter =
+                                format_ident!("{}Getter", name.to_string().to_camel_case());
+                            quote! {
+                                #name(#getter)
+                            }
+                        } else {
+                            quote! {}
+                        }
+                    });
+
+                    let sty = if tys.len() > 1 {
+                        quote! { enum }
+                    } else {
+                        quote! { struct }
+                    };
+
+                    quote! {
+                        crate::vm::value::gen_wrapper! {
+                            #sty: #(#non_ref_tys)*; #(#ref_tys)*
+                        }
+                    }
                 }
                 ArgType::Any(_) => todo!(),
             };
 
             macros_codegen.push(quote! {
                 mod #arg_name {
-
+                    #mod_arg
                 }
             })
         }
@@ -439,12 +490,12 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
             .map(|a| match &a.ty {
                 ArgType::Spread(t) => format!("...{t}"),
                 ArgType::Destructure { binder, name, .. } => {
-                    format!("{binder}: @{}", name.to_string().to_camel_case())
+                    format!("{binder}: @{}", name.to_string().to_snake_case())
                 }
                 ArgType::Ref { binder, tys } => format!(
                     "{binder}: {}",
                     tys.iter()
-                        .map(|ty| format!("@{}", ty.name.to_string().to_camel_case()))
+                        .map(|ty| format!("@{}", ty.name.to_string().to_snake_case()))
                         .collect::<Vec<_>>()
                         .join(" | ")
                 ),
@@ -454,7 +505,7 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
             .join(", ");
 
         let ret_ty = if let Some(ty) = &m.ret_ty {
-            format!(" -> @{} ", ty.to_string().to_camel_case())
+            format!(" -> @{} ", ty.to_string().to_snake_case())
         } else {
             " ".into()
         };
@@ -477,7 +528,7 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
     quote! {
         impl crate::vm::value::type_aliases::#builtin_ident {
             pub fn get_override_fn(self, name: &'static str) -> Option<crate::vm::value::BuiltinFn> {
-                None
+               //#(#macros_codegen)*
             }
             pub fn get_override_const(self, name: &'static str) -> Option<crate::compiling::bytecode::Constant> {
                 None
@@ -490,6 +541,10 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
             pub fn #core_gen_ident() {
                 let path = std::path::PathBuf::from(format!("{}{}.spwn", crate::CORE_PATH, stringify!(#name)));
                 let out = indoc::formatdoc!(r#"
+                        /* 
+                         * This file is automatically generated when SPWN is compiled! 
+                         * Do not modify or your changes will be overwritten!  
+                        */
                         {impl_raw}
                         #[doc(u{impl_doc:?})]
                         impl @{typ} {{{consts}
