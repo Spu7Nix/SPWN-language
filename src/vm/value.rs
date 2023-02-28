@@ -133,6 +133,29 @@ impl IteratorData {
     }
 }
 
+eager_macro_rules! { $eager_2
+    #[macro_export]
+    macro_rules! _destructure_names {
+        ( ($t1:ty) ) => {
+            (a)
+        };
+        ( ($t1:ty, $t2:ty) ) => {
+            (a, b)
+        };
+        ( ($t1:ty, $t2:ty, $t3:ty) ) => {
+            (a, b, c)
+        };
+        ( ($t1:ty, $t2:ty, $t3:ty, $t4:ty) ) => {
+            (a, b, c, d)
+        };
+        ( { $( $n:ident: $t1:ty ,)* } ) => {
+            {$($n,)*}
+        }
+    }
+}
+#[doc(hidden)]
+pub use _destructure_names as destructure_names;
+
 #[rustfmt::skip]
 macro_rules! value {
     (
@@ -204,9 +227,11 @@ macro_rules! value {
                     };
 
                     (
-                        @match_arm ($_($t:tt)*) $aname:ident -> ($_($t2:tt)*)
+                        @destruct $name
                     ) => {
-                        stringify!($_($t)* $aname => $_($t2:tt)* $aname $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?);
+                        eager! {
+                            destructure_names! { $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
+                        }
                     };
                 )*
 
@@ -223,26 +248,6 @@ macro_rules! value {
                             $_(
                                 $extra ( $_($t)* ),
                             )*
-                        }
-                    }
-                };
-
-                (
-                    match $e:expr => ($p:path) $_($ty:ident)*
-                ) => {
-                    use eager::*;
-                    
-                    // eager! {
-                    //     $_(
-                    //         gen_wrapper!($ty);
-                    //     )*
-                    // }
-                    eager! {
-                        match $e {
-                            $_(
-                                gen_wrapper! { @match_arm ($crate::vm::value::) $ty -> ($p) },
-                            )*
-                            _ => unreachable!(),
                         }
                     }
                 };

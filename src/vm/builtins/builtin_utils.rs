@@ -78,6 +78,22 @@ fn poo(v: Vec<ValueKey>, vm: &mut Vm, area: CodeArea) -> RuntimeResult<Value> {
         },
         ...
     }
+
+
+
+    enum Piss {
+        Int(i64),
+        String(StringGetter),
+    }
+
+    let arg = match vm.memory[v[0]].value {
+        Value::String{..} => Piss::String(StringGetter(v[0])),
+        _ => match vm.memory[v[0]].value.clone() {
+            Value::Int(a) => Piss::Int(a)
+        }
+    }
+
+
 }
 
 match arg4.get() {
@@ -214,7 +230,6 @@ macro_rules! impl_type {
                                             }
                                         }
 
-
                                         #[allow(clippy::let_unit_value)]
                                         let $arg_name = match vm.memory[v[arg_idx]].value {
                                             $(
@@ -223,14 +238,22 @@ macro_rules! impl_type {
                                                         $arg_name::[<$ref_ty Getter>](v[arg_idx])
                                                     ),
                                                 )?
-                                                // $(
-                                                //     crate::vm::value::Value::$deref_ty{..} => $arg_name::[<$arg_name:camel>]::$ref_ty(
-                                                //         $arg_name::[<$ref_ty Getter>](v[arg_idx])
-                                                //     ),
-                                                // )?
                                             )+
-                                            _ => match vm.memory[v[arg_idx]].value.clone() {
-                                                _ => todo!(),
+                                            _ => {
+                                                use eager::*;
+
+                                                use crate::vm::value::destructure_names;
+                                                use crate::vm::value::gen_wrapper;
+                                                eager! {
+                                                    match vm.memory[v[arg_idx]].value.clone() {
+                                                        $(
+                                                            $(
+                                                                $crate::vm::value::Value::$deref_ty gen_wrapper!{ @destruct $deref_ty } => $arg_name::[<$arg_name:camel>]::$deref_ty gen_wrapper!{@destruct $deref_ty},
+                                                            )?
+                                                        )+
+                                                        _ => lazy! { unreachable!() }
+                                                    }
+                                                }
                                             },
                                         };
 
@@ -252,6 +275,8 @@ macro_rules! impl_type {
 
                             arg_idx += 1;
                         )*
+
+                        todo!()
                     }
                 )*
 
@@ -419,23 +444,22 @@ impl_type! {
 
         Functions:
         fn poo(
-            String(s) as self = r#"bunkledo"#,
+            // String(s) as self = r#"bunkledo"#,
             arg1: Int | &Range = 10,
-            arg2: Int,
-            Range(start, end, step) as arg2 where Key(b_k),
-            arg4: &String | Float,
+            // arg2: Int,
+            // Range(start, end, step) as arg2 where Key(b_k),
+            // arg4: &String | Float,
         ) -> Range {
             // block
         }
     }
+
 }
 
-fn bulgaria() {
-    use crate::vm::value::gen_wrapper;
+struct RangeGetter;
 
-    gen_wrapper! {
-        @match_arm (crate::vm::value::) Int -> (cock::shite::)
-    }
-
-    use eager::*;
+use crate::vm::value::gen_wrapper;
+gen_wrapper! {
+  pub enum Arg1:Int| ;
+  Range(RangeGetter),
 }
