@@ -705,7 +705,6 @@ impl<'a> FuncBuilder<'a> {
 
                     if let Some(p) = pattern {
                         let k = self.code_builder.const_patterns.insert(p.value);
-                        println!("balha");
                         self.push_opcode_spanned(ProtoOpcode::SetMacroArgPattern(k, dest), p.span);
                     }
                     if let Some(d) = default {

@@ -226,12 +226,12 @@ macro_rules! value {
             use super::*;
 
             pub trait TypeAliasDefaultThisIsNecessaryLOLItsSoThatItHasADefaultAndThenTheDirectImplInBuiltinUtilsOverwritesIt {
-                fn get_override_fn(&self, name: &'static str) -> Option<BuiltinFn> {
+                fn get_override_fn(&self, _: &str) -> Option<BuiltinFn> {
                     None
                 }
-                fn get_override_const(&self, name: &'static str) -> Option<Constant> {
-                    None
-                }
+                // fn get_override_const(&self, _: &str) -> Option<Constant> {
+                //     None
+                // }
             }
 
             $(
@@ -240,7 +240,7 @@ macro_rules! value {
             )*
 
             impl ValueType {
-                pub fn get_override_fn(self, name: &'static str) -> Option<BuiltinFn> {
+                pub fn get_override_fn(self, name: &str) -> Option<BuiltinFn> {
                     match self {
                         $(
                             Self::$name => type_aliases::$name.get_override_fn(name),
@@ -248,14 +248,14 @@ macro_rules! value {
                         _ => unreachable!(),
                     }
                 }
-                pub fn get_override_const(self, name: &'static str) -> Option<Constant> {
-                    match self {
-                        $(
-                            Self::$name => type_aliases::$name.get_override_const(name),
-                        )*
-                        _ => unreachable!(),
-                    }
-                }
+                // pub fn get_override_const(self, name: &str) -> Option<Constant> {
+                //     match self {
+                //         $(
+                //             Self::$name => type_aliases::$name.get_override_const(name),
+                //         )*
+                //         _ => unreachable!(),
+                //     }
+                // }
             }
         }
     };

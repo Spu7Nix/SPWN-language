@@ -1,5 +1,3 @@
-use crate::vm::value::Value;
-
 #[rustfmt::skip]
 #[macro_export]
 macro_rules! impl_type {
@@ -14,11 +12,11 @@ macro_rules! impl_type {
                 // temporary until 1.0
                 $(#[raw($($const_raw:tt)*)])?
                 const $const:ident = $c_name:ident
-                                        $( ( $( $c_val:expr ),* ) )?
-                                        $( { $( $c_n:ident: $c_val_s:expr ,)* } )?;
+                                        $( ( $( $c_val:expr ),* $(,)? ) )?
+                                        $( { $( $c_n:ident: $c_val_s:expr ),* $(,)? } )?;
             )*
 
-            Functions($vm:ident):
+            Functions($vm:ident, $call_area:ident):
             $(
                 $(#[doc = $fn_doc:literal])*
                 // temporary until 1.0
@@ -34,10 +32,10 @@ macro_rules! impl_type {
                             )?
                             $(
                                 $(
-                                    ( $( $v_val:ident ),* )
+                                    ( $( $v_val:ident ),* $(,)? )
                                 )?
                                 $(
-                                    { $( $v_n:ident $(: $v_val_s:ident)? ,)* }
+                                    { $( $v_n:ident $(: $v_val_s:ident)? ),* $(,)? }
                                 )?
                                 as $binder:ident
                             )?
@@ -60,67 +58,70 @@ macro_rules! impl_type {
                         where $($extra:ident($extra_bind:ident))+
                     )?
 
-                    ,
-                )*) $(-> $ret_type:ident)? {$($b:tt)*}
+                ),* $(;)?) $(-> $ret_type:ident)? {$($b:tt)*}
             )*
         }
     ) => {
-
-        impl crate::vm::value::type_aliases::$impl_var {
-            pub fn get_override_fn(self, name: &'static str) -> Option<crate::vm::value::BuiltinFn> {
+        impl $crate::vm::value::type_aliases::$impl_var {
+            pub fn get_override_fn(self, name: &str) -> Option<$crate::vm::value::BuiltinFn> {
                 $(
                     #[allow(unused_assignments)]
                     fn $fn_name(
-                        args: Vec<crate::vm::interpreter::ValueKey>,
-                        $vm: &mut crate::vm::interpreter::Vm,
-                        area: crate::sources::CodeArea
-                    ) -> crate::vm::interpreter::RuntimeResult<crate::vm::value::Value> {
-                        use crate::vm::value::value_structs::*;
+                        __args: Vec<$crate::vm::interpreter::ValueKey>,
+                        $vm: &mut $crate::vm::interpreter::Vm,
+                        $call_area: $crate::sources::CodeArea
+                    ) -> $crate::vm::interpreter::RuntimeResult<$crate::vm::value::Value> {
+                        use $crate::vm::value::value_structs::*;
 
                         let mut arg_idx = 0usize;
 
                         $(
                             $(
                                 $(
-                                    impl_type! {@union ($name, $vm, args, arg_idx) $( $($deref_ty)? $(&$ref_ty)? )|+}
+                                    impl_type! { @union ($name, $vm, __args, arg_idx) $( $($deref_ty)? $(&$ref_ty)? )|+ }
                                 )?
                                 $(
                                     paste::paste! {
-                                        let crate::vm::value::Value::$name
+                                        let $crate::vm::value::Value::$name
                                             $(
                                                 ( $( $v_val ),* )
                                             )?
                                             $(
                                                 { $( $v_n $(: $v_val_s)? ,)* }
                                             )?
-                                        = $vm.memory[args[arg_idx]].value.clone() else {
+                                        = $vm.memory[__args[arg_idx]].value.clone() else {
                                             unreachable!()
                                         };
                                     }
                                 )?
                             )?
                             $(
-                                impl_type! {@... ($spread_arg, $vm, args, arg_idx) $(
+                                impl_type! {@... ($spread_arg, $vm, __args, arg_idx) $(
                                     $(
                                         $($spread_deref_ty)? $(&$spread_ref_ty)?
                                     )|+
                                 )?}
                             )?
+                            $(
+                                $(
+                                    impl_type! {@extra $extra ($extra_bind, $vm, __args, arg_idx)}
+                                )+
+                            )?
                             arg_idx += 1;
                         )*
 
-                        Ok({$($b)*})
+                        Ok({ $($b)* })
                     }
                 )*
 
                 match name {
                     $(
-                        stringify!($fn_name) => Some(crate::vm::value::BuiltinFn(&$fn_name)),
+                        stringify!($fn_name) => Some($crate::vm::value::BuiltinFn(&$fn_name)),
                     )*
                     _ => None
                 }
             }
-            pub fn get_override_const(self, name: &'static str) -> Option<crate::compiling::bytecode::Constant> {
+            pub fn get_override_const(self, name: &str) -> Option<$crate::compiling::bytecode::Constant> {
                 None
             }
         }
@@ -130,7 +131,7 @@ macro_rules! impl_type {
             mod [<$impl_var:snake _core_gen>] {
                 #[test]
                 pub fn [<$impl_var:snake _core_gen>]() {
-                    let path = std::path::PathBuf::from(format!("{}{}.spwn", crate::CORE_PATH, stringify!( [<$impl_var:snake>] )));
+                    let path = std::path::PathBuf::from(format!("{}{}.spwn", $crate::CORE_PATH, stringify!( [<$impl_var:snake>] )));
 
                     paste::paste! {
                         let consts: &[String] = &[
@@ -142,7 +143,7 @@ macro_rules! impl_type {
                                     const_doc = <[String]>::join(&[$($const_doc)*], "\n"),
                                     const_name = stringify!($const),
                                     const_type = stringify!([<$c_name:snake>]),
-                                    const_val = crate::compiling::bytecode::Constant::
+                                    const_val = $crate::compiling::bytecode::Constant::
                                         $c_name
                                             $( ( $( $c_val ),* ) )?
                                             $( { $( $c_n : $c_val_s ,)* } )?,
@@ -216,7 +217,7 @@ macro_rules! impl_type {
                                     macro_ret = {
                                         " " $(; format!(" -> @{} ", stringify!([<$ret_type:snake>])))?
                                     },
-                                )
+                                ),
                             )*
                         ];
                     }
@@ -277,10 +278,10 @@ macro_rules! impl_type {
             let $name = match &$vm.memory[$args[$arg_index]].value {
                 $(
                     $(
-                        v @ crate::vm::value::Value::$deref_ty {..} => [<$name:camel>]::$deref_ty(v.clone().into()),
+                        v @ $crate::vm::value::Value::$deref_ty {..} => [<$name:camel>]::$deref_ty(v.clone().into()),
                     )?
                     $(
-                        crate::vm::value::Value::$ref_ty {..} => [<$name:camel>]::$ref_ty([<$ref_ty Getter>] ($args[$arg_index])),
+                        $crate::vm::value::Value::$ref_ty {..} => [<$name:camel>]::$ref_ty([<$ref_ty Getter>] ($args[$arg_index])),
                     )?
                 )+
                 _ => unreachable!(),
@@ -299,7 +300,7 @@ macro_rules! impl_type {
     
     (@... ($name:ident, $vm:ident, $args:ident, $arg_index:ident)) => {
         let $name = match &$vm.memory[$args[$arg_index]].value {
-            crate::vm::value::Value::Array(v) => {
+            $crate::vm::value::Value::Array(v) => {
                 v.iter().map(|k| $vm.memory[*k].value.clone()).collect::<Vec<_>>()
             }
             _ => unreachable!(),
@@ -309,7 +310,7 @@ macro_rules! impl_type {
         impl_type! { @union [type] ($name, $vm, $args, $arg_index) $( $($deref_ty)? $(&$ref_ty)? )|+ }
 
         let $name = match &$vm.memory[$args[$arg_index]].value {
-            crate::vm::value::Value::Array(v) => {
+            $crate::vm::value::Value::Array(v) => {
                 v.iter().map(|k| {
                     impl_type! { @union [let] ($name, $vm, $args, $arg_index) $( $($deref_ty)? $(&$ref_ty)? )|+ }
                     $name
@@ -317,6 +318,14 @@ macro_rules! impl_type {
             }
             _ => unreachable!(),
         };
+    };
+
+    (@extra Key ($name:ident, $vm:ident, $args:ident, $arg_index:ident) ) => {
+        let $name = $args[$arg_index];
+    };
+
+    (@extra Area ($name:ident, $vm:ident, $args:ident, $arg_index:ident) ) => {
+        let $name = $vm.memory[$args[$arg_index]].area.clone();
     };
 }
 

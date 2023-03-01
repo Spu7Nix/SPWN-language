@@ -1,14 +1,4 @@
-split = () {
-    -> return 1
-    return 2
-}
 
-m = () {
-    split()
-}
-
-m()
-
-
+import core
 
 

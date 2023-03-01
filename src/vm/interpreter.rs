@@ -184,11 +184,6 @@ impl<'a> Vm<'a> {
     }
 
     pub fn set_reg(&mut self, reg: Register, v: StoredValue) {
-        // println!(
-        //     "alulu {} {:?} ",
-        //     reg,
-        //     self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize]
-        // );
         self.memory[self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize]] = v
     }
 
@@ -1157,11 +1152,9 @@ impl<'a> Vm<'a> {
                         let name = self.resolve(name);
 
                         if let Value::Macro(MacroData { target, .. }) = &mut self.memory[*k].value {
-                            todo!()
-
-                            // if let Some(f) = typ.get_override(&name) {
-                            //     *target = MacroTarget::Builtin(f)
-                            // }
+                            if let Some(f) = typ.get_override_fn(&name) {
+                                *target = MacroTarget::Builtin(f)
+                            }
                         }
                     }
 
@@ -1631,7 +1624,14 @@ impl<'a> Vm<'a> {
 
                     if let Some(pattern) = data.pattern() {
                         if !pattern.value_matches(&self.memory[$v].value, $vm) {
-                            todo!()
+                            return Err(RuntimeError::ArgumentPatternMismatch {
+                                call_area,
+                                macro_def_area: base_area,
+                                arg_name: $vm.resolve(&data.name().value),
+                                pattern: pattern.clone(),
+                                v: (self.memory[$v].value.get_type(), self.memory[$v].area.clone()),
+                                call_stack: $vm.get_call_stack(),
+                            });
                         }
                     }
 
