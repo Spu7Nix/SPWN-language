@@ -1,4 +1,7 @@
+use crate::vm::value::Value;
+
 #[rustfmt::skip]
+#[macro_export]
 macro_rules! impl_type {
     (
         $(#[doc = $impl_doc:literal])*
@@ -58,7 +61,7 @@ macro_rules! impl_type {
                     )?
 
                     ,
-                )*) $(-> $ret_type:ident)? $b:block
+                )*) $(-> $ret_type:ident)? {$($b:tt)*}
             )*
         }
     ) => {
@@ -106,9 +109,7 @@ macro_rules! impl_type {
                             arg_idx += 1;
                         )*
 
-                        $b
-
-                        todo!()
+                        Ok({$($b)*})
                     }
                 )*
 
@@ -319,82 +320,4 @@ macro_rules! impl_type {
     };
 }
 
-impl_type! {
-    impl String {
-        Constants:
-
-
-        Functions(vm):
-        fn print(
-            Builtins as self = "$",
-            ...args: &String,
-            end: String = r#""\n""#,
-            sep: String = r#"" ""#,
-        ) {
-            for arg in args {
-
-            }
-
-        }
-    }
-}
-
-/*
-
-arg: Int
-----------------------------
-let arg: IntDeref = vm.memory[args[arg_idx]].value.clone().into();
-
-arg: &Int
-----------------------------
-let arg = IntGetter(args[arg_index]);
-
-arg: Int | &Float
-----------------------------
-enum Arg {
-    Int(IntDeref),
-    Float(FloatGetter),
-}
-let arg = match vm.memory[args[arg_idx]].value {
-    _v @ Value::Int{..} => Arg::Int(_v.clone().into()),
-    _v @ Value::Float{..} => Arg::Float(args[arg_index]),
-}
-
-Range(start, end, step) as arg
-----------------------------
-let Value::Range(start, end, step) = vm.memory[args[arg_idx]].value.clone() else {
-    unreachable!()
-}
-
-...arg: Int | &Float
----------------------------- pub struct Spread<T>(Vec<T>);
-enum Arg {
-    Int(IntDeref),
-    Float(FloatGetter),
-}
-
-let arg = Spread(match vm.memory[args[arg_idx]].value {
-    Value::Array(v) => {
-        v.iter().map(|k| {
-            let arg = match vm.memory[args[arg_idx]].value {
-                _v @ Value::Int{..} => Arg::Int(_v.clone().into()),
-                _v @ Value::Float{..} => Arg::Float(args[arg_index]),
-            };
-            arg
-        }).collect()
-    }
-});
-
-
-
-...arg
----------------------------- pub struct Spread<T>(Vec<T>);
-
-let arg = Spread(match vm.memory[args[arg_idx]].value {
-    Value::Array(v) => {
-        v.iter().map(|k| vm.memory[k].value.clone()).collect()
-    }
-});
-
-
-*/
+pub use impl_type;
