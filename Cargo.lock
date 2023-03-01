@@ -232,6 +232,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "defile"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4362749ff7c9a178a405cde5e93c1f5de0cb66403313460e1e10f09632592513"
+dependencies = [
+ "defile-proc_macros",
+]
+
+[[package]]
+name = "defile-proc_macros"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f86f4483ac4efccc7a82314a40a7234a352181aa8aa8369a7c5bebfdd94a9b46"
+
+[[package]]
 name = "deluxe"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -294,12 +309,6 @@ dependencies = [
  "quote",
  "syn",
 ]
-
-[[package]]
-name = "eager"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abe71d579d1812060163dff96056261deb5bf6729b100fa2e36a68b9649ba3d3"
 
 [[package]]
 name = "errno"
@@ -753,8 +762,8 @@ dependencies = [
  "colored",
  "concolor",
  "crc32fast",
+ "defile",
  "delve",
- "eager",
  "hex-serde",
  "indoc",
  "lasso",

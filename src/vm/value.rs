@@ -5,7 +5,6 @@ use std::str::FromStr;
 
 use ahash::AHashMap;
 use delve::{FieldNames, ModifyField, VariantNames};
-use eager::*;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 use strum::EnumDiscriminants;
@@ -133,34 +132,9 @@ impl IteratorData {
     }
 }
 
-eager_macro_rules! { $eager_2
-    #[macro_export]
-    macro_rules! _populate_names {
-        ( ($t1:ty): $a:ident, $b:ident, $c: ident, $d: ident $([$($t:tt)*])? ) => {
-            ($a $($($t)*)? )
-        };
-        ( ($t1:ty, $t2:ty): $a:ident, $b:ident, $c: ident, $d: ident $([$($t:tt)*])? ) => {
-            ($a, $b $($($t)*)? )
-        };
-        ( ($t1:ty, $t2:ty, $t3:ty): $a:ident, $b:ident, $c: ident, $d: ident $([$($t:tt)*])? ) => {
-            ($a, $b, $c $($($t)*)? )
-        };
-        ( ($t1:ty, $t2:ty, $t3:ty, $t4:ty): $a:ident, $b:ident, $c: ident, $d: ident $([$($t:tt)*])? ) => {
-            ($a, $b, $c, $d $($($t)*)? )
-        };
-        ( { $( $n:ident: $t1:ty ,)* } ) => {
-            {$($n,)*}
-        }
-    }
-}
-#[doc(hidden)]
-pub use _populate_names as populate_names;
-
 #[rustfmt::skip]
 macro_rules! value {
     (
-        $_:tt
-        
         $(
             $(#[$($meta:meta)*] )?
             $name:ident
@@ -208,53 +182,45 @@ macro_rules! value {
             }
         }
 
-        eager_macro_rules!{ $eager_1
-            #[macro_export]
-            macro_rules! _gen_wrapper {
+        pub mod value_structs {
+            use super::*;
+            paste::paste! {
                 $(
-                    (
-                        $name
-                    ) => {
-                        $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?
-                    };
+                    pub struct [<$name Getter>](pub ValueKey);
 
-                    (
-                        $v:vis struct $stname:ident : $_( $_($m:ident)? & $name )? $_(*$name)?
-                    ) => {
-                        $v struct $stname<'a> 
-                            $( ( $( pub $_(&'a $_($m)?)? $t0, )* pub std::marker::PhantomData<&'a ()>); )?
-                            $( { $( pub $n: $_(&'a $_($m)?)? $t1 ,)* pub _pd: std::marker::PhantomData<&'a ()> } )?
-                    };
+                    value! { @struct [<$name Deref>] $( ( $( $t0, )* ) )? $( { $( $n: $t1, )* } )? }
+                    value! { @struct [<$name Ref>]<'a> $( ( $( &'a $t0, )* ) )? $( { $( $n: &'a $t1, )* } )? }
+                    value! { @struct [<$name MutRef>]<'a> $( ( $( &'a mut $t0, )* ) )? $( { $( $n: &'a mut $t1, )* } )? }
 
-                    (
-                        @destruct $name: $a:ident, $b:ident, $c:ident, $d:ident $_([$_($extra:tt)*])?
-                    ) => {
-                        eager! {
-                            populate_names! { $( ( $( $t0 ),* ): $a, $b, $c, $d )? $( { $( $n: $t1 ,)* } )? $_([$_($extra)*])? }
+                    impl [<$name Getter>] {
+                        pub fn get_ref<'a>(&self, vm: &'a Vm) -> [<$name Ref>]<'a> {
+                            match &vm.memory[self.0].value {
+                                value! { @match (a, b, c, d) [Value::$name] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? }
+                                    => value! { @match (a, b, c, d) [[<$name Ref>]] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? + std::marker::PhantomData },
+                                _ => panic!("ValueKey does not point to value of correct type")
+                            }
                         }
-                    };
-                )*
-
-                (
-                    $v:vis enum $ename:ident: $_( $tys:ident) |* $_(|)?; $_( $extra:ident( $_($t:tt)* ) ),* $_(,)?
-                ) => {
-                    use eager::*;
-                    eager! {
-                        $v enum $ename {
-                            $_ (
-                                $tys gen_wrapper!( $tys ),
-                            )*
-
-                            $_(
-                                $extra ( $_($t)* ),
-                            )*
+                        pub fn get_mut_ref<'a>(&self, vm: &'a mut Vm) -> [<$name MutRef>]<'a> {
+                            match &mut vm.memory[self.0].value {
+                                value! { @match (a, b, c, d) [Value::$name] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? }
+                                    => value! { @match (a, b, c, d) [[<$name MutRef>]] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? + std::marker::PhantomData },
+                                _ => panic!("ValueKey does not point to value of correct type")
+                            }
                         }
                     }
-                };
+
+                    impl From<Value> for [<$name Deref>] {
+                        fn from(v: Value) -> Self {
+                            match v {
+                                value! { @match (a, b, c, d) [Value::$name] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? }
+                                    => value! { @match (a, b, c, d) [[<$name Deref>]] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? },
+                                _ => panic!("ValueKey does not point to value of correct type")
+                            }
+                        }
+                    }
+                )*
             }
         }
-        #[doc(hidden)]
-        pub use _gen_wrapper as gen_wrapper;
 
         pub mod type_aliases {
             use super::*;
@@ -292,10 +258,54 @@ macro_rules! value {
                 }
             }
         }
+    };
+    
+    (@struct $name:ident $(<$lt:lifetime>)?) => {
+        pub struct $name $(<$lt> (std::marker::PhantomData<&$lt ()>) )?;
+    };
+    (@struct $name:ident $(<$lt:lifetime>)? ( $( $t0:ty, )* )) => {
+        pub struct $name $(<$lt>)? ( $( pub $t0, )* $(std::marker::PhantomData<&$lt ()>)? );
 
-        // pub mod 
+        ::defile::item! {
+            value! { #try_deref $name, $( @$t0 ),* }
+        }
+    };
+    (@struct $name:ident $(<$lt:lifetime>)? { $( $n:ident: $t1:ty, )* }) => {
+        pub struct $name $(<$lt>)? { $( pub $n: $t1, )* $(_pd: std::marker::PhantomData<&$lt ()>)? }
+    };
 
-    }
+    (@match ($a:ident, $b:ident, $c:ident, $d:ident) [$($path:tt)*] $(+ $($extra:tt)*)? ) => { $($path)* $(( $($extra)* ))? };
+    (@match ($a:ident, $b:ident, $c:ident, $d:ident) [$($path:tt)*] ($t1:ty) $(+ $extra:expr)? ) => { $($path)* ($a $(, $extra )? ) };
+    (@match ($a:ident, $b:ident, $c:ident, $d:ident) [$($path:tt)*] ($t1:ty, $t2:ty) $(+ $extra:expr)? ) => { $($path)* ($a, $b $(, $extra )? ) };
+    (@match ($a:ident, $b:ident, $c:ident, $d:ident) [$($path:tt)*] ($t1:ty, $t2:ty, $t3:ty) $(+ $extra:expr)? ) => { $($path)* ($a, $b, $c $(, $extra )? ) };
+    (@match ($a:ident, $b:ident, $c:ident, $d:ident) [$($path:tt)*] ($t1:ty, $t2:ty, $t3:ty, $t4:ty) $(+ $extra:expr)? ) => { $($path)* ($a, $b, $c, $d $(, $extra )? ) };
+    (@match ($a:ident, $b:ident, $c:ident, $d:ident) [$($path:tt)*] { $( $n:ident: $t1:ty ),* } $(+ $extra:expr)? ) => { $($path)* { $($n),* $(, _pd: $extra )? } };
+     
+    (#try_deref $name:ident, &$lt:lifetime mut $t:ty) => {
+        impl std::ops::Deref for $name<'_> {
+            type Target = $t;
+            
+            fn deref(&self) -> &Self::Target { &self.0 }
+        }
+        impl std::ops::DerefMut for $name<'_> {
+            fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+        }
+    };
+    (#try_deref $name:ident, &$lt:lifetime $t:ty) => {
+        impl std::ops::Deref for $name<'_> {
+            type Target = $t;
+            
+            fn deref(&self) -> &Self::Target { &self.0 }
+        }
+    };
+    (#try_deref $name:ident, $t:ty) => {
+        impl std::ops::Deref for $name {
+            type Target = $t;
+    
+            fn deref(&self) -> &Self::Target { &self.0 }
+        }
+    };
+    (#try_deref $($_:tt)*) => {};
 }
 
 impl ValueType {
@@ -311,7 +321,6 @@ impl ValueType {
 }
 
 value! {
-    $
     Int(i64),
     Float(f64),
     Bool(bool),

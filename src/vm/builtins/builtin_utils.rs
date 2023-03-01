@@ -1,553 +1,400 @@
-/*
-fn poo(v: Vec<ValueKey>, vm: &mut Vm, area: CodeArea) -> RuntimeResult<Value> {
-    mod arg1 {
-        pub struct Arg1 {
-            group: Id,
-            sfddsfsf: Id
-        };
-    }
-    use arg1::Arg1;
+#[rustfmt::skip]
+macro_rules! impl_type {
+    (
+        $(#[doc = $impl_doc:literal])*
+        // temporary until 1.0
+        $(#[raw($($impl_raw:tt)*)])?
+        impl $impl_var:ident {
+            Constants:
+            $(
+                $(#[doc = $const_doc:literal])*
+                // temporary until 1.0
+                $(#[raw($($const_raw:tt)*)])?
+                const $const:ident = $c_name:ident
+                                        $( ( $( $c_val:expr ),* ) )?
+                                        $( { $( $c_n:ident: $c_val_s:expr ,)* } )?;
+            )*
 
-    mod arg2 {
-        pub struct Arg2(i64);
-    }
-    use arg2::Arg2;
+            Functions($vm:ident):
+            $(
+                $(#[doc = $fn_doc:literal])*
+                // temporary until 1.0
+                $(#[raw($($fn_raw:tt)*)])?
+                fn $fn_name:ident($(
+                    $(
 
-    mod arg4 {
-        pub struct StringGetter(ValueKey);
+                        $name:ident
+                            $(:
+                                $(
+                                    $($deref_ty:ident)? $(&$ref_ty:ident)?
+                                )|+
+                            )?
+                            $(
+                                $(
+                                    ( $( $v_val:ident ),* )
+                                )?
+                                $(
+                                    { $( $v_n:ident $(: $v_val_s:ident)? ,)* }
+                                )?
+                                as $binder:ident
+                            )?
 
-        pub struct StringRef<'a>(&'a String);
-        pub struct RangeRef<'a>(&'a (i64,));
-        pub struct StringMutRef<'a>(&'a mut String);
+                        $(
+                            = $default:literal
+                        )?
+                    )?
 
-        impl StringGetter {
-            pub fn get_ref(&self, vm: &Vm) -> StringRef<'_> {
-                match &vm.memory[self.0].value {
-                    Value::String(s) => StringRef(s)
-                    _ => panic!("valuekey does not point to value of correct type !!!!!!!!")
+                    $(
+                        ...$spread_arg:ident
+                        $(:
+                            $(
+                                $($spread_deref_ty:ident)? $(&$spread_ref_ty:ident)?
+                            )|+
+                        )?
+                    )?
+
+                    $(
+                        where $($extra:ident($extra_bind:ident))+
+                    )?
+
+                    ,
+                )*) $(-> $ret_type:ident)? $b:block
+            )*
+        }
+    ) => {
+
+        impl crate::vm::value::type_aliases::$impl_var {
+            pub fn get_override_fn(self, name: &'static str) -> Option<crate::vm::value::BuiltinFn> {
+                $(
+                    #[allow(unused_assignments)]
+                    fn $fn_name(
+                        args: Vec<crate::vm::interpreter::ValueKey>,
+                        $vm: &mut crate::vm::interpreter::Vm,
+                        area: crate::sources::CodeArea
+                    ) -> crate::vm::interpreter::RuntimeResult<crate::vm::value::Value> {
+                        use crate::vm::value::value_structs::*;
+
+                        let mut arg_idx = 0usize;
+
+                        $(
+                            $(
+                                $(
+                                    impl_type! {@union ($name, $vm, args, arg_idx) $( $($deref_ty)? $(&$ref_ty)? )|+}
+                                )?
+                                $(
+                                    paste::paste! {
+                                        let crate::vm::value::Value::$name
+                                            $(
+                                                ( $( $v_val ),* )
+                                            )?
+                                            $(
+                                                { $( $v_n $(: $v_val_s)? ,)* }
+                                            )?
+                                        = $vm.memory[args[arg_idx]].value.clone() else {
+                                            unreachable!()
+                                        };
+                                    }
+                                )?
+                            )?
+                            $(
+                                impl_type! {@... ($spread_arg, $vm, args, arg_idx) $(
+                                    $(
+                                        $($spread_deref_ty)? $(&$spread_ref_ty)?
+                                    )|+
+                                )?}
+                            )?
+                            arg_idx += 1;
+                        )*
+
+                        $b
+
+                        todo!()
+                    }
+                )*
+
+                match name {
+                    $(
+                        stringify!($fn_name) => Some(crate::vm::value::BuiltinFn(&$fn_name)),
+                    )*
+                    _ => None
                 }
             }
-            pub fn get_mut_ref(&self, vm: &mut Vm) -> StringMutRef<'_> {
-                match &vm.memory[self.0].value {
-                    Value::String(s) => StringMutRef(s)
-                    _ => panic!("valuekey does not point to value of correct type !!!!!!!!")
-                }
+            pub fn get_override_const(self, name: &'static str) -> Option<crate::compiling::bytecode::Constant> {
+                None
             }
         }
 
-        pub enum Arg4 {
-            String(StringGetter),
-            Float(f64),
-            TriggerFunction {
-                a: id,
-                b: id
-            }
-        }
-    }
-    use arg4::Arg4;
+        paste::paste! {
+            #[cfg(test)]
+            mod [<$impl_var:snake _core_gen>] {
+                #[test]
+                pub fn [<$impl_var:snake _core_gen>]() {
+                    let path = std::path::PathBuf::from(format!("{}{}.spwn", crate::CORE_PATH, stringify!( [<$impl_var:snake>] )));
 
-    let Value::String(s) = vm.memory[v[0]].value.clone() else {
-        unreachable!();
+                    paste::paste! {
+                        let consts: &[String] = &[
+                            $(
+                                indoc::formatdoc!("\t{const_raw}
+                                    \t#[doc(u{const_doc:?})]
+                                    \t{const_name}: @{const_type} = {const_val:?},",
+                                    const_raw = stringify!($($const_raw)*),
+                                    const_doc = <[String]>::join(&[$($const_doc)*], "\n"),
+                                    const_name = stringify!($const),
+                                    const_type = stringify!([<$c_name:snake>]),
+                                    const_val = crate::compiling::bytecode::Constant::
+                                        $c_name
+                                            $( ( $( $c_val ),* ) )?
+                                            $( { $( $c_n : $c_val_s ,)* } )?,
+                                ),
+                            )*
+                        ];
+
+                        let macros: &[String] = &[
+                            $(
+                                indoc::formatdoc!("\t{macro_raw}
+                                    \t#[doc(u{macro_doc:?})]
+                                    \t{macro_name}: ({macro_args}){macro_ret}{{
+                                        \t/* compiler built-in */
+                                    \t}},",
+                                    macro_raw = stringify!($($fn_raw)*),
+                                    macro_doc = <[&'static str]>::join(&[$($fn_doc),*], "\n"),
+                                    macro_name = stringify!($fn_name),
+                                    macro_args = <[String]>::join(&[
+                                        $(
+                                            $(
+                                                format!("{}{}",
+                                                    $(
+                                                        format!("{}: @{}",
+                                                            stringify!($binder),
+                                                            stringify!([<$name:snake>]),
+                                                        ),
+                                                    )?
+                                                    $(
+                                                        format!("{}: @{}",
+                                                            stringify!($name),
+                                                            <[&'static str]>::join(&[
+                                                                $(
+                                                                    $(
+                                                                        stringify!([<$ref_ty:snake>]),
+                                                                    )?
+                                                                    $(
+                                                                        stringify!([<$deref_ty:snake>]),
+                                                                    )?
+                                                                )+
+                                                            ], " | @")
+                                                        ),
+                                                    )?
+                                                    {
+                                                        "" $(; format!(" = {}", $default) )?
+                                                    }
+                                                ),
+                                            )? 
+                                            $(
+                                                format!("...{}{}",
+                                                    stringify!($spread_arg),
+                                                    {
+                                                        "" $(;
+                                                            format!(": @{}", 
+                                                                <[&'static str]>::join(&[
+                                                                    $(
+                                                                        $(
+                                                                            stringify!([<$spread_ref_ty:snake>]),
+                                                                        )?
+                                                                        $(
+                                                                            stringify!([<$spread_deref_ty:snake>]),
+                                                                        )?
+                                                                    )+
+                                                                ], " | @")
+                                                            )
+                                                        )?
+                                                    }
+                                                ),
+                                            )?
+                                        )*
+                                    ], ", "), 
+                                    macro_ret = {
+                                        " " $(; format!(" -> @{} ", stringify!([<$ret_type:snake>])))?
+                                    },
+                                )
+                            )*
+                        ];
+                    }
+
+                    let out = indoc::formatdoc!(r#"
+                            /*
+                             * This file is automatically generated!
+                             * Do not modify or your changes will be overwritten!
+                            */
+                            {impl_raw}
+                            #[doc(u{impl_doc:?})]
+                            impl @{typ} {{{consts}
+                            {macros}
+                            }}
+                        "#,
+                        impl_raw = stringify!($($impl_raw),*),
+                        impl_doc = <[String]>::join(&[$($impl_doc .to_string()),*], "\n"),
+                        typ = stringify!( [<$impl_var:snake>] ),
+                        consts = consts.join(""),
+                        macros = macros.join(""),
+                    );
+
+                    std::fs::write(path, &out).unwrap();
+                }
+            }
+
+        }
     };
-    let arg1 = match &vm.memory[v[0]].value {
-        Value::TriggerFunction {
-            group, dfsfsdf
-        } => Arg1 { group, dfsfsfsfsgr},
-        ...
-    }
 
-    mod cockle {
-        pub enum CockleElem {
-            Int(i64),
-            Float(f64),
-        }
-
-        pub type Cockle = Vec<CockleElem>;
-    }
-
-    let cockle = match vm.memory[v[0]].value {
-        Value::Array(v) => {
-            let elems = v.iter().map(||)
-
-            let mut elems = vec![];
-            for k in v {
-                elems.push(match &vm.memory[k].value {
-
-                })
+    (@union [type] ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $($deref_ty:ident)? $(&$ref_ty:ident)?) => {};
+    (@union [type] ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $( $($deref_ty:ident)? $(&$ref_ty:ident)? )|+) => {
+        paste::paste! {
+            enum [<$name:camel>] {
+                $(
+                    $(
+                        [<$deref_ty>] ( [<$deref_ty Deref>] ),
+                    )?
+                    $(
+                        [<$ref_ty>] ( [<$ref_ty Getter>] ),
+                    )?
+                )+
             }
-        },
-        ...
-    }
+        }
+    };
+
+    (@union [let] ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $($deref_ty:ident)? $(&$ref_ty:ident)?) => {
+        paste::paste! {
+            $(
+                let $name: [<$deref_ty Deref>] = $vm.memory[$args[$arg_index]].value.clone().into();
+            )?
+            $(
+                let $name = [<$ref_ty Getter>] ($args[$arg_index]);
+            )?
+        }
+    };
+    (@union [let] ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $( $($deref_ty:ident)? $(&$ref_ty:ident)? )|+) => {
+        paste::paste! {
+            let $name = match &$vm.memory[$args[$arg_index]].value {
+                $(
+                    $(
+                        v @ crate::vm::value::Value::$deref_ty {..} => [<$name:camel>]::$deref_ty(v.clone().into()),
+                    )?
+                    $(
+                        crate::vm::value::Value::$ref_ty {..} => [<$name:camel>]::$ref_ty([<$ref_ty Getter>] ($args[$arg_index])),
+                    )?
+                )+
+                _ => unreachable!(),
+            };
+        }
+    };
+    
+    (@union ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $($deref_ty:ident)? $(&$ref_ty:ident)?) => {
+        impl_type! {@union [let] ($name, $vm, $args, $arg_index) $($deref_ty)? $(&$ref_ty)? }
+    };
+    
+    (@union ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $( $($deref_ty:ident)? $(&$ref_ty:ident)? )|+) => {
+        impl_type! { @union [type] ($name, $vm, $args, $arg_index) $( $($deref_ty)? $(&$ref_ty)? )|+ }
+        impl_type! { @union [let] ($name, $vm, $args, $arg_index) $( $($deref_ty)? $(&$ref_ty)? )|+ }
+    };
+    
+    (@... ($name:ident, $vm:ident, $args:ident, $arg_index:ident)) => {
+        let $name = match &$vm.memory[$args[$arg_index]].value {
+            crate::vm::value::Value::Array(v) => {
+                v.iter().map(|k| $vm.memory[*k].value.clone()).collect::<Vec<_>>()
+            }
+            _ => unreachable!(),
+        };
+    };
+    (@... ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $( $($deref_ty:ident)? $(&$ref_ty:ident)? )|+) => {
+        impl_type! { @union [type] ($name, $vm, $args, $arg_index) $( $($deref_ty)? $(&$ref_ty)? )|+ }
+
+        let $name = match &$vm.memory[$args[$arg_index]].value {
+            crate::vm::value::Value::Array(v) => {
+                v.iter().map(|k| {
+                    impl_type! { @union [let] ($name, $vm, $args, $arg_index) $( $($deref_ty)? $(&$ref_ty)? )|+ }
+                    $name
+                }).collect::<Vec<_>>()
+            }
+            _ => unreachable!(),
+        };
+    };
+}
+
+impl_type! {
+    impl String {
+        Constants:
 
 
+        Functions(vm):
+        fn print(
+            Builtins as self = "$",
+            ...args: &String,
+            end: String = r#""\n""#,
+            sep: String = r#"" ""#,
+        ) {
+            for arg in args {
 
-    enum Piss {
-        Int(i64),
-        String(StringGetter),
-    }
+            }
 
-    let arg = match vm.memory[v[0]].value {
-        Value::String{..} => Piss::String(StringGetter(v[0])),
-        _ => match vm.memory[v[0]].value.clone() {
-            Value::Int(a) => Piss::Int(a)
         }
     }
-
-
 }
-
-match arg4.get() {
-    AFloat(f) =>
-}
-
-*/
-
-// spwn_codegen::def_type! {
-//     /// aaa
-//     #[raw( #[deprecated] )]
-//     impl @string {
-//         /// bbb
-//         const A = Range(0, 0, 0);
-
-//         fn poo(
-//             //String(s) as self = r#"obj { HSV: "aaa",  }"#,
-//             ...cockle: Int | &String
-//             //arg1: Int | Int = 10,
-//             //arg2: &Int,
-//             //Range(start, end, step) as arg2 where Key(b_k),
-//             arg4: &String | Float,
-//         ) {
-//             // block
-//         }
-
-//         // fn poo() {}
-
-//         // fn poo(&self) {}
-
-//         // /// ccc
-//         // fn poo(&self) -> Test {}
-
-//         // fn poo(
-//         //     &self,
-//         //     Thing1 as r,
-//         //     Thing2 { a, b } as r,
-//         //     Thing3(a, b) as r where Key(k),
-//         //     a: A | B,
-//         //     b: &C,
-//         //     c: &D,
-//         //     d: &E | &F |, // enum D { E(ERef), F(FRef) } .get_ref
-//         //     ...e,
-//         //     f where Key(k),
-//         //     g where Area(a) Key(k),
-//         // ) -> Test {}
-//     }
-// }
-
-// #[rustfmt::skip]
-// paste::paste! {}
-// macro_rules! impl_type {
-//     (
-//         $(#[doc = $impl_doc:literal])*
-//         // temporary until 1.0
-//         $(#[raw($($impl_raw:tt)*)])?
-//         impl $impl_var:ident {
-//             Constants:
-//             $(
-//                 $(#[doc = $const_doc:literal])*
-//                 // temporary until 1.0
-//                 $(#[raw($($const_raw:tt)*)])?
-//                 const $const:ident = $c_name:ident
-//                                         $( ( $( $c_val:expr ),* ) )?
-//                                         $( { $( $c_n:ident: $c_val_s:expr ,)* } )?;
-//             )*
-
-//             Functions:
-//             $(
-//                 $(#[doc = $fn_doc:literal])*
-//                 // temporary until 1.0
-//                 $(#[raw($($fn_raw:tt)*)])?
-//                 fn $fn_name:ident($(
-//                     $(
-
-//                         $arg_name:ident
-//                             $(:
-//                                 $(
-//                                     $(&$ref_ty:ident)? $($deref_ty:ident)?
-//                                 )|+
-//                             )?
-//                             $(
-//                                 $(
-//                                     ( $( $v_val:ident ),* )
-//                                 )?
-//                                 $(
-//                                     { $( $v_n:ident $(: $v_val_s:ident)? ,)* }
-//                                 )?
-//                                 as $binder:ident
-//                             )?
-
-//                         $(
-//                             = $default:literal
-//                         )?
-//                     )?
-
-//                     $(...$spread_arg:ident)?
-
-//                     $(
-//                         where $($extra:ident($extra_bind:ident))+
-//                     )?
-
-//                     ,
-//                 )*) $(-> $ret_type:ident)? $b:block
-//             )*
-//         }
-//     ) => {
-//         impl crate::vm::value::type_aliases::$impl_var {
-//             pub fn get_override_fn(self, name: &'static str) -> Option<crate::vm::value::BuiltinFn> {
-//                 $(
-//                     #[allow(unused_assignments)]
-//                     fn $fn_name(
-//                         v: Vec<crate::vm::interpreter::ValueKey>,
-//                         vm: &mut crate::vm::interpreter::Vm,
-//                         area: crate::sources::CodeArea
-//                     ) -> crate::vm::interpreter::RuntimeResult<crate::vm::value::Value> {
-
-//                         let mut arg_idx = 0usize;
-
-//                         $(
-//                             $(
-//                                 paste::paste! {
-//                                     $(
-//                                         mod $arg_name {
-//                                             use crate::vm::value::gen_wrapper;
-
-//                                             $(
-//                                                 $(
-//                                                     impl_type! { @make_getter $ref_ty }
-//                                                 )?
-//                                             )+
-
-//                                             impl_type! {
-//                                                 @gen_wrapper [<$arg_name:camel>] $( $(&$ref_ty)? $($deref_ty)? )|+
-//                                             }
-//                                         }
-
-//                                         impl_type! { @gen_match $arg_name [v vm arg_idx] $( $(&$ref_ty)? $($deref_ty)? )|+ }
-
-//                                     )?
-//                                     $(
-//                                         let crate::vm::value::Value::$arg_name
-//                                             $(
-//                                                 ( $( $v_val ),* )
-//                                             )?
-//                                             $(
-//                                                 { $( $v_n $(: $v_val_s)? ,)* }
-//                                             )?
-//                                         = vm.memory[v[arg_idx]].value.clone() else {
-//                                             unreachable!();
-//                                         };
-//                                     )?
-//                                 }
-//                             )?
-
-//                             arg_idx += 1;
-//                         )*
-
-//                         todo!()
-//                     }
-//                 )*
-
-//                 match name {
-//                     $(
-//                         stringify!($fn_name) => Some(crate::vm::value::BuiltinFn(&$fn_name)),
-//                     )*
-//                     _ => None
-//                 }
-//             }
-//             pub fn get_override_const(self, name: &'static str) -> Option<crate::compiling::bytecode::Constant> {
-//                 None
-//             }
-//         }
-
-//         paste::paste! {
-//             #[cfg(test)]
-//             mod [<$impl_var:snake _core_gen>] {
-//                 #[test]
-//                 pub fn [<$impl_var:snake _core_gen>]() {
-//                     let path = std::path::PathBuf::from(format!("{}{}.spwn", crate::CORE_PATH, stringify!( [<$impl_var:snake>] )));
-
-//                     paste::paste! {
-//                         let consts: &[String] = &[
-//                             $(
-//                                 indoc::formatdoc!("\t{const_raw}
-//                                     \t#[doc(u{const_doc:?})]
-//                                     \t{const_name}: @{const_type} = {const_val:?},",
-//                                     const_raw = stringify!($($const_raw)*),
-//                                     const_doc = <[String]>::join(&[$($const_doc)*], "\n"),
-//                                     const_name = stringify!($const),
-//                                     const_type = stringify!([<$c_name:snake>]),
-//                                     const_val = crate::compiling::bytecode::Constant::
-//                                         $c_name
-//                                             $( ( $( $c_val ),* ) )?
-//                                             $( { $( $c_n : $c_val_s ,)* } )?,
-//                                 ),
-//                             )*
-//                         ];
-
-//                         let macros: &[String] = &[
-//                             $(
-//                                 indoc::formatdoc!("\t{macro_raw}
-//                                     \t#[doc(u{macro_doc:?})]
-//                                     \t{macro_name}: ({macro_args}){macro_ret}{{
-//                                         \t/* compiler built-in */
-//                                     \t}},",
-//                                     macro_raw = stringify!($($fn_raw)*),
-//                                     macro_doc = <[&'static str]>::join(&[$($fn_doc),*], "\n"),
-//                                     macro_name = stringify!($fn_name),
-//                                     macro_args = <[String]>::join(&[
-//                                         $(
-//                                             $(
-//                                                 $(
-//                                                     format!("{}: @{}",
-//                                                         stringify!($binder),
-//                                                         stringify!([<$arg_name:snake>]),
-//                                                     ),
-//                                                 )?
-//                                                 $(
-//                                                     format!("{}: @{}",
-//                                                         stringify!($arg_name),
-//                                                         <[&'static str]>::join(&[
-//                                                             $(
-//                                                                 $(
-//                                                                     stringify!([<$ref_ty:snake>]),
-//                                                                 )?
-//                                                                 $(
-//                                                                     stringify!([<$deref_ty:snake>]),
-//                                                                 )?
-//                                                             )+
-//                                                         ], " | @")
-//                                                     ),
-//                                                 )?
-//                                             )?
-//                                         )*
-//                                     ], ", "),
-//                                     macro_ret = " -> @todo ",
-//                                 )
-//                             )*
-//                         ];
-//                     }
-
-//                     let out = indoc::formatdoc!(r#"
-//                             /*
-//                              * This file is automatically generated!
-//                              * Do not modify or your changes will be overwritten!
-//                             */
-//                             {impl_raw}
-//                             #[doc(u{impl_doc:?})]
-//                             impl @{typ} {{{consts}
-//                             {macros}
-//                             }}
-//                         "#,
-//                         impl_raw = stringify!($($impl_raw),*),
-//                         impl_doc = <[String]>::join(&[$($impl_doc .to_string()),*], "\n"),
-//                         typ = stringify!( [<$impl_var:snake>] ),
-//                         consts = consts.join(""),
-//                         macros = macros.join(""),
-//                     );
-
-//                     std::fs::write(path, &out).unwrap();
-//                 }
-//             }
-
-//         }
-//     };
-
-//     (@gen_wrapper $name:ident $(&$ref_ty:ident)? $($deref_ty:ident)?) => {
-//         $(
-//             gen_wrapper! {
-//                 pub struct $name: *$deref_ty
-//             }
-//         )?
-//         $(
-//             paste::paste! {
-//                 pub use [<$ref_ty Getter>] as $name;
-//             }
-//         )?
-//     };
-//     (@gen_wrapper $name:ident $( $(&$ref_ty:ident)? $($deref_ty:ident)? )|+) => {
-//         paste::paste! {
-//             gen_wrapper! {
-//                 pub enum $name: $( $($deref_ty |)? )+; $( $( $ref_ty( [<$ref_ty Getter>] ) ,)? )+
-//             }
-//         }
-//     };
-
-//     (@gen_match $arg_name:ident [$v:ident $vm:ident $idx:ident] $(&$ref_ty:ident)? $($deref_ty:ident)?) => {
-//         paste::paste! {
-
-//             $(
-//                 let $arg_name = match $vm.memory[$v[$idx]].value {
-//                     crate::vm::value::Value::$ref_ty{..} => $arg_name::[<$arg_name:camel>](
-//                         $v[$idx]
-//                     ),
-//                     _ => unreachable!(),
-//                 };
-//             )?
-
-//             $(
-//                 use eager::*;
-
-//                 use crate::vm::value::populate_names;
-//                 use crate::vm::value::gen_wrapper;
-//                 eager! {
-
-//                     let $arg_name = match $vm.memory[$v[$idx]].value {
-//                         $crate::vm::value::Value::$deref_ty
-//                             gen_wrapper! { @destruct $deref_ty: a, b, c, d } =>
-//                                 $arg_name::[<$arg_name:camel>] gen_wrapper! {@destruct $deref_ty: a, b, c, d [, std::marker::PhantomData] },
-//                         _ => lazy! { unreachable!() },
-//                     };
-
-//                 }
-//             )?
-
-//             // let $arg_name = match $vm.memory[$v[$idx]].value {
-//             //     // $(
-//             //     //     crate::vm::value::Value::$ref_ty{..} => $arg_name::[<$arg_name:camel>](
-//             //     //         $arg_name::[<$ref_ty Getter>]($v[$idx])
-//             //     //     ),
-//             //     //     _ => unreachable!(),
-//             //     // )?
-//             //     $(
-//             //         eager! {
-//             //             $crate::vm::value::Value::$deref_ty
-//             //                 gen_wrapper! { @destruct $deref_ty: a, b, c, d } =>
-//             //                     $arg_name::[<$arg_name:camel>] gen_wrapper! {@destruct $deref_ty: a, b, c, d },
-//             //             // _ => lazy! { unreachable!() },
-//             //         }
-//             //     )?
-//             // };
-//         }
-//     };
-
-//     (@gen_match $arg_name:ident [$v:ident $vm:ident $idx:ident] $( $(&$ref_ty:ident)? $($deref_ty:ident)? )|+) => {
-//         paste::paste! {
-//             #[allow(clippy::let_unit_value)]
-//             let $arg_name = match $vm.memory[$v[$idx]].value {
-//                 $(
-//                     $(
-//                         crate::vm::value::Value::$ref_ty{..} => $arg_name::[<$arg_name:camel>]::$ref_ty(
-//                             $arg_name::[<$ref_ty Getter>]($v[$idx])
-//                         ),
-//                     )?
-//                 )+
-//                 _ => {
-//                     use eager::*;
-
-//                     use crate::vm::value::populate_names;
-//                     use crate::vm::value::gen_wrapper;
-//                     eager! {
-//                         match $vm.memory[$v[$idx]].value.clone() {
-//                             $(
-//                                 $(
-//                                     $crate::vm::value::Value::$deref_ty
-//                                         gen_wrapper! { @destruct $deref_ty: a, b, c, d } =>
-//                                             $arg_name::[<$arg_name:camel>]::$deref_ty gen_wrapper! {@destruct $deref_ty: a, b, c, d },
-//                                 )?
-//                             )+
-//                             _ => lazy! { unreachable!() }
-//                         }
-//                     }
-//                 },
-//             };
-//         }
-//     };
-
-//     (@make_getter $ref_ty:ident) => {
-//         paste::paste! {
-//             pub struct [<$ref_ty Getter>](pub crate::vm::interpreter::ValueKey);
-
-//             use crate::gd::ids::Id;
-
-//             gen_wrapper! {
-//                 pub struct [<$ref_ty Ref>]: & $ref_ty
-//             }
-//             gen_wrapper! {
-//                 pub struct [<$ref_ty MutRef>]: mut & $ref_ty
-//             }
-
-//             impl [<$ref_ty Getter>] {
-//                 pub fn get_ref<'a>(&self, vm: &'a crate::vm::interpreter::Vm) -> [<$ref_ty Ref>]<'a> {
-//                     use crate::vm::value::populate_names;
-//                     use crate::vm::value::gen_wrapper;
-//                     impl_type! { @make_getter_match [vm self] $ref_ty }
-//                     // todo!()
-//                 }
-//                 pub fn get_mut_ref<'a>(&self, vm: &'a mut crate::vm::interpreter::Vm) -> [<$ref_ty MutRef>]<'a> {
-//                     use crate::vm::value::populate_names;
-//                     use crate::vm::value::gen_wrapper;
-//                     impl_type! { @make_getter_match [vm self] $ref_ty mut }
-//                     // todo!()
-//                 }
-//             }
-//         }
-//     };
-
-//     (@make_getter_match [$vm:ident $self:ident] $ref_ty:ident $($mut:ident)?) => {
-//         "cockle";
-//         use eager::*;
-//         paste::paste!{
-//             eager! {
-//                 match &$($mut)? $vm.memory[$self.0].value {
-//                     crate::vm::value::Value::$ref_ty gen_wrapper! { @destruct $ref_ty: a, b, c, d }
-//                         => [<$ref_ty $($mut:camel)? Ref>] gen_wrapper! { @destruct $ref_ty: a, b, c, d [, std::marker::PhantomData] },
-//                     _ => lazy! { panic!("ValueKey does not point to value of correct type") },
-//                 }
-//             }
-//         }
-//     }
-// }
-
-/*
-
-arg: &Int
-
-
-IntDeref(i64); IntRef<'a>(&'a i64); IntMutRef<'a>(&'a mut i64);
-...
-
-.get_ref()
-*/
 
 /*
 
 arg: Int
 ----------------------------
+let arg: IntDeref = vm.memory[args[arg_idx]].value.clone().into();
 
-mod arg {
-    pub struct IntDeref(i64);
+arg: &Int
+----------------------------
+let arg = IntGetter(args[arg_index]);
+
+arg: Int | &Float
+----------------------------
+enum Arg {
+    Int(IntDeref),
+    Float(FloatGetter),
 }
-match
+let arg = match vm.memory[args[arg_idx]].value {
+    _v @ Value::Int{..} => Arg::Int(_v.clone().into()),
+    _v @ Value::Float{..} => Arg::Float(args[arg_index]),
+}
 
+Range(start, end, step) as arg
+----------------------------
+let Value::Range(start, end, step) = vm.memory[args[arg_idx]].value.clone() else {
+    unreachable!()
+}
+
+...arg: Int | &Float
+---------------------------- pub struct Spread<T>(Vec<T>);
+enum Arg {
+    Int(IntDeref),
+    Float(FloatGetter),
+}
+
+let arg = Spread(match vm.memory[args[arg_idx]].value {
+    Value::Array(v) => {
+        v.iter().map(|k| {
+            let arg = match vm.memory[args[arg_idx]].value {
+                _v @ Value::Int{..} => Arg::Int(_v.clone().into()),
+                _v @ Value::Float{..} => Arg::Float(args[arg_index]),
+            };
+            arg
+        }).collect()
+    }
+});
+
+
+
+...arg
+---------------------------- pub struct Spread<T>(Vec<T>);
+
+let arg = Spread(match vm.memory[args[arg_idx]].value {
+    Value::Array(v) => {
+        v.iter().map(|k| vm.memory[k].value.clone()).collect()
+    }
+});
 
 
 */
-
-// impl_type! {
-//     impl String {
-//         Constants:
-//         const POO = Int(10);
-//         const FOO = String("aaaa".into());
-
-//         Functions:
-//         fn poo(
-//             // String(s) as self = r#"bunkledo"#,
-//             arg1: &TriggerFunction,
-//             // arg2: Int,
-//             // Range(start, end, step) as arg2 where Key(b_k),
-//             // arg4: &String | Float,
-//         ) -> Range {
-//             // block
-//         }
-//     }
-
-// }
