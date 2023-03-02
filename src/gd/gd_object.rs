@@ -48,7 +48,7 @@ impl fmt::Display for ObjParam {
                 } else {
                     write!(f, "{:.1$}", n, 3)
                 }
-            }
+            },
             ObjParam::Bool(b) => write!(f, "{}", if *b { "1" } else { "0" }),
             ObjParam::Text(t) => write!(f, "{t}"),
             ObjParam::GroupList(list) => {
@@ -63,7 +63,7 @@ impl fmt::Display for ObjParam {
                 }
                 out.pop();
                 write!(f, "{out}")
-            }
+            },
             ObjParam::Epsilon => write!(f, "0.05"),
         }
     }
@@ -115,7 +115,7 @@ pub fn get_used_ids(ls: &str) -> [AHashSet<u16>; 4] {
 
                         out[0].insert(group);
                     }
-                }
+                },
                 // target ids
                 "51" => {
                     match (map.get("1"), map.get("52")) {
@@ -123,15 +123,15 @@ pub fn get_used_ids(ls: &str) -> [AHashSet<u16>; 4] {
                         (Some(&"1006"), _) => out[1].insert(value.parse().unwrap()),
                         _ => out[0].insert(value.parse().unwrap()),
                     };
-                }
+                },
                 // target position, follow, center
                 "71" => {
                     out[0].insert(value.parse().unwrap());
-                }
+                },
                 // channels
                 "21" | "22" | "23" => {
                     out[1].insert(value.parse().unwrap());
-                }
+                },
 
                 "80" => {
                     match map.get("1") {
@@ -142,11 +142,11 @@ pub fn get_used_ids(ls: &str) -> [AHashSet<u16>; 4] {
                         // else add item id
                         _ => out[3].insert(value.parse().unwrap()),
                     };
-                }
+                },
 
                 "95" => {
                     out[2].insert(value.parse().unwrap());
-                }
+                },
                 //some of these depends on what object it is
                 //pulse target depends on group mode/color mode
                 //figure this out, future me
@@ -199,32 +199,32 @@ pub fn append_objects(
                 ObjParam::Group(g) => {
                     class_index = 0;
                     id = vec![g];
-                }
+                },
 
                 ObjParam::GroupList(l) => {
                     class_index = 0;
 
                     id = l.iter().collect();
-                }
+                },
                 ObjParam::Channel(g) => {
                     class_index = 1;
                     id = vec![g];
-                }
+                },
                 ObjParam::Block(g) => {
                     class_index = 2;
                     id = vec![g];
-                }
+                },
                 ObjParam::Item(g) => {
                     class_index = 3;
                     id = vec![g];
-                }
+                },
                 _ => continue,
             }
             for id in id {
                 match id {
                     Id::Specific(i) => {
                         closed_ids[class_index].insert(*i);
-                    }
+                    },
                     _ => continue,
                 }
             }
@@ -249,23 +249,23 @@ pub fn append_objects(
                 ObjParam::Group(g) => {
                     class_index = 0;
                     ids = vec![g];
-                }
+                },
                 ObjParam::GroupList(g) => {
                     class_index = 0;
                     ids = g.iter_mut().collect();
-                }
+                },
                 ObjParam::Channel(g) => {
                     class_index = 1;
                     ids = vec![g];
-                }
+                },
                 ObjParam::Block(g) => {
                     class_index = 2;
                     ids = vec![g];
-                }
+                },
                 ObjParam::Item(g) => {
                     class_index = 3;
                     ids = vec![g];
-                }
+                },
                 _ => continue,
             }
             for id in ids {
@@ -291,9 +291,9 @@ pub fn append_objects(
                                         ["group", "color", "block ID", "item ID"][class_index]
                                     ));
                                 }
-                            }
+                            },
                         })
-                    }
+                    },
                     _ => continue,
                 }
             }
@@ -324,12 +324,12 @@ pub fn append_objects(
                         trigger
                             .params
                             .insert(57, ObjParam::GroupList(vec![group, SPWN_SIGNATURE_GROUP]));
-                    }
+                    },
                     _ => {
                         trigger
                             .params
                             .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP));
-                    }
+                    },
                 };
 
                 let mut param_list = trigger.params.iter().collect::<Vec<(&u8, &ObjParam)>>();
@@ -341,25 +341,25 @@ pub fn append_objects(
                 }
 
                 obj_string + ";"
-            }
+            },
             ObjectType::Trigger => {
                 match trigger.params.get_mut(&57) {
                     Some(ObjParam::GroupList(l)) => {
                         (*l).push(SPWN_SIGNATURE_GROUP);
                         //list
-                    }
+                    },
                     Some(ObjParam::Group(g)) => {
                         let group = *g;
                         trigger
                             .params
                             .insert(57, ObjParam::GroupList(vec![group, SPWN_SIGNATURE_GROUP]));
-                    }
+                    },
                     _ => {
                         trigger
                             .params
                             .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP));
                         //Vec::new()
-                    }
+                    },
                 };
 
                 /*let spawned = match trigger.params.get(&62) {
@@ -378,7 +378,7 @@ pub fn append_objects(
                     obj_string += &format!("{},{},", param.0, param.1);
                 }
                 obj_string + "108,1;" //linked group
-            }
+            },
         }
     }
 
@@ -416,7 +416,7 @@ pub fn apply_triggers(mut triggers: Vec<Trigger>) -> Vec<GdObject> {
         match obj.mode {
             ObjectType::Object => {
                 full_obj_list.push(obj.clone());
-            }
+            },
             ObjectType::Trigger => {
                 let y_pos = (i as u16) % possible_height + START_HEIGHT;
                 let x_pos = 0;
@@ -457,7 +457,7 @@ pub fn apply_triggers(mut triggers: Vec<Trigger>) -> Vec<GdObject> {
                     .params
                     .insert(3, ObjParam::Number(((80 - y_pos) * 30 + 15) as f64));
                 full_obj_list.push(new_obj);
-            }
+            },
         }
     }
 

@@ -4,11 +4,12 @@ use crate::parsing::ast::ObjectType;
 use crate::vm::builtins::builtin_utils::impl_type;
 use crate::vm::error::RuntimeError;
 use crate::vm::value::Value;
+use crate::vm::value_ops;
 
 impl_type! {
     impl Builtins {
         Constants:
-        //const obj_props = Dict(OBJ_PROPS);
+        const bulgaria = Int(3);
 
         Functions(vm, call_area):
         fn print(
@@ -68,6 +69,20 @@ impl_type! {
 
         fn trigger_fn_context(Builtins as self) -> Group {
             Value::Group(vm.contexts.group())
+        }
+
+        fn assert(Builtins as self, value: Bool, is: Bool) {
+            if value != is {
+                return Err(RuntimeError::AssertionFailed { area: call_area, call_stack: vm.get_call_stack() });
+            }
+            Value::Empty
+        }
+
+        fn assert_eq(Builtins as self, left, right) {
+            if !value_ops::equality(left, right, vm) {
+                return Err(RuntimeError::AssertionFailed { area: call_area, call_stack: vm.get_call_stack() });
+            }
+            Value::Empty
         }
     }
 }

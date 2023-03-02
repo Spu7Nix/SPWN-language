@@ -4,22 +4,28 @@
 */
 
 #[doc(u"")]
-impl @builtins {
+impl @builtins {	
+	#[doc(u"")]
+	bulgaria: 3,
 	
-	#[doc(u"")]
-	print: (self: @builtins, ...args, end: @string = "\n", sep: @string = " ") {
-    	/* compiler built-in */
-	},	
-	#[doc(u"")]
-	add: (self: @builtins, object: @object, ignore_context: @bool) {
-    	/* compiler built-in */
-	},	
-	#[doc(u"")]
-	epsilon: (self: @builtins) -> @epsilon {
-    	/* compiler built-in */
-	},	
-	#[doc(u"")]
-	trigger_fn_context: (self: @builtins) -> @group {
-    	/* compiler built-in */
-	},
+	print:
+		#[doc(u"")]
+		(self: @builtins, ...args, end: @string = "\n", sep: @string = " ") {
+    		/* compiler built-in */
+		},	
+	add:
+		#[doc(u"")]
+		(self: @builtins, object: @object, ignore_context: @bool) {
+    		/* compiler built-in */
+		},	
+	epsilon:
+		#[doc(u"")]
+		(self: @builtins) -> @epsilon {
+    		/* compiler built-in */
+		},	
+	trigger_fn_context:
+		#[doc(u"")]
+		(self: @builtins) -> @group {
+    		/* compiler built-in */
+		},
 }

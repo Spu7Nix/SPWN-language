@@ -4,6 +4,7 @@ use super::interpreter::{RuntimeResult, ValueKey, Vm};
 use super::value::{Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Constant;
+use crate::gd::object_keys::ObjectKey;
 use crate::parsing::ast::Pattern;
 
 #[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -17,7 +18,7 @@ impl Constant {
             Constant::Int(n) => n.to_string(),
             Constant::Float(n) => n.to_string(),
             Constant::Bool(b) => b.to_string(),
-            Constant::String(s) => format!("{:?}", s),
+            Constant::String(s) => format!("{s:?}"),
             Constant::Id(class, id) => format!("{id}{}", class.letter()),
             Constant::Array(arr) => format!(
                 "[{}]",
@@ -60,10 +61,10 @@ impl ConstPattern {
             Pattern::Type(t) => t.runtime_display(vm),
             Pattern::Either(a, b) => {
                 format!("({} | {})", a.runtime_display(vm), b.runtime_display(vm))
-            }
+            },
             Pattern::Both(a, b) => {
                 format!("({} & {})", a.runtime_display(vm), b.runtime_display(vm))
-            }
+            },
             Pattern::Any => "_".into(),
             Pattern::Eq(c) => format!("=={}", c.runtime_display(vm)),
             Pattern::Neq(c) => format!("!={}", c.runtime_display(vm)),

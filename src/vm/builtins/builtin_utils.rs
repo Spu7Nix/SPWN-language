@@ -2,13 +2,13 @@
 #[macro_export]
 macro_rules! impl_type {
     (
-        $(#[doc = $impl_doc:literal])*
+        $(#[doc = $impl_doc:expr])*
         // temporary until 1.0
         $(#[raw($($impl_raw:tt)*)])?
         impl $impl_var:ident {
             Constants:
             $(
-                $(#[doc = $const_doc:literal])*
+                $(#[doc = $const_doc:expr])*
                 // temporary until 1.0
                 $(#[raw($($const_raw:tt)*)])?
                 const $const:ident = $c_name:ident
@@ -18,7 +18,7 @@ macro_rules! impl_type {
 
             Functions($vm:ident, $call_area:ident):
             $(
-                $(#[doc = $fn_doc:literal])*
+                $(#[doc = $fn_doc:expr])*
                 // temporary until 1.0
                 $(#[raw($($fn_raw:tt)*)])?
                 fn $fn_name:ident($(
@@ -65,7 +65,7 @@ macro_rules! impl_type {
         impl $crate::vm::value::type_aliases::$impl_var {
             pub fn get_override_fn(self, name: &str) -> Option<$crate::vm::value::BuiltinFn> {
                 $(
-                    #[allow(unused_assignments)]
+                    #[allow(unused_assignments, unused_variables, unused_imports)]
                     fn $fn_name(
                         __args: Vec<$crate::vm::interpreter::ValueKey>,
                         $vm: &mut $crate::vm::interpreter::Vm,
@@ -73,12 +73,12 @@ macro_rules! impl_type {
                     ) -> $crate::vm::interpreter::RuntimeResult<$crate::vm::value::Value> {
                         use $crate::vm::value::value_structs::*;
 
-                        let mut arg_idx = 0usize;
+                        let mut __arg_idx = 0usize;
 
                         $(
                             $(
                                 $(
-                                    impl_type! { @union ($name, $vm, __args, arg_idx) $( $($deref_ty)? $(&$ref_ty)? )|+ }
+                                    impl_type! { @union ($name, $vm, __args, __arg_idx) $( $($deref_ty)? $(&$ref_ty)? )|+ }
                                 )?
                                 $(
                                     paste::paste! {
@@ -89,14 +89,14 @@ macro_rules! impl_type {
                                             $(
                                                 { $( $v_n $(: $v_val_s)? ,)* }
                                             )?
-                                        = $vm.memory[__args[arg_idx]].value.clone() else {
+                                        = $vm.memory[__args[__arg_idx]].value.clone() else {
                                             unreachable!()
                                         };
                                     }
                                 )?
                             )?
                             $(
-                                impl_type! {@... ($spread_arg, $vm, __args, arg_idx) $(
+                                impl_type! {@... ($spread_arg, $vm, __args, __arg_idx) $(
                                     $(
                                         $($spread_deref_ty)? $(&$spread_ref_ty)?
                                     )|+
@@ -104,10 +104,10 @@ macro_rules! impl_type {
                             )?
                             $(
                                 $(
-                                    impl_type! {@extra $extra ($extra_bind, $vm, __args, arg_idx)}
+                                    impl_type! {@extra $extra ($extra_bind, $vm, __args, __arg_idx)}
                                 )+
                             )?
-                            arg_idx += 1;
+                            __arg_idx += 1;
                         )*
 
                         Ok({ $($b)* })
@@ -120,9 +120,6 @@ macro_rules! impl_type {
                     )*
                     _ => None
                 }
-            }
-            pub fn get_override_const(self, name: &str) -> Option<$crate::compiling::bytecode::Constant> {
-                None
             }
         }
 
@@ -138,11 +135,10 @@ macro_rules! impl_type {
                             $(
                                 indoc::formatdoc!("\t{const_raw}
                                     \t#[doc(u{const_doc:?})]
-                                    \t{const_name}: @{const_type} = {const_val:?},",
+                                    \t{const_name}: {const_val:?},",
                                     const_raw = stringify!($($const_raw)*),
                                     const_doc = <[String]>::join(&[$($const_doc)*], "\n"),
                                     const_name = stringify!($const),
-                                    const_type = stringify!([<$c_name:snake>]),
                                     const_val = $crate::compiling::bytecode::Constant::
                                         $c_name
                                             $( ( $( $c_val ),* ) )?
@@ -154,43 +150,64 @@ macro_rules! impl_type {
                         let macros: &[String] = &[
                             $(
                                 indoc::formatdoc!("\t{macro_raw}
-                                    \t#[doc(u{macro_doc:?})]
-                                    \t{macro_name}: ({macro_args}){macro_ret}{{
-                                        \t/* compiler built-in */
-                                    \t}},",
+                                    \t{macro_name}:
+                                    \t\t#[doc(u{macro_doc:?})]
+                                    \t\t({macro_args}){macro_ret}{{
+                                        \t\t/* compiler built-in */
+                                    \t\t}},",
                                     macro_raw = stringify!($($fn_raw)*),
                                     macro_doc = <[&'static str]>::join(&[$($fn_doc),*], "\n"),
                                     macro_name = stringify!($fn_name),
                                     macro_args = <[String]>::join(&[
                                         $(
                                             $(
-                                                format!("{}{}",
+                                                format!("{}",
                                                     $(
-                                                        format!("{}: @{}",
-                                                            stringify!($binder),
-                                                            stringify!([<$name:snake>]),
-                                                        ),
+                                                        stringify!($binder),
                                                     )?
                                                     $(
-                                                        format!("{}: @{}",
-                                                            stringify!($name),
-                                                            <[&'static str]>::join(&[
-                                                                $(
-                                                                    $(
-                                                                        stringify!([<$ref_ty:snake>]),
-                                                                    )?
-                                                                    $(
-                                                                        stringify!([<$deref_ty:snake>]),
-                                                                    )?
-                                                                )+
-                                                            ], " | @")
-                                                        ),
+                                                        {
+                                                            $(
+                                                                stringify!($($deref_ty)? $(&$ref_ty)?);
+                                                            )+
+                                                            stringify!($name)
+                                                        },
                                                     )?
-                                                    {
-                                                        "" $(; format!(" = {}", $default) )?
-                                                    }
                                                 ),
-                                            )? 
+                                            )?
+                                            // format!("{}{}{}",
+                                            //     $( $( stringify!($binder), )? )?
+                                            //     $( $( { stringify!($( $( $ref_ty )? $($deref_ty)? )+); stringify!([<$name:snake>]) }, )? )?
+                                            //     $(
+                                            //         $(
+                                            //             { 
+                                            //                 stringify!($( $( $ref_ty )? )+);
+                                            //                 format!(": @{}",
+                                            //                     stringify!([<$name:snake>]),
+                                            //                 )
+                                            //             },
+                                            //         )?
+                                            //     )?
+                                            //     $(
+                                            //         $(
+                                            //             format!(": @{}",
+                                            //                 <[&'static str]>::join(&[
+                                            //                     $(
+                                            //                         $(
+                                            //                             stringify!([<$ref_ty:snake>]),
+                                            //                         )?
+                                            //                         $(
+                                            //                             stringify!([<$deref_ty:snake>]),
+                                            //                         )?
+                                            //                     )+
+                                            //                 ], " | @")
+                                            //             ),
+                                            //         )?
+                                            //     )?
+                                            //     {
+                                            //         "" $( $( ; format!(" = {}", $default) )? )?
+                                            //     }
+                                            // ),
                                             $(
                                                 format!("...{}{}",
                                                     stringify!($spread_arg),

@@ -295,3 +295,18 @@ attributes! {
         NoStd,
     }
 }
+
+// #[doc(u"")]
+// type @a;
+
+// #[doc(u"")]
+// a: () {}
+
+// #[no_optimize] !{
+
+// }
+
+// #[doc("")]
+// #[doc(type_alias = @foo), doc_type = @cunt]
+
+// #[doc = ""] ??

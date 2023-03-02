@@ -1,7 +1,7 @@
 use ahash::{HashMap, HashMapExt};
 
-use crate::vm::opcodes::Opcode;
 use super::bytecode::Function;
+use crate::vm::opcodes::Opcode;
 
 pub fn optimize_function(func: &Function<usize>) -> Function<usize> {
     let mut prev_func = func.clone();
@@ -32,26 +32,26 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
                 read[left] = true;
                 read[right] = true;
                 write[dest] = true;
-            }
+            },
             Opcode::Sub { left, right, dest } => {
                 read[left] = true;
                 read[right] = true;
                 write[dest] = true;
-            }
+            },
             Opcode::Copy { from, to } => {
                 read[from] = true;
                 write[to] = true;
-            }
+            },
             Opcode::Print { reg } => {
                 read[reg] = true;
-            }
+            },
             Opcode::JumpIfFalse { src, to: _ } => read[src] = true,
-            Opcode::Jump { to: _ } => {}
+            Opcode::Jump { to: _ } => {},
             Opcode::Lt { left, right, dest } => {
                 read[left] = true;
                 read[right] = true;
-                write[dest] = true; 
-            }
+                write[dest] = true;
+            },
             _ => {
                 println!("OPTIMIZATION: UNIMPLEMENTED OPERATOR [{:?}]", op);
             },
@@ -79,53 +79,98 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
             (false, false) => false,
         }
     };
-    
-    let opcodes = func.opcodes.iter().copied().map(|op| match op {
-        Opcode::LoadBuiltins { dest } =>
-            is_used(dest).then(|| Opcode::LoadBuiltins { dest: get_reg(dest) }),
-        Opcode::LoadConst { dest, id } =>
-            is_used(dest).then(|| Opcode::LoadConst { dest: get_reg(dest), id }),
-        Opcode::LoadEmpty { dest } =>
-            is_used(dest).then(|| Opcode::LoadEmpty { dest: get_reg(dest) }),
-        Opcode::LoadNone { dest } => 
-            is_used(dest).then(|| Opcode::LoadNone { dest: get_reg(dest) }),
-        Opcode::Add { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Add { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Sub { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Sub { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Lt { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Lt { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Lte { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Lte { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Gt { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Gt { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Gte { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Gte { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Copy { from, to } =>
-            is_used(to).then(|| Opcode::Copy { from: get_reg(from), to: get_reg(to) }),
-        Opcode::Print { reg } => Some(Opcode::Print { reg: get_reg(reg) }),
-        Opcode::JumpIfFalse { src, to } => Some(Opcode::JumpIfFalse { src: get_reg(src), to }),
-        Opcode::Jump { to } => Some(Opcode::Jump { to }),
-        _ => {
-            println!("OPTIMIZATION: UNIMPLEMENTED OPERATOR [{:?}]", op);
-            Some(op)
-        },
-    })
-    .collect::<Vec<_>>();
+
+    let opcodes = func
+        .opcodes
+        .iter()
+        .copied()
+        .map(|op| match op {
+            Opcode::LoadBuiltins { dest } => is_used(dest).then(|| Opcode::LoadBuiltins {
+                dest: get_reg(dest),
+            }),
+            Opcode::LoadConst { dest, id } => is_used(dest).then(|| Opcode::LoadConst {
+                dest: get_reg(dest),
+                id,
+            }),
+            Opcode::LoadEmpty { dest } => is_used(dest).then(|| Opcode::LoadEmpty {
+                dest: get_reg(dest),
+            }),
+            Opcode::LoadNone { dest } => is_used(dest).then(|| Opcode::LoadNone {
+                dest: get_reg(dest),
+            }),
+            Opcode::Add { left, right, dest } => is_used(dest).then(|| Opcode::Add {
+                left: get_reg(left),
+                right: get_reg(right),
+                dest: get_reg(dest),
+            }),
+            Opcode::Sub { left, right, dest } => is_used(dest).then(|| Opcode::Sub {
+                left: get_reg(left),
+                right: get_reg(right),
+                dest: get_reg(dest),
+            }),
+            Opcode::Lt { left, right, dest } => is_used(dest).then(|| Opcode::Lt {
+                left: get_reg(left),
+                right: get_reg(right),
+                dest: get_reg(dest),
+            }),
+            Opcode::Lte { left, right, dest } => is_used(dest).then(|| Opcode::Lte {
+                left: get_reg(left),
+                right: get_reg(right),
+                dest: get_reg(dest),
+            }),
+            Opcode::Gt { left, right, dest } => is_used(dest).then(|| Opcode::Gt {
+                left: get_reg(left),
+                right: get_reg(right),
+                dest: get_reg(dest),
+            }),
+            Opcode::Gte { left, right, dest } => is_used(dest).then(|| Opcode::Gte {
+                left: get_reg(left),
+                right: get_reg(right),
+                dest: get_reg(dest),
+            }),
+            Opcode::Copy { from, to } => is_used(to).then(|| Opcode::Copy {
+                from: get_reg(from),
+                to: get_reg(to),
+            }),
+            Opcode::Print { reg } => Some(Opcode::Print { reg: get_reg(reg) }),
+            Opcode::JumpIfFalse { src, to } => Some(Opcode::JumpIfFalse {
+                src: get_reg(src),
+                to,
+            }),
+            Opcode::Jump { to } => Some(Opcode::Jump { to }),
+            _ => {
+                println!("OPTIMIZATION: UNIMPLEMENTED OPERATOR [{:?}]", op);
+                Some(op)
+            },
+        })
+        .collect::<Vec<_>>();
 
     let mut output = Function { opcodes: vec![] };
 
     // fix jumps
-    for (_i, op) in opcodes.iter().enumerate().filter_map(|(i, v)| v.map(|v| (i, v))) {
+    for (_i, op) in opcodes
+        .iter()
+        .enumerate()
+        .filter_map(|(i, v)| v.map(|v| (i, v)))
+    {
         match op {
             Opcode::Jump { to } | Opcode::JumpIfFalse { src: _, to } => {
                 let to = to as usize;
 
-                let output_address = to - &opcodes[0..to].into_iter().filter(|v| matches!(v, None)).count();
+                let output_address = to
+                    - &opcodes[0..to]
+                        .into_iter()
+                        .filter(|v| matches!(v, None))
+                        .count();
 
                 output.opcodes.push(match op {
-                    Opcode::Jump { to: _ } => Opcode::Jump { to: output_address as u16 },
-                    Opcode::JumpIfFalse { src, to: _ } => Opcode::JumpIfFalse { src, to: output_address as u16 },
+                    Opcode::Jump { to: _ } => Opcode::Jump {
+                        to: output_address as u16,
+                    },
+                    Opcode::JumpIfFalse { src, to: _ } => Opcode::JumpIfFalse {
+                        src,
+                        to: output_address as u16,
+                    },
                     _ => unreachable!(),
                 });
             },

@@ -167,7 +167,7 @@ impl<'a> Compiler<'a> {
                     Some(k) => self.is_inside_loop(k),
                     None => None,
                 }
-            }
+            },
             Some(t) => match t {
                 ScopeType::Loop(v) => Some(v),
                 _ => None,
@@ -202,13 +202,13 @@ impl<'a> Compiler<'a> {
                             area,
                             def: def.clone(),
                         })
-                    }
+                    },
                     ScopeType::ArrowStmt(def) => {
                         return Err(CompilerError::BreakInArrowStmtScope {
                             area,
                             def: def.clone(),
                         })
-                    }
+                    },
                     _ => (),
                 },
                 None => (),
@@ -236,13 +236,13 @@ impl<'a> Compiler<'a> {
                         area,
                         def: def.clone(),
                     })
-                }
+                },
                 ScopeType::ArrowStmt(def) => {
                     return Err(CompilerError::BreakInArrowStmtScope {
                         area,
                         def: def.clone(),
                     })
-                }
+                },
 
                 _ => (),
             },
@@ -308,7 +308,7 @@ impl<'a> Compiler<'a> {
                     v.0.iter()
                         .map(|s| self.interner.borrow().resolve(&s.value).into())
                         .collect()
-                }
+                },
                 None => vec![],
             },
         );
@@ -389,7 +389,7 @@ impl<'a> Compiler<'a> {
                     name,
                     area: self.make_area(span),
                 })
-            }
+            },
         };
         let import_base = import_path.parent().unwrap();
 
@@ -405,7 +405,7 @@ impl<'a> Compiler<'a> {
                     Ok(b) => b,
                     Err(_) => {
                         break 'from_cache;
-                    }
+                    },
                 };
 
                 if bytecode.source_hash == hash.into()
@@ -453,17 +453,17 @@ impl<'a> Compiler<'a> {
                             let _ = std::fs::create_dir(import_base.join(".spwnc"));
                             std::fs::write(&spwnc_path, bytes).unwrap();
                         }
-                    }
+                    },
                     Err(err) => return Err(err),
                 }
-            }
+            },
             Err(err) => {
                 return Err(CompilerError::ImportSyntaxError {
                     is_module,
                     err,
                     area: self.make_area(span),
                 })
-            }
+            },
         };
 
         Ok(())
@@ -490,7 +490,7 @@ impl<'a> Compiler<'a> {
         match &*stmt.stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder, ExprType::Normal)?;
-            }
+            },
             Statement::Let(var, expr) => match *var.expr {
                 Expression::Var(s) => {
                     let var_reg = builder.next_reg();
@@ -506,7 +506,7 @@ impl<'a> Compiler<'a> {
                     let expr_reg = self.compile_expr(expr, scope, builder, ExprType::Normal)?;
 
                     builder.copy(expr_reg, var_reg, stmt.span);
-                }
+                },
                 _ => todo!("haha 😂😂😂😂"),
             },
             Statement::AssignOp(left, op, right) => match op {
@@ -539,57 +539,57 @@ impl<'a> Compiler<'a> {
                     let expr_reg = self.compile_expr(right, scope, builder, ExprType::Normal)?;
 
                     builder.copy(expr_reg, into_reg, stmt.span);
-                }
+                },
                 AssignOp::PlusEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.add_eq(a, b, stmt.span)
-                }
+                },
                 AssignOp::MinusEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.sub_eq(a, b, stmt.span)
-                }
+                },
                 AssignOp::MultEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.mult_eq(a, b, stmt.span)
-                }
+                },
                 AssignOp::DivEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.div_eq(a, b, stmt.span)
-                }
+                },
                 AssignOp::ModEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.modulo_eq(a, b, stmt.span)
-                }
+                },
                 AssignOp::PowEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.pow_eq(a, b, stmt.span)
-                }
+                },
                 AssignOp::ShiftLeftEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.shl_eq(a, b, stmt.span)
-                }
+                },
                 AssignOp::ShiftRightEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.shr_eq(a, b, stmt.span)
-                }
+                },
                 AssignOp::BinAndEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.bin_and_eq(a, b, stmt.span)
-                }
+                },
                 AssignOp::BinOrEq => {
                     let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.bin_or_eq(a, b, stmt.span)
-                }
+                },
             },
 
             Statement::While { cond, code } => {
@@ -605,7 +605,7 @@ impl<'a> Compiler<'a> {
                     b.repeat_block();
                     Ok(())
                 })?;
-            }
+            },
 
             Statement::For {
                 iter_var,
@@ -638,7 +638,7 @@ impl<'a> Compiler<'a> {
                                 inner_scope,
                             );
                             b.copy(next_reg, var_reg, iter_var.span);
-                        }
+                        },
                         _ => todo!("haha 😂😂😂😂"),
                     }
 
@@ -647,7 +647,7 @@ impl<'a> Compiler<'a> {
                     b.repeat_block();
                     Ok(())
                 })?;
-            }
+            },
 
             Statement::If {
                 branches,
@@ -677,28 +677,28 @@ impl<'a> Compiler<'a> {
 
                     Ok(())
                 })?;
-            }
+            },
             Statement::Break => match self.is_inside_loop(scope) {
                 Some(path) => {
                     self.assert_can_break_loop(scope, self.make_area(stmt.span))?;
                     builder.exit_other_block(path.clone())
-                }
+                },
                 _ => {
                     return Err(CompilerError::BreakOutsideLoop {
                         area: self.make_area(stmt.span),
                     })
-                }
+                },
             },
             Statement::Continue => match self.is_inside_loop(scope) {
                 Some(path) => {
                     self.assert_can_break_loop(scope, self.make_area(stmt.span))?;
                     builder.repeat_other_block(path.clone())
-                }
+                },
                 _ => {
                     return Err(CompilerError::ContinueOutsideLoop {
                         area: self.make_area(stmt.span),
                     })
-                }
+                },
             },
             Statement::TryCatch {
                 try_code,
@@ -762,7 +762,7 @@ impl<'a> Compiler<'a> {
                 }
 
                 */
-            }
+            },
             Statement::Arrow(statement) => {
                 builder.block(|b| {
                     let inner_scope = self
@@ -772,7 +772,7 @@ impl<'a> Compiler<'a> {
                     b.yeet_context();
                     Ok(())
                 })?;
-            }
+            },
             Statement::Return(value) => {
                 if matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
                     match value {
@@ -790,18 +790,18 @@ impl<'a> Compiler<'a> {
                                 self.global_return =
                                     Some((items.iter().map(|i| i.0).collect(), stmt.span));
                                 builder.ret(ret_reg, true);
-                            }
+                            },
                             _ => {
                                 return Err(CompilerError::InvalidModuleReturn {
                                     area: self.make_area(stmt.span),
                                 })
-                            }
+                            },
                         },
                         None => {
                             return Err(CompilerError::InvalidModuleReturn {
                                 area: self.make_area(stmt.span),
                             })
-                        }
+                        },
                     }
                 } else if self.is_inside_macro(scope) {
                     self.assert_can_return(scope, self.make_area(stmt.span))?;
@@ -810,19 +810,19 @@ impl<'a> Compiler<'a> {
                             let out_reg = builder.next_reg();
                             builder.load_empty(out_reg, stmt.span);
                             builder.ret(out_reg, false)
-                        }
+                        },
                         Some(expr) => {
                             let ret_reg =
                                 self.compile_expr(expr, scope, builder, ExprType::Normal)?;
                             builder.ret(ret_reg, false)
-                        }
+                        },
                     }
                 } else {
                     return Err(CompilerError::ReturnOutsideMacro {
                         area: self.make_area(stmt.span),
                     });
                 }
-            }
+            },
             Statement::TypeDef { name, private } => {
                 if !matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
                     return Err(CompilerError::TypeDefNotGlobal {
@@ -856,7 +856,7 @@ impl<'a> Compiler<'a> {
 
                 self.custom_type_defs.insert(info, k.spanned(stmt.span));
                 self.available_custom_types.insert(*name, k);
-            }
+            },
             Statement::Impl { base, items } => {
                 let dict_reg = builder.next_reg();
                 self.build_dict(builder, items, dict_reg, scope, stmt.span)?;
@@ -864,7 +864,7 @@ impl<'a> Compiler<'a> {
                 let base_reg = self.compile_expr(base, scope, builder, ExprType::Normal)?;
 
                 builder.do_impl(base_reg, dict_reg, stmt.span);
-            }
+            },
             Statement::Overload { op, macros } => {
                 let array_reg = builder.next_reg();
 
@@ -883,7 +883,7 @@ impl<'a> Compiler<'a> {
                                                     area: self.make_area(e.span),
                                                 });
                                             }
-                                        }
+                                        },
                                         Operator::Unary(_) => {
                                             if args.len() != 1 {
                                                 return Err(CompilerError::InvalidOverload {
@@ -891,19 +891,19 @@ impl<'a> Compiler<'a> {
                                                     area: self.make_area(e.span),
                                                 });
                                             }
-                                        }
+                                        },
                                     }
                                     for arg in args {
                                         let err = match arg {
                                             MacroArg::Spread { .. } => {
                                                 Some("macro with no spreads")
-                                            }
+                                            },
                                             MacroArg::Single {
                                                 default: Some(_), ..
                                             } => Some("macro with no defaults"),
                                             MacroArg::Single { pattern: None, .. } => {
                                                 Some("macro with explicit patterns")
-                                            }
+                                            },
                                             _ => None,
                                         };
                                         if let Some(msg) = err {
@@ -913,13 +913,13 @@ impl<'a> Compiler<'a> {
                                             });
                                         }
                                     }
-                                }
+                                },
                                 _ => {
                                     return Err(CompilerError::InvalidOverload {
                                         expected: "macro expression".into(),
                                         area: self.make_area(e.span),
                                     })
-                                }
+                                },
                             }
 
                             elems.push((
@@ -934,18 +934,18 @@ impl<'a> Compiler<'a> {
                 )?;
 
                 builder.do_overload(array_reg, *op, stmt.span);
-            }
+            },
             Statement::ExtractImport(_) => todo!(),
             Statement::Dbg(v) => {
                 let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
                 builder.dbg(v);
-            }
+            },
             Statement::Throw(err) => {
                 let out_reg = builder.next_reg();
 
                 builder.load_string(self.resolve(err), out_reg, stmt.span);
                 builder.throw(out_reg, stmt.span);
-            }
+            },
         }
         Ok(())
     }
@@ -976,43 +976,43 @@ impl<'a> Compiler<'a> {
                 builder.type_of(expr_reg, typeof_reg, pattern.span);
 
                 builder.eq(t_reg, typeof_reg, out_reg, pattern.span);
-            }
+            },
             Pattern::Either(a, b) => {
                 let left = self.compile_pattern_check(expr_reg, a, scope, builder)?;
                 let right = self.compile_pattern_check(expr_reg, b, scope, builder)?;
 
                 builder.or(left, right, out_reg, pattern.span);
-            }
+            },
             Pattern::Both(a, b) => {
                 let left = self.compile_pattern_check(expr_reg, a, scope, builder)?;
                 let right = self.compile_pattern_check(expr_reg, b, scope, builder)?;
 
                 builder.and(left, right, out_reg, pattern.span);
-            }
+            },
             Pattern::Eq(val) => {
                 let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
                 builder.eq(expr_reg, val, out_reg, pattern.span);
-            }
+            },
             Pattern::Neq(val) => {
                 let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
                 builder.neq(expr_reg, val, out_reg, pattern.span);
-            }
+            },
             Pattern::Lt(val) => {
                 let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
                 builder.lt(expr_reg, val, out_reg, pattern.span);
-            }
+            },
             Pattern::Lte(val) => {
                 let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
                 builder.lte(expr_reg, val, out_reg, pattern.span);
-            }
+            },
             Pattern::Gt(val) => {
                 let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
                 builder.gt(expr_reg, val, out_reg, pattern.span);
-            }
+            },
             Pattern::Gte(val) => {
                 let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
                 builder.gte(expr_reg, val, out_reg, pattern.span);
-            }
+            },
             Pattern::MacroPattern { args, ret_type } => {
                 // for pattern in args {
                 // let p = self.compile_pattern_check(expr_reg, pattern, scope, builder)?;
@@ -1020,7 +1020,7 @@ impl<'a> Compiler<'a> {
                 // }
 
                 // let ret = self.compile_pattern_check(expr_reg, ret_type, scope, builder)?;
-            }
+            },
         };
 
         Ok(out_reg)
@@ -1039,7 +1039,7 @@ impl<'a> Compiler<'a> {
                 } else {
                     Constant::String(content)
                 }
-            }
+            },
             Expression::Bool(v) => Constant::Bool(*v),
             Expression::Id(class, Some(id)) => Constant::Id(*class, *id),
             Expression::Type(t) => {
@@ -1054,24 +1054,27 @@ impl<'a> Compiler<'a> {
                                 area: self.make_area(expr.span),
                                 type_name: name,
                             })
-                        }
+                        },
                     }
                 }
-            }
+            },
             Expression::Array(arr) => {
                 let mut v = vec![];
                 for i in arr {
                     v.push(self.convert_const_expr(i)?)
                 }
                 Constant::Array(v)
-            }
+            },
             Expression::Dict(map) if map.iter().all(|(_, v, _)| v.is_some()) => {
                 let mut m = AHashMap::new();
                 for (k, v, _) in map {
-                    m.insert(self.resolve(&k.value), self.convert_const_expr(&v.clone().unwrap())?);
+                    m.insert(
+                        self.resolve(&k.value),
+                        self.convert_const_expr(&v.clone().unwrap())?,
+                    );
                 }
                 Constant::Dict(m)
-            }
+            },
             Expression::Maybe(o) => Constant::Maybe(match o {
                 Some(e) => Some(Box::new(self.convert_const_expr(e)?)),
                 None => None,
@@ -1098,13 +1101,13 @@ impl<'a> Compiler<'a> {
                     );
                 }
                 Constant::Instance(k, m)
-            }
+            },
             Expression::Obj(..) => todo!(),
             _ => {
                 return Err(CompilerError::ExpectedConstantExpr {
                     area: self.make_area(expr.span),
                 })
-            }
+            },
         })
     }
 
@@ -1124,11 +1127,11 @@ impl<'a> Compiler<'a> {
                                     area: self.make_area(pat.span),
                                     type_name: name,
                                 })
-                            }
+                            },
                         }
                     };
                     Pattern::Type(t)
-                }
+                },
                 Pattern::Either(a, b) => Pattern::Either(
                     Box::new(self.convert_const_pattern(a)?),
                     Box::new(self.convert_const_pattern(b)?),
@@ -1173,12 +1176,12 @@ impl<'a> Compiler<'a> {
                 match v.s {
                     StringContent::Normal(s) => {
                         builder.load_string(self.resolve(&s), out_reg, expr.span);
-                    }
+                    },
                 }
                 if v.bytes {
                     builder.make_byte_array(out_reg, expr.span);
                 }
-            }
+            },
             Expression::Id(class, value) => builder.load_id(*value, *class, out_reg, expr.span),
             Expression::Op(left, op, right) => match op {
                 BinOp::Plus => bin_op!(left add right),
@@ -1189,43 +1192,43 @@ impl<'a> Compiler<'a> {
                 BinOp::Pow => bin_op!(left pow right),
                 BinOp::ShiftLeft => {
                     bin_op!(left shl right)
-                }
+                },
                 BinOp::ShiftRight => {
                     bin_op!(left shr right)
-                }
+                },
                 BinOp::BinAnd => {
                     bin_op!(left bin_and right)
-                }
+                },
                 BinOp::BinOr => {
                     bin_op!(left bin_or right)
-                }
+                },
                 BinOp::Eq => {
                     bin_op!(left eq right)
-                }
+                },
                 BinOp::Neq => {
                     bin_op!(left neq right)
-                }
+                },
                 BinOp::Gt => {
                     bin_op!(left gt right)
-                }
+                },
                 BinOp::Gte => {
                     bin_op!(left gte right)
-                }
+                },
                 BinOp::Lt => {
                     bin_op!(left lt right)
-                }
+                },
                 BinOp::Lte => {
                     bin_op!(left lte right)
-                }
+                },
                 BinOp::Range => {
                     bin_op!(left range right)
-                }
+                },
                 BinOp::In => {
                     bin_op!(left in_op right)
-                }
+                },
                 BinOp::As => {
                     bin_op!(left as_op right)
-                }
+                },
                 BinOp::Or => bin_op!(left or right),
                 BinOp::And => bin_op!(left and right),
             },
@@ -1242,7 +1245,7 @@ impl<'a> Compiler<'a> {
                     // UnaryOp::Lt => builder.unary_pat_lt(v, out_reg, expr.span),
                     // UnaryOp::Lte => builder.unary_pat_lte(v, out_reg, expr.span),
                 }
-            }
+            },
             Expression::Var(name) => match self.get_var(*name, scope) {
                 Some(data) => {
                     if let ExprType::Assign(stmt_span) = expr_type {
@@ -1256,13 +1259,13 @@ impl<'a> Compiler<'a> {
                     }
 
                     return Ok(data.reg);
-                }
+                },
                 None => {
                     return Err(CompilerError::NonexistentVariable {
                         area: self.make_area(expr.span),
                         var: self.resolve(name),
                     })
-                }
+                },
             },
             Expression::Type(t) => {
                 let name = self.resolve(t);
@@ -1276,10 +1279,10 @@ impl<'a> Compiler<'a> {
                                 area: self.make_area(expr.span),
                                 type_name: name,
                             })
-                        }
+                        },
                     }
                 }
-            }
+            },
             Expression::Array(items) => {
                 builder.new_array(
                     items.len() as u16,
@@ -1295,10 +1298,10 @@ impl<'a> Compiler<'a> {
                     },
                     expr.span,
                 )?;
-            }
+            },
             Expression::Dict(items) => {
                 self.build_dict(builder, items, out_reg, scope, expr.span)?;
-            }
+            },
             Expression::Instance { base, items } => {
                 let dict_reg = builder.next_reg();
                 self.build_dict(builder, items, dict_reg, scope, expr.span)?;
@@ -1306,19 +1309,19 @@ impl<'a> Compiler<'a> {
                 let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
 
                 builder.create_instance(base_reg, dict_reg, out_reg, expr.span);
-            }
+            },
             Expression::Maybe(e) => match e {
                 Some(e) => {
                     let value = self.compile_expr(e, scope, builder, ExprType::Normal)?;
                     builder.wrap_maybe(value, out_reg, expr.span)
-                }
+                },
                 None => builder.load_none(out_reg, expr.span),
             },
             Expression::Index { base, index } => {
                 let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
                 let index_reg = self.compile_expr(index, scope, builder, ExprType::Normal)?;
                 builder.index(base_reg, out_reg, index_reg, expr.span)
-            }
+            },
             Expression::Member { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
                 builder.member(
@@ -1327,7 +1330,7 @@ impl<'a> Compiler<'a> {
                     self.resolve(&name.value).spanned(name.span),
                     expr.span,
                 )
-            }
+            },
             Expression::TypeMember { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
                 builder.type_member(
@@ -1336,7 +1339,7 @@ impl<'a> Compiler<'a> {
                     self.resolve(&name.value).spanned(name.span),
                     expr.span,
                 )
-            }
+            },
             Expression::Associated { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
                 builder.associated(
@@ -1345,12 +1348,12 @@ impl<'a> Compiler<'a> {
                     self.resolve(&name.value).spanned(name.span),
                     expr.span,
                 )
-            }
+            },
             Expression::Is(val, pat) => {
                 let reg = self.compile_expr(val, scope, builder, expr_type)?;
                 let out = self.compile_pattern_check(reg, pat, scope, builder)?;
                 builder.copy(out, out_reg, expr.span);
-            }
+            },
             Expression::Macro {
                 args,
                 ret_type,
@@ -1405,7 +1408,7 @@ impl<'a> Compiler<'a> {
                                 let ret_reg =
                                     self.compile_expr(expr, base_scope, f, ExprType::Normal)?;
                                 f.ret(ret_reg, false);
-                            }
+                            },
                         }
 
                         Ok((capture_regs, ref_arg_regs))
@@ -1449,7 +1452,7 @@ impl<'a> Compiler<'a> {
                                         default: d,
                                         is_ref: *is_ref,
                                     })
-                                }
+                                },
                                 MacroArg::Spread { name, pattern } => {
                                     let n = self.resolve(&name.value).spanned(name.span);
 
@@ -1463,14 +1466,14 @@ impl<'a> Compiler<'a> {
                                         name: n,
                                         pattern: p,
                                     })
-                                }
+                                },
                             }
                         }
                         Ok(())
                     },
                     expr.span,
                 )?;
-            }
+            },
             Expression::Call {
                 base,
                 params,
@@ -1527,7 +1530,7 @@ impl<'a> Compiler<'a> {
                     expr.span,
                 )?;
                 builder.call(base_reg, out_reg, args_reg, expr.span);
-            }
+            },
             // Expression::MacroPattern { args, ret_type } => todo!(),
             Expression::TriggerFunc { attributes, code } => {
                 use crate::gd::ids::IDClass::Group;
@@ -1544,7 +1547,7 @@ impl<'a> Compiler<'a> {
                     self.compile_stmts(code, inner_scope, b)
                 })?;
                 builder.pop_context_group(out_reg, expr.span);
-            }
+            },
             Expression::TriggerFuncCall(_) => todo!(),
             Expression::Ternary {
                 cond,
@@ -1569,24 +1572,24 @@ impl<'a> Compiler<'a> {
 
                     Ok(())
                 })?;
-            }
+            },
             Expression::Typeof(e) => {
                 let reg = self.compile_expr(e, scope, builder, ExprType::Normal)?;
                 builder.type_of(reg, out_reg, expr.span);
-            }
+            },
             Expression::Builtins => {
                 builder.load_builtins(out_reg, expr.span);
-            }
+            },
             Expression::Empty => {
                 builder.load_empty(out_reg, expr.span);
-            }
+            },
             // Expression::AnyPattern => {
             //     builder.load_any(out_reg, expr.span);
             // }
             Expression::Import(t) => {
                 self.compile_import(t, expr.span, self.src.clone())?;
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
-            }
+            },
 
             Expression::Obj(typ, items) => {
                 builder.new_object(
@@ -1605,7 +1608,7 @@ impl<'a> Compiler<'a> {
                     expr.span,
                     *typ,
                 )?;
-            }
+            },
         }
 
         Ok(out_reg)
@@ -1633,7 +1636,7 @@ impl<'a> Compiler<'a> {
                                     area: self.make_area(key.span),
                                     var: self.resolve(&key.value),
                                 })
-                            }
+                            },
                         },
                     };
 

@@ -33,8 +33,11 @@ impl ImportType {
         match self {
             ImportType::Module(s) => {
                 let rel_path = PathBuf::from(s);
-                (rel_path.file_stem().unwrap().to_str().unwrap().to_string(), rel_path)
-            }
+                (
+                    rel_path.file_stem().unwrap().to_str().unwrap().to_string(),
+                    rel_path,
+                )
+            },
             ImportType::Library(name) => {
                 let rel_path = PathBuf::from(format!("libraries/{name}/lib.spwn"));
                 (
@@ -48,7 +51,7 @@ impl ImportType {
                         .to_string(),
                     rel_path,
                 )
-            }
+            },
         }
     }
 }

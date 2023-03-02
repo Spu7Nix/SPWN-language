@@ -15,7 +15,7 @@ pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm, code: BytecodeKey) -> R
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -51,7 +51,7 @@ pub fn to_obj_param(
                     }
                 }
                 Some(ObjParam::GroupList(arr))
-            }
+            },
             // if v.iter().all(|k| {
             //     matches!(&vm.memory[*k].value, Value::Group(_))
             // }) => ObjParam::GroupList(v.iter().map(f))
@@ -77,7 +77,7 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
                     .zip(v2)
                     .all(|(k1, k2)| equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm))
             }
-        }
+        },
         (Value::Dict(v1), Value::Dict(v2)) => {
             if v1.len() != v2.len() {
                 false
@@ -88,16 +88,16 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
                             if !equality(&vm.memory[k1.0].value, &vm.memory[k2.0].value, vm) {
                                 return false;
                             }
-                        }
+                        },
                         None => return false,
                     }
                 }
                 true
             }
-        }
+        },
         (Value::Maybe(Some(k1)), Value::Maybe(Some(k2))) => {
             equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm)
-        }
+        },
         _ => a == b,
     }
 }
@@ -155,7 +155,7 @@ pub fn add(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -179,7 +179,7 @@ pub fn sub(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -198,7 +198,7 @@ pub fn mult(
 
         (Value::Int(n), Value::String(s)) | (Value::String(s), Value::Int(n)) => {
             Value::String(s.repeat((*n).max(0) as usize))
-        }
+        },
 
         _ => {
             return Err(RuntimeError::InvalidOperands {
@@ -208,7 +208,7 @@ pub fn mult(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 pub fn div(
@@ -231,7 +231,7 @@ pub fn div(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -255,7 +255,7 @@ pub fn modulo(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -279,7 +279,7 @@ pub fn pow(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -298,7 +298,7 @@ pub fn unary_not(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -318,7 +318,7 @@ pub fn unary_negate(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -343,7 +343,7 @@ pub fn gt(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -368,7 +368,7 @@ pub fn lt(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -393,7 +393,7 @@ pub fn gte(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -418,7 +418,7 @@ pub fn lte(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -439,7 +439,7 @@ pub fn and(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -460,7 +460,7 @@ pub fn or(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -479,7 +479,7 @@ pub fn range(
             } else {
                 todo!()
             }
-        }
+        },
         // (Value::Int(a), Value::Float(b)) => Value::Range(*a, *b as i64, 1),
         // (Value::Float(a), Value::Int(b)) => Value::Range(*a as i64, *b, 1),
         // (Value::Float(a), Value::Float(b)) => Value::Range(*a as i64, *b as i64, 1),
@@ -493,7 +493,7 @@ pub fn range(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -516,7 +516,7 @@ pub fn bin_and(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -539,7 +539,7 @@ pub fn bin_or(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -561,7 +561,7 @@ pub fn shift_left(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 
@@ -583,7 +583,7 @@ pub fn shift_right(
                 area: vm.make_area(span, code),
                 call_stack: vm.get_call_stack(),
             })
-        }
+        },
     })
 }
 

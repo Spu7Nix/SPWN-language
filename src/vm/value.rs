@@ -17,7 +17,8 @@ use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::CustomTypeKey;
 use crate::gd::gd_object::ObjParam;
 use crate::gd::ids::*;
-use crate::parsing::ast::{MacroArg, ObjKeyType, ObjectType, Spanned};
+use crate::gd::object_keys::ObjectKey;
+use crate::parsing::ast::{MacroArg, ObjectType, Spanned};
 use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,7 +90,7 @@ impl IteratorData {
                     Value::Array(values) => values.get(*index).map(|k| vm.memory[*k].clone()),
                     _ => todo!(), // maybe add error here incase its mutated???
                 }
-            }
+            },
             IteratorData::Range { range, index } => {
                 let v = if range.1 >= range.0 {
                     (range.0..range.1).nth(*index * range.2)
@@ -105,7 +106,7 @@ impl IteratorData {
                     value: Value::Int(v),
                     area,
                 })
-            }
+            },
             IteratorData::String { string, index } => {
                 match &vm.memory[*string].value {
                     Value::String(s) => s.get(*index).map(|c| StoredValue {
@@ -114,7 +115,7 @@ impl IteratorData {
                     }),
                     _ => todo!(), // maybe add error here incase its mutated???
                 }
-            }
+            },
             // dict string TODO
             _ => unreachable!(),
         }
@@ -229,9 +230,6 @@ macro_rules! value {
                 fn get_override_fn(&self, _: &str) -> Option<BuiltinFn> {
                     None
                 }
-                // fn get_override_const(&self, _: &str) -> Option<Constant> {
-                //     None
-                // }
             }
 
             $(
@@ -248,22 +246,16 @@ macro_rules! value {
                         _ => unreachable!(),
                     }
                 }
-                // pub fn get_override_const(self, name: &str) -> Option<Constant> {
-                //     match self {
-                //         $(
-                //             Self::$name => type_aliases::$name.get_override_const(name),
-                //         )*
-                //         _ => unreachable!(),
-                //     }
-                // }
             }
         }
     };
     
     (@struct $name:ident $(<$lt:lifetime>)?) => {
+        #[derive(Clone, Debug, PartialEq)]
         pub struct $name $(<$lt> (std::marker::PhantomData<&$lt ()>) )?;
     };
     (@struct $name:ident $(<$lt:lifetime>)? ( $( $t0:ty, )* )) => {
+        #[derive(Debug, PartialEq)]
         pub struct $name $(<$lt>)? ( $( pub $t0, )* $(std::marker::PhantomData<&$lt ()>)? );
 
         ::defile::item! {
@@ -271,6 +263,7 @@ macro_rules! value {
         }
     };
     (@struct $name:ident $(<$lt:lifetime>)? { $( $n:ident: $t1:ty, )* }) => {
+        #[derive(Debug, PartialEq)]
         pub struct $name $(<$lt>)? { $( pub $n: $t1, )* $(_pd: std::marker::PhantomData<&$lt ()>)? }
     };
 
@@ -357,6 +350,7 @@ value! {
     },
 
     Object(AHashMap<u8, ObjParam>, ObjectType),
+    ObjectKey(ObjectKey),
 
     Epsilon,
 
@@ -383,7 +377,7 @@ impl Value {
                     IDClass::Block => Value::Block(id),
                     IDClass::Item => Value::Item(id),
                 }
-            }
+            },
             Constant::Type(k) => Value::Type(*k),
             Constant::Array(arr) => Value::Array(
                 arr.iter()
@@ -479,7 +473,7 @@ impl Value {
                 } else {
                     format!("{n1}..{s}..{n2}")
                 }
-            }
+            },
             Value::Maybe(o) => match o {
                 Some(k) => format!("({})?", vm.memory[*k].value.runtime_display(vm)),
                 None => "?".into(),
@@ -547,6 +541,10 @@ impl Value {
                     .join(", "),
             ),
             Value::Iterator(_) => "<iterator>".into(),
+            Value::ObjectKey(k) => format!(
+                "$.obj_props.{}",
+                <ObjectKey as Into<&'static str>>::into(*k)
+            ),
         }
     }
 }

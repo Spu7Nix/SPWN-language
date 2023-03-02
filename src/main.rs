@@ -145,7 +145,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             )));
 
                             std::process::exit(1);
-                        }
+                        },
                     }
 
                     let (mut level_string, level_name) = match levelstring::get_level_string(
@@ -161,7 +161,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             )));
 
                             std::process::exit(1);
-                        }
+                        },
                     };
 
                     spinner.complete(None);
@@ -188,12 +188,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                     spinner.fail(Some(format!("❌  {e}")));
 
                     std::process::exit(1);
-                }
+                },
             };
 
             objects.extend(gd_object::apply_triggers(triggers));
 
-            println!("\n{} objects added", (objects.len()).to_string().bright_white().bold());
+            println!(
+                "\n{} objects added",
+                (objects.len()).to_string().bright_white().bold()
+            );
 
             let (new_ls, used_ids) = gd_object::append_objects(objects, &level_string)?;
 
@@ -234,11 +237,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                             .bright_green()
                             .bold(),
                     )));
-                }
+                },
 
                 None => println!("\nOutput: {new_ls}",),
             };
-        }
+        },
     };
 
     Ok(())
@@ -257,7 +260,10 @@ fn run_spwn(
 ) -> Result<SpwnOutput, Box<dyn Error>> {
     let interner = Rc::new(RefCell::new(Rodeo::with_hasher(RandomState::new())));
 
-    spinner.start(format!("{:20}", "Parsing...".color_hex(PARSING_COLOR).bold()));
+    spinner.start(format!(
+        "{:20}",
+        "Parsing...".color_hex(PARSING_COLOR).bold()
+    ));
 
     let src = SpwnSource::File(file);
     let code = src
@@ -270,13 +276,21 @@ fn run_spwn(
 
     spinner.complete(None);
 
-    spinner.start(format!("{:20}", "Compiling...".color_hex(COMPILING_COLOR).bold()));
+    spinner.start(format!(
+        "{:20}",
+        "Compiling...".color_hex(COMPILING_COLOR).bold()
+    ));
 
     let mut map = BytecodeMap::default();
     let mut typedefs = TypeDefMap::default();
 
-    let mut compiler =
-        Compiler::new(Rc::clone(&interner), parser.src.clone(), settings, &mut map, &mut typedefs);
+    let mut compiler = Compiler::new(
+        Rc::clone(&interner),
+        parser.src.clone(),
+        settings,
+        &mut map,
+        &mut typedefs,
+    );
 
     compiler
         .compile(ast.statements)

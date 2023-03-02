@@ -354,18 +354,18 @@ impl Parse for TypeImpl {
                 Ok(c) => {
                     constants.push(c);
                     continue;
-                }
+                },
                 Err(e) => {
                     match TypeMacro::parse(&content) {
                         Ok(m) => {
                             macros.push(m);
                             continue;
-                        }
+                        },
                         Err(e) => return Err(e),
                     }
 
                     return Err(e);
-                }
+                },
             };
         }
 
@@ -468,7 +468,7 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
                             #sty: #(#non_ref_tys)*; #(#ref_tys)*
                         }
                     }
-                }
+                },
                 ArgType::Any(_) => todo!(),
             };
 
@@ -491,7 +491,7 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
                 ArgType::Spread(t) => format!("...{t}"),
                 ArgType::Destructure { binder, name, .. } => {
                     format!("{binder}: @{}", name.to_string().to_snake_case())
-                }
+                },
                 ArgType::Ref { binder, tys } => format!(
                     "{binder}: {}",
                     tys.iter()

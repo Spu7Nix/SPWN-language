@@ -15,7 +15,7 @@ use crate::compiling::bytecode::Bytecode;
 use crate::compiling::compiler::{CustomTypeKey, TypeDef};
 use crate::gd::gd_object::{GdObject, Trigger, TriggerOrder};
 use crate::gd::ids::{IDClass, Id, SpecificId};
-use crate::gd::object_keys::ObjectKeyValueType;
+use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{MacroArg, ObjectType, Spannable, Spanned};
 use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
@@ -46,8 +46,14 @@ pub struct Vm<'a> {
     // 256 registers per function
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    pub programs:
-        SlotMap<BytecodeKey, (SpwnSource, &'a Bytecode<Register>, Vec<(CustomTypeKey, bool)>)>,
+    pub programs: SlotMap<
+        BytecodeKey,
+        (
+            SpwnSource,
+            &'a Bytecode<Register>,
+            Vec<(CustomTypeKey, bool)>,
+        ),
+    >,
     pub src_map: AHashMap<SpwnSource, BytecodeKey>,
 
     pub interner: Rc<RefCell<Interner>>,
@@ -365,12 +371,12 @@ impl<'a> Vm<'a> {
                     );
 
                     self.set_reg(*dest, StoredValue { value, area })
-                }
+                },
                 Opcode::Copy { from, to } => {
                     // println!("galha {} {} {}", self.contexts.0.len(), ip, func.func);
                     let v = self.deep_clone_reg(*from);
                     self.set_reg(*to, v)
-                }
+                },
                 Opcode::Dbg { reg } => {
                     println!(
                         "{}, {} | {:?} | {:?}",
@@ -379,7 +385,7 @@ impl<'a> Vm<'a> {
                         self.get_reg(*reg).value,
                         self.get_reg_key(*reg),
                     )
-                }
+                },
                 Opcode::AllocArray { size, dest } => self.set_reg(
                     *dest,
                     StoredValue {
@@ -401,7 +407,7 @@ impl<'a> Vm<'a> {
                         Value::Array(v) => v.push(push),
                         _ => unreachable!(),
                     }
-                }
+                },
                 Opcode::PushDictElem { elem, key, dest } => {
                     let push = self.deep_clone_reg_insert(*elem);
 
@@ -415,10 +421,10 @@ impl<'a> Vm<'a> {
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
                             v.insert(key, (push, Visibility::Public));
-                        }
+                        },
                         _ => unreachable!(),
                     }
-                }
+                },
                 Opcode::PushArrayElemByKey { elem, dest } => {
                     let push = self.get_reg_key(*elem);
                     // println!("bavi {:?}", self.get_reg_mut(*dest).value);
@@ -426,7 +432,7 @@ impl<'a> Vm<'a> {
                         Value::Array(v) => v.push(push),
                         _ => unreachable!(),
                     }
-                }
+                },
                 Opcode::PushDictElemByKey { elem, key, dest } => {
                     let push = self.get_reg_key(*elem);
 
@@ -440,10 +446,10 @@ impl<'a> Vm<'a> {
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
                             v.insert(key, (push, Visibility::Public));
-                        }
+                        },
                         _ => unreachable!(),
                     }
-                }
+                },
 
                 Opcode::MakeDictElemPrivate { dest, key } => {
                     let key = match &self.get_reg(*key).value {
@@ -458,10 +464,10 @@ impl<'a> Vm<'a> {
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
                             v.entry(key).and_modify(|(_, p)| *p = new_vis);
-                        }
+                        },
                         _ => unreachable!(),
                     }
-                }
+                },
 
                 Opcode::AllocObject { size, dest } => self.set_reg(
                     *dest,
@@ -504,7 +510,7 @@ impl<'a> Vm<'a> {
                     );
 
                     self.set_reg(*reg, StoredValue { value: val, area })
-                }
+                },
 
                 Opcode::PushObjectElemKey {
                     elem,
@@ -535,7 +541,7 @@ impl<'a> Vm<'a> {
                                 | (ObjectKeyValueType::Epsilon, Value::Epsilon) => {
                                     valid = true;
                                     break;
-                                }
+                                },
 
                                 (ObjectKeyValueType::GroupArray, Value::Array(v))
                                     if v.iter().all(|k| {
@@ -544,7 +550,7 @@ impl<'a> Vm<'a> {
                                 {
                                     valid = true;
                                     break;
-                                }
+                                },
 
                                 _ => (),
                             }
@@ -567,10 +573,10 @@ impl<'a> Vm<'a> {
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Object(v, _) => {
                             v.insert(obj_key.id(), param);
-                        }
+                        },
                         _ => unreachable!(),
                     }
-                }
+                },
                 Opcode::PushObjectElemUnchecked {
                     elem,
                     obj_key,
@@ -589,103 +595,120 @@ impl<'a> Vm<'a> {
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Object(v, _) => {
                             v.insert(*obj_key, param);
-                        }
+                        },
                         _ => unreachable!(),
                     }
-                }
+                },
 
                 Opcode::Add { left, right, dest } => {
                     self.bin_op(vo::add, func, ip, left, right, dest, BinOp::Plus)?
-                }
+                },
                 Opcode::Sub { left, right, dest } => {
                     self.bin_op(vo::sub, func, ip, left, right, dest, BinOp::Minus)?
-                }
+                },
                 Opcode::Mult { left, right, dest } => {
                     self.bin_op(vo::mult, func, ip, left, right, dest, BinOp::Mult)?
-                }
+                },
                 Opcode::Div { left, right, dest } => {
                     self.bin_op(vo::div, func, ip, left, right, dest, BinOp::Div)?
-                }
+                },
                 Opcode::Mod { left, right, dest } => {
                     self.bin_op(vo::modulo, func, ip, left, right, dest, BinOp::Mod)?
-                }
+                },
                 Opcode::Pow { left, right, dest } => {
                     self.bin_op(vo::pow, func, ip, left, right, dest, BinOp::Pow)?
-                }
-                Opcode::ShiftLeft { left, right, dest } => {
-                    self.bin_op(vo::shift_left, func, ip, left, right, dest, BinOp::ShiftLeft)?
-                }
-                Opcode::ShiftRight { left, right, dest } => {
-                    self.bin_op(vo::shift_right, func, ip, left, right, dest, BinOp::ShiftRight)?
-                }
+                },
+                Opcode::ShiftLeft { left, right, dest } => self.bin_op(
+                    vo::shift_left,
+                    func,
+                    ip,
+                    left,
+                    right,
+                    dest,
+                    BinOp::ShiftLeft,
+                )?,
+                Opcode::ShiftRight { left, right, dest } => self.bin_op(
+                    vo::shift_right,
+                    func,
+                    ip,
+                    left,
+                    right,
+                    dest,
+                    BinOp::ShiftRight,
+                )?,
                 Opcode::BinOr { left, right, dest } => {
                     self.bin_op(vo::bin_or, func, ip, left, right, dest, BinOp::BinOr)?
-                }
+                },
                 Opcode::BinAnd { left, right, dest } => {
                     self.bin_op(vo::bin_and, func, ip, left, right, dest, BinOp::BinAnd)?
-                }
+                },
 
                 Opcode::AddEq { left, right } => {
                     self.assign_op(vo::add, func, ip, left, right, AssignOp::PlusEq)?
-                }
+                },
                 Opcode::SubEq { left, right } => {
                     self.assign_op(vo::sub, func, ip, left, right, AssignOp::MinusEq)?
-                }
+                },
                 Opcode::MultEq { left, right } => {
                     self.assign_op(vo::mult, func, ip, left, right, AssignOp::MultEq)?
-                }
+                },
                 Opcode::DivEq { left, right } => {
                     self.assign_op(vo::div, func, ip, left, right, AssignOp::DivEq)?
-                }
+                },
                 Opcode::ModEq { left, right } => {
                     self.assign_op(vo::modulo, func, ip, left, right, AssignOp::ModEq)?
-                }
+                },
                 Opcode::PowEq { left, right } => {
                     self.assign_op(vo::pow, func, ip, left, right, AssignOp::PowEq)?
-                }
+                },
                 Opcode::ShiftLeftEq { left, right } => {
                     self.assign_op(vo::shift_left, func, ip, left, right, AssignOp::ShiftLeftEq)?
-                }
-                Opcode::ShiftRightEq { left, right } => {
-                    self.assign_op(vo::shift_right, func, ip, left, right, AssignOp::ShiftRightEq)?
-                }
+                },
+                Opcode::ShiftRightEq { left, right } => self.assign_op(
+                    vo::shift_right,
+                    func,
+                    ip,
+                    left,
+                    right,
+                    AssignOp::ShiftRightEq,
+                )?,
                 Opcode::BinAndEq { left, right } => {
                     self.assign_op(vo::bin_and, func, ip, left, right, AssignOp::BinAndEq)?
-                }
+                },
                 Opcode::BinOrEq { left, right } => {
                     self.assign_op(vo::bin_or, func, ip, left, right, AssignOp::BinOrEq)?
-                }
+                },
 
                 Opcode::Not { src, dest } => {
                     self.unary_op(vo::unary_not, func, ip, src, dest, UnaryOp::ExclMark)?
-                }
+                },
                 Opcode::Negate { src, dest } => {
                     self.unary_op(vo::unary_negate, func, ip, src, dest, UnaryOp::Minus)?
-                }
+                },
 
                 Opcode::BinNot { src: _, dest: _ } => todo!(),
 
                 Opcode::Eq { left, right, dest } => {
                     self.bin_op(vo::eq_op, func, ip, left, right, dest, BinOp::Mod)?
-                }
+                },
                 Opcode::Neq { left, right, dest } => {
                     self.bin_op(vo::neq_op, func, ip, left, right, dest, BinOp::Mod)?
-                }
+                },
                 Opcode::Gt { left, right, dest } => {
                     self.bin_op(vo::gt, func, ip, left, right, dest, BinOp::Gt)?
-                }
+                },
                 Opcode::Lt { left, right, dest } => {
                     self.bin_op(vo::lt, func, ip, left, right, dest, BinOp::Lt)?
-                }
+                },
                 Opcode::Gte { left, right, dest } => {
                     self.bin_op(vo::gte, func, ip, left, right, dest, BinOp::Gte)?
-                }
+                },
                 Opcode::Lte { left, right, dest } => {
                     self.bin_op(vo::lte, func, ip, left, right, dest, BinOp::Lte)?
-                }
+                },
                 Opcode::Range { left, right, dest } => {
                     self.bin_op(vo::range, func, ip, left, right, dest, BinOp::Range)?
-                }
+                },
                 Opcode::In {
                     left: _,
                     right: _,
@@ -717,24 +740,24 @@ impl<'a> Vm<'a> {
                             },
                         );
                     };
-                }
+                },
                 Opcode::And { left, right, dest } => {
                     self.bin_op(vo::and, func, ip, left, right, dest, BinOp::And)?
-                }
+                },
                 Opcode::Or { left, right, dest } => {
                     self.bin_op(vo::or, func, ip, left, right, dest, BinOp::Or)?
-                }
+                },
                 Opcode::Jump { to } => {
                     self.contexts.jump_current(*to as usize);
                     continue;
-                }
+                },
                 Opcode::JumpIfFalse { src, to } => {
                     let span = self.get_span(func, ip);
                     if !vo::to_bool(self.get_reg(*src), span, self, func.code)? {
                         self.contexts.jump_current(*to as usize);
                         continue;
                     }
-                }
+                },
                 Opcode::Ret { src, module_ret } => {
                     let mut ret_val = self.deep_clone_reg(*src);
 
@@ -747,7 +770,7 @@ impl<'a> Vm<'a> {
                                     exports: d.into_iter().map(|(s, (k, _))| (s, k)).collect(),
                                     types: self.programs[func.code].2.to_vec(),
                                 }
-                            }
+                            },
                             _ => unreachable!(),
                         }
                     }
@@ -778,7 +801,7 @@ impl<'a> Vm<'a> {
 
                     // let Some(call_key) = self.return_and_pop_current(Some(ret_val)) else { continue };
                     // self.contexts.have_not_returned.remove(call_key);
-                }
+                },
                 Opcode::WrapMaybe { src, dest } => {
                     let v = self.deep_clone_reg_insert(*src);
                     let span = self.get_span(func, ip);
@@ -789,7 +812,7 @@ impl<'a> Vm<'a> {
                             area: self.make_area(span, func.code),
                         },
                     )
-                }
+                },
                 Opcode::LoadNone { dest } => {
                     let span = self.get_span(func, ip);
                     self.set_reg(
@@ -799,7 +822,7 @@ impl<'a> Vm<'a> {
                             area: self.make_area(span, func.code),
                         },
                     )
-                }
+                },
                 Opcode::LoadEmpty { dest } => {
                     let span = self.get_span(func, ip);
                     self.set_reg(
@@ -809,7 +832,7 @@ impl<'a> Vm<'a> {
                             area: self.make_area(span, func.code),
                         },
                     )
-                }
+                },
                 Opcode::LoadEmptyDict { dest } => {
                     let span = self.get_span(func, ip);
                     self.set_reg(
@@ -819,7 +842,7 @@ impl<'a> Vm<'a> {
                             area: self.make_area(span, func.code),
                         },
                     )
-                }
+                },
                 Opcode::Index { base, dest, index } => {
                     let span = self.get_span(func, ip);
 
@@ -847,7 +870,7 @@ impl<'a> Vm<'a> {
                             let k = v[index_wrap(*index, v.len(), ValueType::Array)?];
 
                             self.change_reg_key(*dest, k);
-                        }
+                        },
                         (Value::String(s), Value::Int(index)) => {
                             let idx = index_wrap(*index, s.len(), ValueType::String)?;
                             let c = s[idx];
@@ -859,7 +882,7 @@ impl<'a> Vm<'a> {
                                     area: self.make_area(span, func.code),
                                 },
                             );
-                        }
+                        },
                         (Value::Dict(v), Value::String(s)) => {
                             let key_interned = self.intern_vec(s);
                             match v.get(&key_interned) {
@@ -871,19 +894,19 @@ impl<'a> Vm<'a> {
                                         base_type: base.value.get_type(),
                                         call_stack: self.get_call_stack(),
                                     })
-                                }
+                                },
                             }
-                        }
+                        },
                         _ => {
                             return Err(RuntimeError::InvalidIndex {
                                 base: (base.value.get_type(), base.area.clone()),
                                 index: (index.value.get_type(), index.area.clone()),
                                 area: self.make_area(span, func.code),
                                 call_stack: self.get_call_stack(),
-                            })
-                        }
+                            });
+                        },
                     };
-                }
+                },
                 Opcode::Member { from, dest, member } => {
                     let key: String = match &self.get_reg(*member).value {
                         Value::String(s) => s.iter().collect(),
@@ -895,13 +918,30 @@ impl<'a> Vm<'a> {
 
                     let special = match (value, &key[..]) {
                         (Value::String(s), "length") => Some(Value::Int(s.len() as i64)),
-
+                        
                         (Value::Range(start, ..), "start") => Some(Value::Int(*start)),
                         (Value::Range(_, end, _), "end") => Some(Value::Int(*end)),
                         (Value::Range(_, _, step), "step") => Some(Value::Int(*step as i64)),
 
                         (Value::Array(v), "length") => Some(Value::Int(v.len() as i64)),
                         (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
+
+                        (Value::Builtins, "obj_props") => Some(Value::Dict({
+                            let mut map = AHashMap::new();
+                            for (n, k) in OBJECT_KEYS.iter() {
+                                map.insert(
+                                    self.intern(n),
+                                    (
+                                        self.memory.insert(StoredValue {
+                                            value: Value::ObjectKey(*k),
+                                            area: self.make_area(span, func.code),
+                                        }),
+                                        Visibility::Public,
+                                    ),
+                                );
+                            }
+                            map
+                        })),
 
                         _ => None,
                     };
@@ -927,17 +967,17 @@ impl<'a> Vm<'a> {
                         );
                     } else {
                         let key_interned = self.intern(&key);
-                        let base_type = value.get_type();
+                        let base_type = self.get_reg(*from).value.get_type();
 
                         let mut found = false;
 
-                        match value {
+                        match &self.get_reg(*from).value {
                             Value::Dict(v) => {
                                 if let Some((k, _)) = v.get(&key_interned) {
                                     self.change_reg_key(*dest, *k);
                                     found = true;
                                 }
-                            }
+                            },
                             Value::Instance { items, .. } => {
                                 if let Some((k, vis)) = items.get(&key_interned) {
                                     if let Visibility::Private(src) = vis {
@@ -953,13 +993,13 @@ impl<'a> Vm<'a> {
                                     self.change_reg_key(*dest, *k);
                                     found = true;
                                 }
-                            }
+                            },
                             Value::Module { exports, .. } => {
                                 if let Some(k) = exports.get(&key_interned) {
                                     self.change_reg_key(*dest, *k);
                                     found = true;
                                 }
-                            }
+                            },
                             _ => (),
                         }
 
@@ -973,7 +1013,7 @@ impl<'a> Vm<'a> {
                                 match args.get(0) {
                                     Some(arg) if arg.name().value == self.intern("self") => {
                                         *self_arg = Some(self.get_reg_key(*from))
-                                    }
+                                    },
                                     _ => {
                                         return Err(RuntimeError::AssociatedNotAMethod {
                                             area: self.make_area(span, func.code),
@@ -982,7 +1022,7 @@ impl<'a> Vm<'a> {
                                             base_type,
                                             call_stack: self.get_call_stack(),
                                         });
-                                    }
+                                    },
                                 }
                             } else {
                                 return Err(RuntimeError::NotAMethod {
@@ -998,7 +1038,7 @@ impl<'a> Vm<'a> {
                             self.set_reg(*dest, v);
                         }
                     }
-                }
+                },
                 Opcode::TypeMember { from, dest, member } => {
                     let stored_value = self.get_reg(*from);
                     let value = &stored_value.value;
@@ -1035,7 +1075,7 @@ impl<'a> Vm<'a> {
                                     area: self.make_area(span, func.code),
                                 },
                             );
-                        }
+                        },
                         _ => {
                             return Err(RuntimeError::TypeMismatch {
                                 v: (value.get_type(), stored_value.area.clone()),
@@ -1043,9 +1083,9 @@ impl<'a> Vm<'a> {
                                 expected: ValueType::Module,
                                 call_stack: self.get_call_stack(),
                             })
-                        }
+                        },
                     }
-                }
+                },
                 Opcode::Associated { from, dest, name } => {
                     let key = self.intern_vec(match &self.get_reg(*name).value {
                         Value::String(s) => s,
@@ -1073,12 +1113,12 @@ impl<'a> Vm<'a> {
                                         let v = self.deep_clone_key(*k);
 
                                         self.set_reg(*dest, v);
-                                    }
+                                    },
                                     None => error!(),
                                 },
                                 None => error!(),
                             }
-                        }
+                        },
                         _ => {
                             return Err(RuntimeError::TypeMismatch {
                                 v: (value.value.get_type(), value.area.clone()),
@@ -1086,9 +1126,9 @@ impl<'a> Vm<'a> {
                                 expected: ValueType::Type,
                                 call_stack: self.get_call_stack(),
                             })
-                        }
+                        },
                     }
-                }
+                },
                 Opcode::CreateInstance { base, dict, dest } => {
                     let span = self.get_span(func, ip);
 
@@ -1102,7 +1142,7 @@ impl<'a> Vm<'a> {
                                 typ: *t,
                                 call_stack: self.get_call_stack(),
                             })
-                        }
+                        },
                         _ => {
                             return Err(RuntimeError::TypeMismatch {
                                 v: (value.value.get_type(), value.area.clone()),
@@ -1110,7 +1150,7 @@ impl<'a> Vm<'a> {
                                 expected: ValueType::Type,
                                 call_stack: self.get_call_stack(),
                             })
-                        }
+                        },
                     };
 
                     let items = match &self.get_reg(*dict).value {
@@ -1125,7 +1165,7 @@ impl<'a> Vm<'a> {
                             area: self.make_area(span, func.code),
                         },
                     );
-                }
+                },
                 Opcode::Impl { base, dict } => {
                     let span = self.get_span(func, ip);
 
@@ -1140,7 +1180,7 @@ impl<'a> Vm<'a> {
                                 expected: ValueType::Type,
                                 call_stack: self.get_call_stack(),
                             })
-                        }
+                        },
                     };
 
                     let items = match &self.get_reg(*dict).value {
@@ -1162,7 +1202,7 @@ impl<'a> Vm<'a> {
                         .entry(typ)
                         .and_modify(|d| d.extend(items.clone().into_iter()))
                         .or_insert(items);
-                }
+                },
                 Opcode::Overload { array, op } => {
                     let span = self.get_span(func, ip);
 
@@ -1175,15 +1215,15 @@ impl<'a> Vm<'a> {
                         .entry(*op)
                         .and_modify(|d| d.extend(items.clone()))
                         .or_insert(items);
-                }
+                },
                 Opcode::YeetContext => {
                     self.contexts.yeet_current();
                     continue;
-                }
+                },
                 Opcode::EnterArrowStatement { skip_to } => {
                     self.split_current_context();
                     self.contexts.jump_current(*skip_to as usize);
-                }
+                },
                 Opcode::LoadBuiltins { dest } => {
                     let span = self.get_span(func, ip);
                     self.set_reg(
@@ -1193,7 +1233,7 @@ impl<'a> Vm<'a> {
                             area: self.make_area(span, func.code),
                         },
                     )
-                }
+                },
                 Opcode::Export { src: _ } => todo!(),
                 Opcode::Call { args, base, dest } => {
                     let base = self.get_reg(*base).clone();
@@ -1211,17 +1251,17 @@ impl<'a> Vm<'a> {
                                     match std::mem::take(&mut self.memory[v[0]].value) {
                                         Value::Array(v) => {
                                             pos_args = v;
-                                        }
+                                        },
                                         _ => unreachable!(),
                                     }
                                     match std::mem::take(&mut self.memory[v[1]].value) {
                                         Value::Dict(m) => {
                                             named_args =
                                                 m.into_iter().map(|(s, (k, _))| (s, k)).collect();
-                                        }
+                                        },
                                         _ => unreachable!(),
                                     }
-                                }
+                                },
                                 _ => unreachable!(),
                             }
 
@@ -1234,7 +1274,7 @@ impl<'a> Vm<'a> {
                                 Some(*dest),
                                 base.area,
                             )?
-                        }
+                        },
                         _ => {
                             return Err(RuntimeError::TypeMismatch {
                                 v: (base.value.get_type(), base.area.clone()),
@@ -1242,9 +1282,9 @@ impl<'a> Vm<'a> {
                                 area: call_area,
                                 call_stack: self.get_call_stack(),
                             })
-                        }
+                        },
                     }
-                }
+                },
                 Opcode::CreateMacro { id, dest } => self.set_reg(
                     *dest,
                     StoredValue {
@@ -1282,7 +1322,7 @@ impl<'a> Vm<'a> {
                         }),
                         _ => unreachable!(),
                     }
-                }
+                },
                 Opcode::PushMacroSpreadArg { name, dest } => {
                     let name = match &self.get_reg(*name).value {
                         Value::String(s) => self.intern_vec(s),
@@ -1297,16 +1337,16 @@ impl<'a> Vm<'a> {
                         }),
                         _ => unreachable!(),
                     }
-                }
+                },
                 Opcode::SetMacroArgDefault { src, dest } => {
                     let set = self.deep_clone_reg_insert(*src);
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Macro(MacroData { args, .. }) => {
                             *args.last_mut().unwrap().default_mut() = Some(set)
-                        }
+                        },
                         _ => unreachable!(),
                     }
-                }
+                },
                 Opcode::SetMacroArgPattern { id, dest } => {
                     // let span = self.get_span(func, ip);
 
@@ -1315,10 +1355,10 @@ impl<'a> Vm<'a> {
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Macro(MacroData { args, .. }) => {
                             *args.last_mut().unwrap().pattern_mut() = Some(pat.clone())
-                        }
+                        },
                         _ => unreachable!(),
                     }
-                }
+                },
                 Opcode::Import { src, dest } => {
                     let import = &self.programs[func.code].1.import_paths[*src as usize];
 
@@ -1344,7 +1384,7 @@ impl<'a> Vm<'a> {
                     )?;
 
                     //self.contexts.merge_down(full_context, original_ip + 1);
-                }
+                },
                 Opcode::LoadArbitraryId { class, dest } => {
                     let id = Id::Arbitrary(self.next_id(*class));
                     let v = match class {
@@ -1361,14 +1401,14 @@ impl<'a> Vm<'a> {
                             area: self.get_area(func, ip),
                         },
                     )
-                }
+                },
                 Opcode::PushContextGroup { src } => {
                     let group = match &self.get_reg(*src).value {
                         Value::Group(g) => *g,
                         _ => unreachable!(),
                     };
                     self.contexts.set_group_and_push(group);
-                }
+                },
                 Opcode::PopGroupStack { fn_reg } => {
                     let prev_group = match &self.get_reg(*fn_reg).value {
                         Value::TriggerFunction { prev_context, .. } => *prev_context,
@@ -1376,7 +1416,7 @@ impl<'a> Vm<'a> {
                     };
 
                     self.contexts.pop_groups_until(prev_group);
-                }
+                },
                 Opcode::MakeTriggerFunc { src, dest } => {
                     let group = match &self.get_reg(*src).value {
                         Value::Group(g) => *g,
@@ -1393,7 +1433,7 @@ impl<'a> Vm<'a> {
                             area: self.get_area(func, ip),
                         },
                     )
-                }
+                },
                 Opcode::UnwrapOrJump { src, to } => {
                     // let span = self.get_span(func, ip);
                     match self.get_reg(*src).value {
@@ -1401,15 +1441,15 @@ impl<'a> Vm<'a> {
                             Some(k) => {
                                 let v = self.deep_clone_key(k);
                                 self.set_reg(*src, v)
-                            }
+                            },
                             None => {
                                 self.contexts.jump_current(*to as usize);
                                 continue;
-                            }
+                            },
                         },
                         _ => unreachable!(),
                     }
-                }
+                },
                 Opcode::WrapIterator { src, dest } => {
                     let span = self.get_span(func, ip);
                     let val = self.get_reg_key(*src);
@@ -1433,7 +1473,7 @@ impl<'a> Vm<'a> {
                                 area: self.make_area(span, func.code),
                                 call_stack: self.get_call_stack(),
                             })
-                        }
+                        },
                     };
 
                     self.set_reg(
@@ -1443,7 +1483,7 @@ impl<'a> Vm<'a> {
                             area: self.get_area(func, ip),
                         },
                     )
-                }
+                },
                 Opcode::IterNext { src, dest } => {
                     let area = self.get_area(func, ip);
 
@@ -1468,7 +1508,7 @@ impl<'a> Vm<'a> {
                             area: self.get_area(func, ip),
                         },
                     )
-                }
+                },
                 // Opcode::PatEq { src, dest } => todo!(),
                 // Opcode::PatNeq { src, dest } => todo!(),
                 // Opcode::PatGt { src, dest } => todo!(),
@@ -1484,7 +1524,7 @@ impl<'a> Vm<'a> {
                         message: err.value.runtime_display(self),
                         call_stack: self.get_call_stack(),
                     });
-                }
+                },
                 Opcode::TypeOf { src, dest } => {
                     let area = self.get_area(func, ip);
 
@@ -1495,7 +1535,7 @@ impl<'a> Vm<'a> {
                             area,
                         },
                     )
-                }
+                },
             }
 
             {
@@ -1565,7 +1605,7 @@ impl<'a> Vm<'a> {
                         param_map.insert(name.value, param);
                         exp_idx += 1;
                         passed_idx += 1;
-                    }
+                    },
                     MacroArg::Spread { name, .. } => {
                         match &mut self.memory[param_map[&name.value]].value {
                             Value::Array(v) => v.push(param),
@@ -1573,7 +1613,7 @@ impl<'a> Vm<'a> {
                         }
 
                         passed_idx += 1;
-                    }
+                    },
                 }
             }
         }
@@ -1608,7 +1648,7 @@ impl<'a> Vm<'a> {
                             } else {
                                 $vm.deep_clone_key_insert(*k)
                             }
-                        }
+                        },
                         None => match data.default() {
                             Some(k) => $vm.deep_clone_key_insert(*k),
                             None => {
@@ -1618,7 +1658,7 @@ impl<'a> Vm<'a> {
                                     arg_name: $vm.resolve(&data.name().value),
                                     call_stack: $vm.get_call_stack(),
                                 })
-                            }
+                            },
                         },
                     };
 
@@ -1629,7 +1669,10 @@ impl<'a> Vm<'a> {
                                 macro_def_area: base_area,
                                 arg_name: $vm.resolve(&data.name().value),
                                 pattern: pattern.clone(),
-                                v: (self.memory[$v].value.get_type(), self.memory[$v].area.clone()),
+                                v: (
+                                    self.memory[$v].value.get_type(),
+                                    self.memory[$v].area.clone(),
+                                ),
                                 call_stack: $vm.get_call_stack(),
                             });
                         }
@@ -1677,7 +1720,7 @@ impl<'a> Vm<'a> {
                 )?;
 
                 Ok(())
-            }
+            },
 
             MacroTarget::Builtin(f) => {
                 let mut args = vec![];
@@ -1698,7 +1741,7 @@ impl<'a> Vm<'a> {
                     );
                 }
                 Ok(())
-            }
+            },
         }
     }
 
@@ -1781,11 +1824,23 @@ impl<'a> Vm<'a> {
     {
         let span = self.get_span(func, ip);
 
-        if self.run_overload(Operator::Bin(operator), [*left, *right], func, span, Some(*dest))? {
+        if self.run_overload(
+            Operator::Bin(operator),
+            [*left, *right],
+            func,
+            span,
+            Some(*dest),
+        )? {
             return Ok(());
         };
 
-        let value = op(self.get_reg(*left), self.get_reg(*right), span, self, func.code)?;
+        let value = op(
+            self.get_reg(*left),
+            self.get_reg(*right),
+            span,
+            self,
+            func.code,
+        )?;
 
         self.set_reg(
             *dest,
@@ -1812,11 +1867,23 @@ impl<'a> Vm<'a> {
     {
         let span = self.get_span(func, ip);
 
-        if self.run_overload(Operator::Assign(operator), [*left, *right], func, span, None)? {
+        if self.run_overload(
+            Operator::Assign(operator),
+            [*left, *right],
+            func,
+            span,
+            None,
+        )? {
             return Ok(());
         };
 
-        let value = op(self.get_reg(*left), self.get_reg(*right), span, self, func.code)?;
+        let value = op(
+            self.get_reg(*left),
+            self.get_reg(*right),
+            span,
+            self,
+            func.code,
+        )?;
         let k = self.get_reg_key(*left);
         self.memory[k].value = value;
         Ok(())
@@ -1892,7 +1959,7 @@ impl<'a> Vm<'a> {
 
             (Value::String(s), ValueType::Float) => {
                 Value::Float(s.iter().collect::<String>().parse().unwrap())
-            }
+            },
 
             (Value::String(s), ValueType::Array) => Value::Array(
                 s.iter()

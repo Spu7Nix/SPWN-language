@@ -144,7 +144,7 @@ impl<'a> super::interpreter::Vm<'a> {
                         let k = self.deep_clone_key_insert(*reg);
                         clone_map.insert(*reg, k);
                         k
-                    }
+                    },
                 };
 
                 *reg = k;

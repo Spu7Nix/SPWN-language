@@ -25,7 +25,7 @@ macro_rules! object_keys {
         )*
     ) => {
         paste! {
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, delve::EnumToStr)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, delve::EnumToStr, serde::Serialize, serde::Deserialize)]
             #[delve(rename_variants = "SCREAMING_SNAKE_CASE")]
             pub enum ObjectKey {
                 $(

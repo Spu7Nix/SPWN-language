@@ -9,6 +9,4 @@ format_macro_matchers = true
 reorder_impl_items = true
 group_imports = "StdExternalCrate"
 imports_granularity = "Module"
-
-# make max line length load
-fn_call_width = 150
+match_block_trailing_comma = true

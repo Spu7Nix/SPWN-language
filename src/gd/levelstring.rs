@@ -112,7 +112,7 @@ pub fn get_level_string(
                     level_string = text;
                     break;
                 }
-            }
+            },
 
             Ok(Event::Eof) => break, // exits the loop when reaching end of file
             Err(e) => {
@@ -122,7 +122,7 @@ pub fn get_level_string(
                     e
                 ))
                 .into());
-            }
+            },
             _ => (), // There are several other `Event`s we do not consider here
         }
     }
@@ -228,7 +228,7 @@ pub fn encrypt_level_string(
                 if !done && text == "k2" {
                     k2_detected = true
                 }
-            }
+            },
             Ok(Event::Eof) => break, // exits the loop when reaching end of file
             Err(e) => {
                 return Err(BasicError(format!(
@@ -237,7 +237,7 @@ pub fn encrypt_level_string(
                     e
                 ))
                 .into());
-            }
+            },
             Ok(e) => assert!(writer.write_event(e).is_ok()),
         }
     }
