@@ -1258,22 +1258,40 @@ impl Parser<'_> {
             },
             Token::Try => {
                 self.next();
+                let mut branches = vec![];
+
                 let try_code = self.parse_block()?;
-                self.expect_tok(Token::Catch)?;
 
-                let error_var = if self.next_is(Token::Ident) {
+                let mut found_catch_all: Option<CodeSpan> = None;
+
+                while self.next_is(Token::Catch) {
                     self.next();
-                    Some(self.slice_interned())
-                } else {
-                    None
-                };
 
-                let catch_code = self.parse_block()?;
+                    let error_typ = if self.next_is(Token::LBracket) {
+                        if let Some(s) = found_catch_all {
+                            return Err(SyntaxError::DuplicateCatchAll { area: self.make_area(s), second_area: self.make_area(self.span()) })
+                        } else {
+                            found_catch_all = Some(self.span());
+                        }
+                        None
+                    } else {
+                        #[allow(clippy::collapsible_else_if)]
+                        if let Some(s) = found_catch_all {
+                            return Err(SyntaxError::CatchAllNotFinal { area: self.make_area(s), named_catch_area: self.make_area(self.span()) })
+                        } else {
+                            self.next();
+                            Some(self.parse_expr(true)?)
+                        }
+                    };
+
+                    let catch_code = self.parse_block()?;
+
+                    branches.push((error_typ, catch_code));
+                }
 
                 Statement::TryCatch {
                     try_code,
-                    error_var,
-                    catch_code,
+                    branches,
                 }
             },
             Token::Return => {

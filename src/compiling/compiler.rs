@@ -700,11 +700,7 @@ impl<'a> Compiler<'a> {
                     })
                 },
             },
-            Statement::TryCatch {
-                try_code,
-                error_var,
-                catch_code,
-            } => {
+            Statement::TryCatch { try_code, branches } => {
                 /*
 
                 #[

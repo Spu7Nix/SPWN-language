@@ -251,8 +251,9 @@ pub enum Statement {
     },
     TryCatch {
         try_code: Statements,
-        error_var: Option<Spur>,
-        catch_code: Statements,
+        // error_var: Option<Spur>,
+        // catch_code: Statements,
+        branches: Vec<(Option<ExprNode>, Statements)>,
     },
 
     Arrow(Box<StmtNode>),
@@ -302,10 +303,6 @@ pub enum Pattern<T, P, E> {
 
     MacroPattern { args: Vec<P>, ret_type: P },
 }
-
-// impl<T, P, E> Pattern<T, P, E> {
-//     pub fn map_
-// }
 
 impl Expression {
     pub fn into_node(self, attributes: Vec<ExprAttribute>, span: CodeSpan) -> ExprNode {
