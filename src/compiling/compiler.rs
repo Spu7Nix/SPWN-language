@@ -17,6 +17,7 @@ use crate::parsing::ast::{
     DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjKeyType, Pattern,
     PatternNode, Spannable, Spanned, Statement, StmtNode, StringContent,
 };
+use crate::parsing::attributes::ScriptAttribute;
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
@@ -269,7 +270,11 @@ impl<'a> Compiler<'a> {
         vars
     }
 
-    pub fn compile(&mut self, stmts: Vec<StmtNode>) -> CompileResult<&Bytecode<Register>> {
+    pub fn compile(
+        &mut self,
+        stmts: Vec<StmtNode>,
+        entry: Option<Vec<ScriptAttribute>>,
+    ) -> CompileResult<&Bytecode<Register>> {
         let mut builder = BytecodeBuilder::new();
 
         // func 0 ("global")
@@ -280,6 +285,27 @@ impl<'a> Compiler<'a> {
                     variables: AHashMap::new(),
                     typ: Some(ScopeType::Global),
                 });
+
+                let builtin_dir = home::home_dir().expect("no home dir").join(format!(
+                    ".spwn/versions/{}/libraries/",
+                    env!("CARGO_PKG_VERSION")
+                ));
+                if let Some(attrs) = entry {
+                    // self.compile_import(
+                    //     &ImportType::Absolute(builtin_dir.join("core/lib.spwn")),
+                    //     CodeSpan::invalid(),
+                    //     self.src.clone(),
+                    // )?;
+
+                    // if !attrs.iter().any(|a| *a == ScriptAttribute::NoStd) {
+                    //     self.compile_import(
+                    //         &ImportType::Absolute(builtin_dir.join("std/lib.spwn")),
+                    //         CodeSpan::invalid(),
+                    //         self.src.clone(),
+                    //     )?;
+                    //     // f.import(f.next_reg(), t.clone().spanned(expr.span), expr.span);
+                    // }
+                }
 
                 self.compile_stmts(&stmts, base_scope, f)?;
 
@@ -371,14 +397,14 @@ impl<'a> Compiler<'a> {
         span: CodeSpan,
         importer_src: SpwnSource,
     ) -> CompileResult<()> {
-        let base_dir = match &importer_src {
-            SpwnSource::File(path) => path.parent().unwrap(),
-        };
+        println!("galaxy {:?}", typ);
+
+        let base_dir = importer_src.path().parent().unwrap();
 
         let (name, rel_path) = typ.to_path_name();
         let import_path = base_dir.join(rel_path);
 
-        let import_src = SpwnSource::File(import_path.clone());
+        let import_src = importer_src.map_path(|_| import_path.clone());
         let is_module = matches!(typ, ImportType::Module(_));
 
         let code = match import_src.read() {
@@ -444,7 +470,7 @@ impl<'a> Compiler<'a> {
                     self.custom_type_defs,
                 );
 
-                match compiler.compile(ast.statements) {
+                match compiler.compile(ast.statements, None) {
                     Ok(bytecode) => {
                         let bytes = bincode::serialize(&bytecode).unwrap();
 

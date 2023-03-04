@@ -349,6 +349,8 @@ value! {
         prev_context: Id,
     },
 
+    Error(usize),
+
     Object(AHashMap<u8, ObjParam>, ObjectType),
     ObjectKey(ObjectKey),
 
@@ -545,6 +547,7 @@ impl Value {
                 "$.obj_props.{}",
                 <ObjectKey as Into<&'static str>>::into(*k)
             ),
+            Value::Error(_) => todo!(),
         }
     }
 }

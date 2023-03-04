@@ -293,7 +293,7 @@ fn run_spwn(
     );
 
     compiler
-        .compile(ast.statements)
+        .compile(ast.statements, Some(ast.file_attributes))
         .map_err(|e| e.to_report())?;
 
     spinner.complete(None);

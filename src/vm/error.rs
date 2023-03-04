@@ -363,5 +363,17 @@ error_maker! {
             message: String,
             [call_stack]
         },
+
+        /////////
+        #[
+            Message: "Cannot implement on a builtin type", Note: None;
+            Labels: [
+                area => "Implementation happens here";
+            ]
+        ]
+        ImplOnBuiltin {
+            area: CodeArea,
+            [call_stack]
+        },
     }
 }

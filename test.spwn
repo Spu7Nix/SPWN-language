@@ -1,2 +1,7 @@
+// wait i need to do thing firstsijefi
+import core
 
-// import core
+let a = [1, 2, 3, 4]
+
+$.print(a.remove(1029))
+$.print(a)

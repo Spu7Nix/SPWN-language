@@ -82,7 +82,6 @@ impl ConstPattern {
             Pattern::Either(a, b) => a.value_matches(v, vm) || b.value_matches(v, vm),
             Pattern::Both(a, b) => a.value_matches(v, vm) && b.value_matches(v, vm),
             Pattern::Any => true,
-
             _ => todo!(),
         }
     }

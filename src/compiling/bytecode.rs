@@ -93,7 +93,14 @@ impl std::fmt::Debug for Constant {
             Constant::Bool(v) => write!(f, "{v}"),
             Constant::String(v) => write!(f, "{v:?}"),
             Constant::Id(class, n) => write!(f, "{}{}", n, class.letter()),
-            Constant::Type(t) => write!(f, "@{}", <ValueType as Into<&'static str>>::into(*t)),
+            Constant::Type(t) => write!(
+                f,
+                "@{}",
+                match t {
+                    ValueType::Custom(_) => "<type>",
+                    _ => <ValueType as Into<&'static str>>::into(*t),
+                }
+            ),
             Constant::Array(arr) => write!(f, "{arr:?}"),
             Constant::Dict(m) => write!(f, "{m:?}"),
 
@@ -1427,6 +1434,11 @@ impl<'a> FuncBuilder<'a> {
 
 impl Bytecode<Register> {
     pub fn debug_str(&self, src: &SpwnSource) {
+        match src {
+            SpwnSource::File(_) => (),
+            _ => return,
+        }
+
         let code = src.read().unwrap();
 
         let longest_opcode: usize = Opcode::<Register>::VARIANT_NAMES

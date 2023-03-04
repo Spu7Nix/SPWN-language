@@ -26,6 +26,7 @@ pub struct StringType {
 pub enum ImportType {
     Module(String),
     Library(String),
+    Absolute(PathBuf),
 }
 
 impl ImportType {
@@ -52,6 +53,16 @@ impl ImportType {
                     rel_path,
                 )
             },
+            ImportType::Absolute(f) => (
+                f.parent()
+                    .unwrap()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                f.clone(),
+            ),
         }
     }
 }

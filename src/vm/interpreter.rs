@@ -918,7 +918,7 @@ impl<'a> Vm<'a> {
 
                     let special = match (value, &key[..]) {
                         (Value::String(s), "length") => Some(Value::Int(s.len() as i64)),
-                        
+
                         (Value::Range(start, ..), "start") => Some(Value::Int(*start)),
                         (Value::Range(_, end, _), "end") => Some(Value::Int(*end)),
                         (Value::Range(_, _, step), "step") => Some(Value::Int(*step as i64)),
@@ -1183,12 +1183,32 @@ impl<'a> Vm<'a> {
                         },
                     };
 
+                    match typ {
+                        ValueType::Custom(..) => (),
+                        _ => {
+                            // if !matches!(
+                            //     self.programs[func.code].0,
+                            //     SpwnSource::Core(_) | SpwnSource::Std(_)
+                            // ) {
+                            //     return Err(RuntimeError::ImplOnBuiltin {
+                            //         area: self.make_area(span, func.code),
+                            //         call_stack: self.get_call_stack(),
+                            //     });
+                            // }
+
+                            // return Err(RuntimeError::ImplOnBuiltin {
+                            //     area: self.make_area(span, func.code),
+                            //     call_stack: self.get_call_stack(),
+                            // });
+                        },
+                    }
+
                     let items = match &self.get_reg(*dict).value {
                         Value::Dict(items) => items.clone(),
                         _ => unreachable!(),
                     };
 
-                    for (name, (k, vis)) in &items {
+                    for (name, (k, _)) in &items {
                         let name = self.resolve(name);
 
                         if let Value::Macro(MacroData { target, .. }) = &mut self.memory[*k].value {
@@ -1363,9 +1383,12 @@ impl<'a> Vm<'a> {
                     let import = &self.programs[func.code].1.import_paths[*src as usize];
 
                     let rel_path = import.value.to_path_name().1;
-                    let SpwnSource::File(current_path) = &self.programs[func.code].0;
+                    let current_path = self.programs[func.code].0.path();
 
-                    let src = SpwnSource::File(current_path.parent().unwrap().join(rel_path));
+                    let src = self.programs[func.code]
+                        .0
+                        .map_path(|_| current_path.parent().unwrap().join(rel_path));
+
                     let coord = FuncCoord {
                         func: 0,
                         code: self.src_map[&src],

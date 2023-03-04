@@ -12,6 +12,8 @@ use crate::vm::opcodes::Register;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpwnSource {
     File(PathBuf),
+    Core(PathBuf),
+    Std(PathBuf),
 }
 
 impl SpwnSource {
@@ -25,26 +27,43 @@ impl SpwnSource {
     pub fn name(&self) -> String {
         match self {
             SpwnSource::File(f) => f.display().to_string(),
+            SpwnSource::Core(f) => format!("<core: {}>", f.display()),
+            SpwnSource::Std(f) => format!("<std: {}>", f.display()),
         }
     }
 
     pub fn read(&self) -> Option<String> {
-        match self {
-            SpwnSource::File(p) => fs::read_to_string(p)
-                .ok()
-                .map(|s| s.replace("\r\n", "\n").trim_end().to_string()),
-        }
+        fs::read_to_string(self.path())
+            .ok()
+            .map(|s| s.replace("\r\n", "\n").trim_end().to_string())
     }
 
-    pub fn path(&self) -> String {
-        match self {
-            SpwnSource::File(f) => fs::canonicalize(f).unwrap().to_str().unwrap().into(),
-        }
+    pub fn path_str(&self) -> String {
+        fs::canonicalize(self.path())
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .into()
     }
 
     pub fn hyperlink(&self) -> String {
+        hyperlink(self.path_str(), Some(self.name()))
+    }
+
+    pub fn path(&self) -> &PathBuf {
         match self {
-            SpwnSource::File(_) => hyperlink(self.path(), Some(self.name())),
+            Self::File(f) | Self::Core(f) | Self::Std(f) => f,
+        }
+    }
+
+    pub fn map_path<F>(&self, cb: F) -> Self
+    where
+        F: FnOnce(&PathBuf) -> PathBuf,
+    {
+        match self {
+            Self::File(f) => Self::File(cb(f)),
+            Self::Std(f) => Self::Std(cb(f)),
+            Self::Core(f) => Self::Core(cb(f)),
         }
     }
 }
@@ -63,12 +82,12 @@ impl CodeArea {
         (self.name(), self.span.into())
     }
 
-    pub(crate) fn internal() -> CodeArea {
-        CodeArea {
-            src: SpwnSource::File(PathBuf::from("<internal>")),
-            span: CodeSpan::internal(),
-        }
-    }
+    // pub(crate) fn internal() -> CodeArea {
+    //     CodeArea {
+    //         src: SpwnSource::File(PathBuf::from("<internal>")),
+    //         span: CodeSpan::internal(),
+    //     }
+    // }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Copy, Default, Serialize, Deserialize)]
@@ -112,3 +131,5 @@ impl From<CodeSpan> for Range<usize> {
 pub struct BytecodeMap {
     pub map: AHashMap<SpwnSource, Bytecode<Register>>,
 }
+
+// cp .\libraries\ ~\.spwn\versions\0.9.0 -r
