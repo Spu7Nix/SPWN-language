@@ -2,6 +2,7 @@
 macro_rules! lexer {
     (
         $(
+            $([$name:literal])?
             $tok:ident $(: $(regex($regex:literal))? $(text($text:literal))?)?,
         )*
 
@@ -190,6 +191,23 @@ macro_rules! lexer {
                     }
                 }
 
+            }
+        }
+
+        impl Token {
+            pub fn to_str(self) -> &'static str {
+                match self {
+                    $(
+                        $(
+                            Self::$tok => $name,
+                        )?
+                        $($(
+                            #[allow(unreachable_patterns)]
+                            Self::$tok => $text,
+                        )?)?
+                    )*
+                    Self::$error_tok => "unknown",
+                }
             }
         }
     };
