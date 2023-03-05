@@ -57,7 +57,7 @@ impl @string {
     		/* compiler built-in */
 		},	
 	reversed:
-	
+		
 		(self: @string) {
     		/* compiler built-in */
 		},	
@@ -68,7 +68,7 @@ impl @string {
 		},	
 	substr:
 		
-		(self: @string, start: @int, end: @int) {
+		(self: @string, start: @int & > 0, end: @int & > 0) {
     		/* compiler built-in */
 		},	
 	trim:

@@ -42,7 +42,7 @@ impl_type! {
             Value::String(s)
         }
 
-        fn pop(slf: &Array) {
+        fn pop(slf: &Array) { // yea what flow said in rust we uses slf instead of self
             let k = slf.get_mut_ref(vm).pop();
             Value::Maybe(k.map(|x| vm.deep_clone_key_insert(x)))
         }

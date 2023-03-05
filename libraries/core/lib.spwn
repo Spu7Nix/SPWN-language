@@ -1,5 +1,3 @@
-
-
+import "array.spwn"
 import "builtins.spwn"
 import "string.spwn"
-import "array.spwn"

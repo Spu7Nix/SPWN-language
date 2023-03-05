@@ -1,7 +1,10 @@
 pub type RandomState = ahash::RandomState;
 pub type Interner = lasso::Rodeo<lasso::Spur, RandomState>;
 
+use std::path::PathBuf;
+
 use colored::{ColoredString, Colorize};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
 pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
@@ -96,4 +99,11 @@ impl std::fmt::Display for BasicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
+}
+
+lazy_static! {
+    pub static ref BUILTIN_DIR: PathBuf = home::home_dir().expect("no home dir").join(format!(
+        ".spwn/versions/{}/libraries/",
+        env!("CARGO_PKG_VERSION")
+    ));
 }

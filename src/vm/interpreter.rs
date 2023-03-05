@@ -16,7 +16,7 @@ use crate::compiling::compiler::{CustomTypeKey, TypeDef};
 use crate::gd::gd_object::{GdObject, Trigger, TriggerOrder};
 use crate::gd::ids::{IDClass, Id, SpecificId};
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
-use crate::parsing::ast::{MacroArg, ObjectType, Spannable, Spanned};
+use crate::parsing::ast::{MacroArg, ModuleImport, ObjectType, Spannable, Spanned};
 use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
@@ -28,6 +28,12 @@ pub type RuntimeResult<T> = Result<T, RuntimeError>;
 new_key_type! {
     pub struct ValueKey;
     pub struct BytecodeKey;
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ContextSplitMode {
+    Allow,
+    Disallow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -305,6 +311,7 @@ impl<'a> Vm<'a> {
         mut context: Context,
         call_info: CallInfo,
         cb: Box<dyn FnOnce(&mut Vm) -> RuntimeResult<()>>,
+        split_mode: ContextSplitMode,
     ) -> RuntimeResult<()> {
         let &CallInfo {
             func, return_dest, ..
@@ -313,6 +320,8 @@ impl<'a> Vm<'a> {
         let original_ip = context.ip;
         context.ip = 0;
 
+        // ok so there is two cases, wither there are multiple implicit return or there is an explicit return after another
+        // we just have to disallow it in two places is what i mean
         {
             let regs_used = self.programs[func.code].1.functions[func.func].regs_used;
 
@@ -333,12 +342,30 @@ impl<'a> Vm<'a> {
         cb(self)?;
 
         let opcodes = &self.programs[func.code].1.functions[func.func].opcodes;
+        // idk man itdoent really matter we can  we need to make a new area with the bruh why does the funcs dont have an area why do the bytecode funcs themselves not store an area its useful now ig
+
+        let mut has_implicitly_returned = false;
 
         while self.contexts.valid() {
             let ip = self.contexts.ip();
 
             if ip >= opcodes.len() {
+                // it should you are not al
                 if !self.contexts.last().have_returned {
+                    if has_implicitly_returned && split_mode == ContextSplitMode::Disallow {
+                        println!(
+                            "africa asia europe antarctica north america south america {:?}",
+                            self.programs[func.code].1.functions[func.func].span
+                        );
+                        return Err(RuntimeError::ContextSplitDisallowed {
+                            area: self.make_area(
+                                self.programs[func.code].1.functions[func.func].span,
+                                func.code,
+                            ),
+                            call_stack: self.get_call_stack(), // just get the areaf from first and last opcode in the function? like start of
+                        });
+                    }
+
                     let return_dest = self.contexts.last().call_info.return_dest;
                     {
                         let mut current = self.contexts.current_mut();
@@ -349,9 +376,11 @@ impl<'a> Vm<'a> {
                     top.ip = original_ip + 1;
 
                     if return_dest.is_some() {
+                        // on the return? in this case just the end of the macro but we can pribably just have the whole macro body as the area also idk does the function have an area prop or somethign the call area is not the macro its the call maybe we don just take the area of the first and the last opcode?
                         let idx = self.contexts.0.len() - 2;
                         self.contexts.0[idx].contexts.push(top);
-                    }
+                    } // hmm we need wait
+                    has_implicitly_returned = true;
 
                     continue;
                 } else {
@@ -764,8 +793,6 @@ impl<'a> Vm<'a> {
                     if *module_ret {
                         match ret_val.value {
                             Value::Dict(d) => {
-                                // let module_name = self.programs[func.code].0.name()
-
                                 ret_val.value = Value::Module {
                                     exports: d.into_iter().map(|(s, (k, _))| (s, k)).collect(),
                                     types: self.programs[func.code].2.to_vec(),
@@ -773,6 +800,19 @@ impl<'a> Vm<'a> {
                             },
                             _ => unreachable!(),
                         }
+                    }
+
+                    if self.contexts.last().have_returned
+                        && split_mode == ContextSplitMode::Disallow
+                    {
+                        let span = self.get_span(func, ip);
+
+                        println!("google {:?}", span);
+
+                        return Err(RuntimeError::ContextSplitDisallowed {
+                            area: self.make_area(span, func.code),
+                            call_stack: self.get_call_stack(),
+                        });
                     }
 
                     self.contexts.last_mut().have_returned = true;
@@ -1186,20 +1226,16 @@ impl<'a> Vm<'a> {
                     match typ {
                         ValueType::Custom(..) => (),
                         _ => {
-                            // if !matches!(
-                            //     self.programs[func.code].0,
-                            //     SpwnSource::Core(_) | SpwnSource::Std(_)
-                            // ) {
-                            //     return Err(RuntimeError::ImplOnBuiltin {
-                            //         area: self.make_area(span, func.code),
-                            //         call_stack: self.get_call_stack(),
-                            //     });
-                            // }
-
-                            // return Err(RuntimeError::ImplOnBuiltin {
-                            //     area: self.make_area(span, func.code),
-                            //     call_stack: self.get_call_stack(),
-                            // });
+                            println!("🫵gorgonzola🫵 {:?}", self.programs[func.code].0);
+                            if !matches!(
+                                self.programs[func.code].0,
+                                SpwnSource::Core(_) | SpwnSource::Std(_)
+                            ) {
+                                return Err(RuntimeError::ImplOnBuiltin {
+                                    area: self.make_area(span, func.code),
+                                    call_stack: self.get_call_stack(),
+                                });
+                            }
                         },
                     }
 
@@ -1382,12 +1418,14 @@ impl<'a> Vm<'a> {
                 Opcode::Import { src, dest } => {
                     let import = &self.programs[func.code].1.import_paths[*src as usize];
 
-                    let rel_path = import.value.to_path_name().1;
                     let current_path = self.programs[func.code].0.path();
 
-                    let src = self.programs[func.code]
-                        .0
-                        .map_path(|_| current_path.parent().unwrap().join(rel_path));
+                    let src = self.programs[func.code].0.change_path_conditional(
+                        import.value.full_path(current_path.parent().unwrap()),
+                        import.value.module_import_type(),
+                    );
+
+                    // println!("🫵😳GUNKY😳🫵 {src:?}");
 
                     let coord = FuncCoord {
                         func: 0,
@@ -1395,7 +1433,7 @@ impl<'a> Vm<'a> {
                     };
 
                     let current_context = self.contexts.last_mut().yeet_current().unwrap();
-
+                    // also i need to do mergig
                     self.run_function(
                         current_context,
                         CallInfo {
@@ -1404,9 +1442,8 @@ impl<'a> Vm<'a> {
                             call_area: None,
                         },
                         Box::new(|_| Ok(())),
+                        ContextSplitMode::Disallow,
                     )?;
-
-                    //self.contexts.merge_down(full_context, original_ip + 1);
                 },
                 Opcode::LoadArbitraryId { class, dest } => {
                     let id = Id::Arbitrary(self.next_id(*class));
@@ -1740,6 +1777,7 @@ impl<'a> Vm<'a> {
 
                         Ok(())
                     }),
+                    ContextSplitMode::Allow,
                 )?;
 
                 Ok(())

@@ -375,5 +375,17 @@ error_maker! {
             area: CodeArea,
             [call_stack]
         },
+
+        /////////
+        #[
+            Message: "Returning twice from this macro/module is not allowed", Note: None;
+            Labels: [
+                area => "Context split happens here";
+            ]
+        ]
+        ContextSplitDisallowed {
+            area: CodeArea,
+            [call_stack]
+        },
     }
 }

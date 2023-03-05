@@ -38,6 +38,8 @@ where
 
     pub capture_regs: Vec<(R, R)>,
     pub ref_arg_regs: Vec<R>,
+
+    pub span: CodeSpan,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -236,6 +238,7 @@ struct ProtoFunc {
     arg_amount: usize,
     capture_regs: Vec<(UnoptRegister, UnoptRegister)>,
     ref_arg_regs: Vec<UnoptRegister>,
+    span: CodeSpan,
 }
 
 new_key_type! {
@@ -271,7 +274,12 @@ impl BytecodeBuilder {
         }
     }
 
-    pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
+    pub fn new_func<F>(
+        &mut self,
+        f: F,
+        arg_amount: usize,
+        span: CodeSpan,
+    ) -> CompileResult<FunctionID>
     where
         F: FnOnce(
             &mut FuncBuilder,
@@ -287,6 +295,7 @@ impl BytecodeBuilder {
             arg_amount,
             capture_regs: vec![],
             ref_arg_regs: vec![],
+            span,
         };
         let func_id = self.funcs.len();
         self.funcs.push(new_func);
@@ -447,6 +456,7 @@ impl BytecodeBuilder {
                 arg_amount: f.arg_amount,
                 capture_regs: f.capture_regs.clone(),
                 ref_arg_regs: f.ref_arg_regs.clone(),
+                span: f.span,
             })
         }
 
@@ -459,7 +469,7 @@ impl BytecodeBuilder {
             const_patterns,
             functions,
             opcode_span_map,
-            export_names: global_returns, //todo
+            export_names: global_returns,
             import_paths: self.import_paths,
             custom_types: self.custom_types,
         }
@@ -535,14 +545,19 @@ impl<'a> FuncBuilder<'a> {
         Ok(())
     }
 
-    pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
+    pub fn new_func<F>(
+        &mut self,
+        f: F,
+        arg_amount: usize,
+        span: CodeSpan,
+    ) -> CompileResult<FunctionID>
     where
         F: FnOnce(
             &mut FuncBuilder,
         )
             -> CompileResult<(Vec<(UnoptRegister, UnoptRegister)>, Vec<UnoptRegister>)>,
     {
-        self.code_builder.new_func(f, arg_amount)
+        self.code_builder.new_func(f, arg_amount, span)
     }
 
     pub fn new_array<F>(
@@ -1381,8 +1396,8 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
-    pub fn ret(&mut self, src: UnoptRegister, module_ret: bool) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Ret { src, module_ret }))
+    pub fn ret(&mut self, src: UnoptRegister, module_ret: bool, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Ret { src, module_ret }), span)
     }
 
     pub fn yeet_context(&mut self) {

@@ -1,7 +1,10 @@
-// wait i need to do thing firstsijefi
-import core
+// import "test2.spwn" // ye at least for now
 
-let a = [1, 2, 3, 4]
-
-$.print(a.remove(1029))
+let a = []
 $.print(a)
+a.push(1)
+$.print(a) // ti cannot see ?? ot literwlly epmty omg wow thats so cool i love tehnologoy
+
+
+
+ make something in bender

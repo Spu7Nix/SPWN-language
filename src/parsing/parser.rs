@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::os::windows::raw;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::Chars;
 
@@ -9,7 +10,7 @@ use unindent::unindent;
 
 use super::ast::{
     Ast, DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjectType, Pattern,
-    PatternNode, Spannable, Spanned, Statement, Statements, StmtNode, StringContent, StringType,
+    PatternNode, Spannable, Spanned, Statement, Statements, StmtNode, StringContent, StringType, ModuleImport,
 };
 use super::attributes::{ExprAttribute, IsValidOn, ParseAttribute, ScriptAttribute, StmtAttribute};
 use super::error::SyntaxError;
@@ -422,7 +423,8 @@ impl Parser<'_> {
             Token::String => {
                 self.next();
                 ImportType::Module(
-                    self.resolve(&self.parse_plain_string(self.slice(), self.span())?),
+                    self.resolve(&self.parse_plain_string(self.slice(), self.span())?).into(),
+                    ModuleImport::Regular
                 )
             },
             Token::Ident => {

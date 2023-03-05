@@ -1,5 +1,5 @@
 use std::fmt::{write, Display};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use delve::{EnumDisplay, EnumToStr};
 use lasso::Spur;
@@ -22,47 +22,61 @@ pub struct StringType {
     pub bytes: bool,
 }
 
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum ModuleImport {
+    Regular,
+    Core,
+    Std,
+}
+impl ModuleImport {
+    pub fn is_absolute(&self) -> bool {
+        !matches!(self, ModuleImport::Regular)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ImportType {
-    Module(String),
-    Library(String),
-    Absolute(PathBuf),
+    Module(PathBuf, ModuleImport),
+    Library(PathBuf),
 }
 
 impl ImportType {
-    pub fn to_path_name(&self) -> (String, PathBuf) {
+    pub fn module_import_type(&self) -> ModuleImport {
         match self {
-            ImportType::Module(s) => {
-                let rel_path = PathBuf::from(s);
-                (
-                    rel_path.file_stem().unwrap().to_str().unwrap().to_string(),
-                    rel_path,
-                )
-            },
-            ImportType::Library(name) => {
-                let rel_path = PathBuf::from(format!("libraries/{name}/lib.spwn"));
-                (
-                    rel_path
-                        .parent()
-                        .unwrap()
-                        .file_name()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
-                    rel_path,
-                )
-            },
-            ImportType::Absolute(f) => (
-                f.parent()
+            ImportType::Module(_, t) => *t,
+            ImportType::Library(_) => ModuleImport::Regular,
+        }
+    }
+}
+
+impl ImportType {
+    pub fn name(&self) -> String {
+        match self {
+            ImportType::Module(p, _) => p.file_stem().unwrap().to_str().unwrap().to_string(),
+            ImportType::Library(p) => {
+                let rel_path = PathBuf::from("libraries").join(p).join("lib.spwn");
+                rel_path
+                    .parent()
                     .unwrap()
                     .file_name()
                     .unwrap()
                     .to_str()
                     .unwrap()
-                    .to_string(),
-                f.clone(),
-            ),
+                    .to_string()
+            },
+        }
+    }
+
+    pub fn full_path(&self, base_dir: &Path) -> PathBuf {
+        match self {
+            ImportType::Module(p, t) => {
+                if !t.is_absolute() {
+                    base_dir.join(p)
+                } else {
+                    p.clone()
+                }
+            },
+            ImportType::Library(p) => PathBuf::from("libraries").join(p).join("lib.spwn"),
         }
     }
 }

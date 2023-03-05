@@ -38,10 +38,10 @@ use crate::compiling::compiler::{Compiler, TypeDefMap};
 use crate::gd::{gd_object, levelstring};
 use crate::parsing::ast::Spannable;
 use crate::parsing::parser::Parser;
-use crate::sources::{BytecodeMap, SpwnSource};
+use crate::sources::{BytecodeMap, CodeSpan, SpwnSource};
 use crate::util::{BasicError, HexColorize, RandomState};
 use crate::vm::context::{CallInfo, Context};
-use crate::vm::interpreter::{FuncCoord, Vm};
+use crate::vm::interpreter::{ContextSplitMode, FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
 use crate::vm::value::ValueType;
 
@@ -293,7 +293,14 @@ fn run_spwn(
     );
 
     compiler
-        .compile(ast.statements, Some(ast.file_attributes))
+        .compile(
+            ast.statements,
+            Some(ast.file_attributes),
+            CodeSpan {
+                start: 0,
+                end: code.len(),
+            },
+        )
         .map_err(|e| e.to_report())?;
 
     spinner.complete(None);
@@ -322,6 +329,7 @@ fn run_spwn(
             call_area: None,
         },
         Box::new(|_| Ok(())),
+        ContextSplitMode::Allow,
     )
     .map_err(|e| e.to_report(&vm))?;
 

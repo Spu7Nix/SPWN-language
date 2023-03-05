@@ -124,13 +124,14 @@ macro_rules! impl_type {
                 pub fn [<$impl_var:snake _core_gen>]() {
                     let path = std::path::PathBuf::from(format!("{}{}.spwn", $crate::CORE_PATH, stringify!( [<$impl_var:snake>] )));
 
+                    //#[doc(u{const_doc:?})]
                     let consts: &[String] = &[
                         $(
                             indoc::formatdoc!("\t{const_raw}
-                                \t#[doc(u{const_doc:?})]
+                                \t
                                 \t{const_name}: {const_val:?},",
                                 const_raw = stringify!($($const_raw)*),
-                                const_doc = <[String]>::join(&[$($const_doc)*], "\n"),
+                                //const_doc = <[String]>::join(&[$($const_doc)*], "\n"),
                                 const_name = stringify!($const),
                                 const_val = $crate::compiling::bytecode::Constant::
                                     $c_name
@@ -140,59 +141,92 @@ macro_rules! impl_type {
                         )*
                     ];
 
+                    //#[doc(u{macro_doc:?})]
                     let macros: &[String] = &[
                         $(
                             indoc::formatdoc!("\t{macro_raw}
                                 \t{macro_name}:
-                                \t\t#[doc(u{macro_doc:?})]
+                                \t\t
                                 \t\t({macro_args}){macro_ret}{{
                                     \t\t/* compiler built-in */
                                 \t\t}},",
                                 macro_raw = stringify!($($fn_raw)*),
-                                macro_doc = <[&'static str]>::join(&[$($fn_doc),*], "\n"),
+                                //macro_doc = <[&'static str]>::join(&[$($fn_doc),*], "\n"),
                                 macro_name = stringify!($fn_name),
                                 macro_args = <[String]>::join(&[
+
+
                                     $(
                                         format!("{}{}",
                                             format!("{}{}",
-                                                $(
-                                                    format!("{}: @{}", 
-                                                        stringify!($binder),
-                                                        stringify!([<$name:snake>]),
-                                                    ),
-                                                )?
-                                                $(
-                                                    format!("...{}: @{}", 
-                                                        stringify!($name),
-                                                        <[String]>::join(&[
-                                                            $(
-                                                                $({
-                                                                    let name = stringify!([<$spread_deref_ty:snake>]);
-                                                                    if name == "value" { "".into() } else { format!("@{}", name) }
-                                                                },)?
-                                                                $(
-                                                                    stringify!([<$spread_deref_ty:snake>]).into(),
-                                                                )?
-                                                            )+
-                                                        ], " | @")
-                                                    ),  
-                                                )?
-                                                $(
-                                                    format!("{}: {}",
-                                                        stringify!($name),
-                                                        <[String]>::join(&[
-                                                            $(
-                                                                $({
-                                                                    let name = stringify!([<$deref_ty:snake>]);
-                                                                    if name == "value" { "".into() } else { format!("@{}", name) }
-                                                                },)?
-                                                                $(
-                                                                    stringify!(@ [<$ref_ty:snake>]).into(),
-                                                                )?
-                                                            )+
-                                                        ], " | @")
-                                                    ),
-                                                )?
+                                                {
+                                                    #[allow(unused_variables)]
+                                                    fn rename_self(s: &str) -> &str {
+                                                        if s == "slf" {
+                                                            "self"
+                                                        } else {
+                                                            s
+                                                        }
+                                                    }
+                                                    $(
+                                                        format!("{}: @{}", 
+                                                            stringify!($binder),
+                                                            rename_self(&stringify!([<$name:snake>])),
+                                                        )
+                                                    )?
+                                                    $(
+                                                        format!("...{}{}",
+                                                            rename_self(&stringify!([<$name:snake>])),
+                                                            {
+                                                                let types: &[String] = &[
+                                                                    $(
+                                                                        {
+                                                                            let name = $(stringify!([<$spread_deref_ty:snake>]))? $(stringify!([<$spread_ref_ty:snake>]))?;
+                                                                            if ["value", "value_key"].contains(&name) {
+                                                                                "".into()
+                                                                            } else {
+                                                                                format!("@{name}")
+                                                                            }
+                                                                        },
+                                                                    )*
+                                                                ];
+                                                                let types = types.iter().filter(|n| n.len() != 0).cloned().collect::<Vec<_>>();
+                                                                if types.is_empty() {
+                                                                    "".into()
+                                                                } else {
+                                                                    format!(": {}", types.join(" | "))
+                                                                }
+                                                            }
+                                                        )
+                                                    )?
+                                        
+                                                    $(
+                                                        format!("{}{}",
+                                                            rename_self(&stringify!([<$name:snake>])),
+                                                            {
+                                                                let types: &[String] = &[
+                                                                    $(
+                                                                        {
+                                                                            let name = $(stringify!([<$deref_ty:snake>]))? $(stringify!([<$ref_ty:snake>]))?;
+                                                                            if ["value", "value_key"].contains(&name) {
+                                                                                "".into()
+                                                                            } else {
+                                                                                format!("@{name}")
+                                                                            }
+                                                                        },
+                                                                    )*
+                                                                ];
+                                                                let types = types.iter().filter(|n| n.len() != 0).cloned().collect::<Vec<_>>();
+                                                                if types.is_empty() {
+                                                                    "".into()
+                                                                } else {
+                                                                    format!(": {}", types.join(" | "))
+                                                                }
+                                                            }
+                                                        )
+                                                    )?
+                                                },
+
                                                 {
                                                     "" $(; format!(" & {}", stringify!( $($pat)* )))?
                                                 }
@@ -210,19 +244,20 @@ macro_rules! impl_type {
                         )*
                     ];
 
+                    //#[doc(u{impl_doc:?})]
                     let out = indoc::formatdoc!(r#"
                             /*
                              * This file is automatically generated!
                              * Do not modify or your changes will be overwritten!
                             */
                             {impl_raw}
-                            #[doc(u{impl_doc:?})]
+                            
                             impl @{typ} {{{consts}
                             {macros}
                             }}
                         "#,
                         impl_raw = stringify!($($impl_raw),*),
-                        impl_doc = <[String]>::join(&[$($impl_doc .to_string()),*], "\n"),
+                        //impl_doc = <[String]>::join(&[$($impl_doc .to_string()),*], "\n"),
                         typ = stringify!( [<$impl_var:snake>] ),
                         consts = consts.join(""),
                         macros = macros.join(""),

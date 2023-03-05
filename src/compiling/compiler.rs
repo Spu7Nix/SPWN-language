@@ -14,14 +14,14 @@ use super::error::CompilerError;
 use crate::cli::Settings;
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
-    DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjKeyType, Pattern,
-    PatternNode, Spannable, Spanned, Statement, StmtNode, StringContent,
+    DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, ObjKeyType,
+    Pattern, PatternNode, Spannable, Spanned, Statement, StmtNode, StringContent,
 };
 use crate::parsing::attributes::ScriptAttribute;
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
-use crate::util::Interner;
+use crate::util::{Interner, BUILTIN_DIR};
 use crate::vm::opcodes::{Register, UnoptRegister};
 use crate::vm::pattern::ConstPattern;
 use crate::vm::value::ValueType;
@@ -274,6 +274,7 @@ impl<'a> Compiler<'a> {
         &mut self,
         stmts: Vec<StmtNode>,
         entry: Option<Vec<ScriptAttribute>>,
+        span: CodeSpan,
     ) -> CompileResult<&Bytecode<Register>> {
         let mut builder = BytecodeBuilder::new();
 
@@ -286,25 +287,29 @@ impl<'a> Compiler<'a> {
                     typ: Some(ScopeType::Global),
                 });
 
-                let builtin_dir = home::home_dir().expect("no home dir").join(format!(
-                    ".spwn/versions/{}/libraries/",
-                    env!("CARGO_PKG_VERSION")
-                ));
-                if let Some(attrs) = entry {
-                    // self.compile_import(
-                    //     &ImportType::Absolute(builtin_dir.join("core/lib.spwn")),
-                    //     CodeSpan::invalid(),
-                    //     self.src.clone(),
-                    // )?;
+                let builtin_import_reg = f.next_reg();
 
-                    // if !attrs.iter().any(|a| *a == ScriptAttribute::NoStd) {
-                    //     self.compile_import(
-                    //         &ImportType::Absolute(builtin_dir.join("std/lib.spwn")),
-                    //         CodeSpan::invalid(),
-                    //         self.src.clone(),
-                    //     )?;
-                    //     // f.import(f.next_reg(), t.clone().spanned(expr.span), expr.span);
-                    // }
+                if entry.is_some() {
+                    let import_type =
+                        ImportType::Module(BUILTIN_DIR.join("core/lib.spwn"), ModuleImport::Core);
+                    self.compile_import(&import_type, CodeSpan::internal(), self.src.clone())?;
+                    f.import(
+                        builtin_import_reg,
+                        import_type.spanned(CodeSpan::internal()),
+                        CodeSpan::internal(),
+                    )
+                }
+                if let Some(attrs) = entry {
+                    if !attrs.iter().any(|a| *a == ScriptAttribute::NoStd) {
+                        let import_type =
+                            ImportType::Module(BUILTIN_DIR.join("std/lib.spwn"), ModuleImport::Std);
+                        self.compile_import(&import_type, CodeSpan::internal(), self.src.clone())?;
+                        f.import(
+                            builtin_import_reg,
+                            import_type.spanned(CodeSpan::internal()),
+                            CodeSpan::internal(),
+                        )
+                    }
                 }
 
                 self.compile_stmts(&stmts, base_scope, f)?;
@@ -318,13 +323,14 @@ impl<'a> Compiler<'a> {
                         end: usize::MAX,
                     },
                 );
-                f.ret(final_ret, true);
+                f.ret(final_ret, true, span);
 
                 // f.load_empty(reg, span)
 
                 Ok((vec![], vec![]))
             },
             0,
+            span,
         )?;
 
         let unopt_code = builder.build(
@@ -369,6 +375,7 @@ impl<'a> Compiler<'a> {
                         .map(|(from, to)| (*from as Register, *to as Register))
                         .collect(),
                     ref_arg_regs: f.ref_arg_regs.iter().map(|r| *r as Register).collect(),
+                    span: f.span,
                 }
             })
             .collect();
@@ -397,15 +404,14 @@ impl<'a> Compiler<'a> {
         span: CodeSpan,
         importer_src: SpwnSource,
     ) -> CompileResult<()> {
-        println!("galaxy {:?}", typ);
-
         let base_dir = importer_src.path().parent().unwrap();
 
-        let (name, rel_path) = typ.to_path_name();
-        let import_path = base_dir.join(rel_path);
+        let (name, import_path) = (typ.name(), typ.full_path(base_dir));
 
-        let import_src = importer_src.map_path(|_| import_path.clone());
-        let is_module = matches!(typ, ImportType::Module(_));
+        let import_src =
+            importer_src.change_path_conditional(import_path.clone(), typ.module_import_type());
+
+        let is_module = matches!(typ, ImportType::Module { .. });
 
         let code = match import_src.read() {
             Some(s) => s,
@@ -414,7 +420,7 @@ impl<'a> Compiler<'a> {
                     is_module,
                     name,
                     area: self.make_area(span),
-                })
+                });
             },
         };
         let import_base = import_path.parent().unwrap();
@@ -453,7 +459,6 @@ impl<'a> Compiler<'a> {
 
                     self.map.map.insert(import_src, bytecode);
                     return Ok(());
-                    // break 'bytecode &self.map.map[&import_src];
                 }
             }
         }
@@ -470,7 +475,14 @@ impl<'a> Compiler<'a> {
                     self.custom_type_defs,
                 );
 
-                match compiler.compile(ast.statements, None) {
+                match compiler.compile(
+                    ast.statements,
+                    None,
+                    CodeSpan {
+                        start: 0,
+                        end: code.len(),
+                    },
+                ) {
                     Ok(bytecode) => {
                         let bytes = bincode::serialize(&bytecode).unwrap();
 
@@ -811,7 +823,7 @@ impl<'a> Compiler<'a> {
                                     self.compile_expr(node, scope, builder, ExprType::Normal)?;
                                 self.global_return =
                                     Some((items.iter().map(|i| i.0).collect(), stmt.span));
-                                builder.ret(ret_reg, true);
+                                builder.ret(ret_reg, true, stmt.span);
                             },
                             _ => {
                                 return Err(CompilerError::InvalidModuleReturn {
@@ -831,12 +843,12 @@ impl<'a> Compiler<'a> {
                         None => {
                             let out_reg = builder.next_reg();
                             builder.load_empty(out_reg, stmt.span);
-                            builder.ret(out_reg, false)
+                            builder.ret(out_reg, false, stmt.span)
                         },
                         Some(expr) => {
                             let ret_reg =
                                 self.compile_expr(expr, scope, builder, ExprType::Normal)?;
-                            builder.ret(ret_reg, false)
+                            builder.ret(ret_reg, false, stmt.span)
                         },
                     }
                 } else {
@@ -1429,13 +1441,14 @@ impl<'a> Compiler<'a> {
                             MacroCode::Lambda(expr) => {
                                 let ret_reg =
                                     self.compile_expr(expr, base_scope, f, ExprType::Normal)?;
-                                f.ret(ret_reg, false);
+                                f.ret(ret_reg, false, expr.span);
                             },
                         }
 
                         Ok((capture_regs, ref_arg_regs))
                     },
                     args.len(),
+                    expr.span,
                 )?;
 
                 builder.new_macro(

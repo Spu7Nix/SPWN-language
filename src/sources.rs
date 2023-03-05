@@ -6,6 +6,7 @@ use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::compiling::bytecode::Bytecode;
+use crate::parsing::ast::ModuleImport;
 use crate::util::hyperlink;
 use crate::vm::opcodes::Register;
 
@@ -56,14 +57,23 @@ impl SpwnSource {
         }
     }
 
-    pub fn map_path<F>(&self, cb: F) -> Self
-    where
-        F: FnOnce(&PathBuf) -> PathBuf,
-    {
+    pub fn change_path(&self, path: PathBuf) -> Self {
         match self {
-            Self::File(f) => Self::File(cb(f)),
-            Self::Std(f) => Self::Std(cb(f)),
-            Self::Core(f) => Self::Core(cb(f)),
+            Self::File(_) => Self::File(path),
+            Self::Std(_) => Self::Std(path),
+            Self::Core(_) => Self::Core(path),
+        }
+    }
+
+    pub fn change_path_conditional(&self, path: PathBuf, parent_typ: ModuleImport) -> Self {
+        match self {
+            SpwnSource::File(_) => match parent_typ {
+                ModuleImport::Regular => SpwnSource::File(path),
+                ModuleImport::Core => SpwnSource::Core(path),
+                ModuleImport::Std => SpwnSource::Std(path),
+            },
+
+            _ => self.change_path(path),
         }
     }
 }
@@ -132,4 +142,4 @@ pub struct BytecodeMap {
     pub map: AHashMap<SpwnSource, Bytecode<Register>>,
 }
 
-// cp .\libraries\ ~\.spwn\versions\0.9.0 -r
+// rmdir -r -fo ~\.spwn\versions\0.9.0\libraries; cp .\libraries\ ~\.spwn\versions\0.9.0 -r
