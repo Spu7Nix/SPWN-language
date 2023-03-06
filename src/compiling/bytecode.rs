@@ -101,7 +101,7 @@ impl std::fmt::Debug for Constant {
                 "@{}",
                 match t {
                     ValueType::Custom(_) => "<type>",
-                    _ => <ValueType as Into<&'static str>>::into(*t),
+                    _ => <ValueType as Into<&str>>::into(*t),
                 }
             ),
             Constant::Array(arr) => write!(f, "{arr:?}"),
@@ -1526,7 +1526,7 @@ impl Bytecode<Register> {
                 lines.push(format!(
                     "{:<pad$}  {:>pad2$}",
                     opcode_i.to_string().bright_blue().bold(),
-                    <&Opcode<Register> as Into<&'static str>>::into(opcode),
+                    <&Opcode<Register> as Into<&str>>::into(opcode),
                     pad = max_num_width,
                     pad2 = longest_opcode
                 ));

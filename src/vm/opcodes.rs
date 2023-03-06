@@ -178,7 +178,7 @@ opcodes! {
     #[delve(display = |s: &R, k: &R| format!("R{s}[R{k}] private"))]
     MakeDictElemPrivate { => dest, => key },
 
-    #[delve(display = |e: &R, k: &ObjectKey, d: &R| format!("insert {}:R{e} into R{d}", <&ObjectKey as Into<&'static str>>::into(k)))]
+    #[delve(display = |e: &R, k: &ObjectKey, d: &R| format!("insert {}:R{e} into R{d}", <&ObjectKey as Into<& str>>::into(k)))]
     PushObjectElemKey { => elem, obj_key: ObjectKey, => dest },
     #[delve(display = |e: &R, k: &u8, d: &R| format!("insert {k}:R{e} into R{d}"))]
     PushObjectElemUnchecked { => elem, obj_key: u8, => dest },

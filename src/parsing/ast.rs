@@ -250,7 +250,7 @@ pub enum ObjectType {
 
 #[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash, EnumDisplay)]
 pub enum ObjKeyType {
-    #[delve(display = |o: &ObjectKey| <&ObjectKey as Into<&'static str>>::into(o).to_string())]
+    #[delve(display = |o: &ObjectKey| <&ObjectKey as Into<&str>>::into(o).to_string())]
     Name(ObjectKey),
     #[delve(display = |n: &u8| format!("{n}"))]
     Num(u8),

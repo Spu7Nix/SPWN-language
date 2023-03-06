@@ -1806,7 +1806,6 @@ impl<'a> Vm<'a> {
 
                 Ok(())
             },
-
             MacroTarget::Builtin(f) => {
                 let mut args = vec![];
                 per_arg! {
@@ -1815,7 +1814,9 @@ impl<'a> Vm<'a> {
                         args.push(k);
                     }
                 }
+
                 let ret = f.0(args, self, call_area.clone())?;
+
                 if let Some(dest) = dest {
                     self.set_reg(
                         dest,
@@ -1825,6 +1826,7 @@ impl<'a> Vm<'a> {
                         },
                     );
                 }
+
                 Ok(())
             },
         }

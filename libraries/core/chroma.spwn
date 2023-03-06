@@ -35,72 +35,72 @@ impl @chroma {
 		},	
 	r:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=1.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=1.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},	
 	g:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=1.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=1.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},	
 	b:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=1.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=1.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},	
 	a:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=1.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=1.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},	
 	r8:
 		
-		(self: @chroma, set: (@float & >=0 & <=255) | @empty = ()) -> @int {
+		(self: @chroma, set: @int & >=0&<=255 | @empty = ()) -> @int {
     		/* compiler built-in */
 		},	
 	g8:
 		
-		(self: @chroma, set: (@float & >=0 & <=255) | @empty = ()) -> @int {
+		(self: @chroma, set: @int & >=0&<=255 | @empty = ()) -> @int {
     		/* compiler built-in */
 		},	
 	b8:
 		
-		(self: @chroma, set: (@float & >=0 & <=255) | @empty = ()) -> @int {
+		(self: @chroma, set: @int & >=0&<=255 | @empty = ()) -> @int {
     		/* compiler built-in */
 		},	
 	a8:
 		
-		(self: @chroma, set: (@float & >=0 & <=255) | @empty = ()) -> @int {
+		(self: @chroma, set: @int & >=0&<=255 | @empty = ()) -> @int {
     		/* compiler built-in */
 		},	
 	h:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=1.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=1.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},	
 	s:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=1.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=1.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},	
 	v:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=1.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=1.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},	
 	h2:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=360.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=360.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},	
 	s2:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=100.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=100.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},	
 	v2:
 		
-		(self: @chroma, set: (@float & >=0.0 & <=100.0) | @empty = ()) -> @float {
+		(self: @chroma, set: @float & >=0.0&<=100.0 | @empty = ()) -> @float {
     		/* compiler built-in */
 		},
 }

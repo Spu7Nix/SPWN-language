@@ -316,7 +316,7 @@ impl ValueType {
             "@{}",
             match self {
                 Self::Custom(t) => vm.resolve(&vm.types[t].value.name),
-                _ => <ValueType as Into<&'static str>>::into(self).into(),
+                _ => <ValueType as Into<&str>>::into(self).into(),
             }
         )
     }
@@ -557,10 +557,7 @@ impl Value {
                     .join(", "),
             ),
             Value::Iterator(_) => "<iterator>".into(),
-            Value::ObjectKey(k) => format!(
-                "$.obj_props.{}",
-                <ObjectKey as Into<&'static str>>::into(*k)
-            ),
+            Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
             Value::Error(_) => todo!(),
         }
     }

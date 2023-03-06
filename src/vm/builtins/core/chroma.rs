@@ -86,7 +86,7 @@ impl_type! {
 
         fn r(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=1.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=1.0) | Empty = {()},
         ) -> Float {
             match set {
                 SetValue::Float(n) => {
@@ -98,7 +98,7 @@ impl_type! {
         }
         fn g(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=1.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=1.0) | Empty = {()},
         ) -> Float {
             match set {
                 SetValue::Float(n) => {
@@ -110,7 +110,7 @@ impl_type! {
         }
         fn b(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=1.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=1.0) | Empty = {()},
         ) -> Float {
             match set {
                 SetValue::Float(n) => {
@@ -122,7 +122,7 @@ impl_type! {
         }
         fn a(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=1.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=1.0) | Empty = {()},
         ) -> Float {
             match set {
                 SetValue::Float(n) => {
@@ -135,7 +135,7 @@ impl_type! {
 
         fn r8(
             slf: &Chroma,
-            set: Int | Empty if as "(@float & >=0 & <=255) | @empty" = {()},
+            set: Int if (>=0 & <=255) | Empty = {()},
         ) -> Int {
             match set {
                 SetValue::Int(n) => {
@@ -147,7 +147,7 @@ impl_type! {
         }
         fn g8(
             slf: &Chroma,
-            set: Int | Empty if as "(@float & >=0 & <=255) | @empty" = {()},
+            set: Int if (>=0 & <=255) | Empty = {()},
         ) -> Int {
             match set {
                 SetValue::Int(n) => {
@@ -159,7 +159,7 @@ impl_type! {
         }
         fn b8(
             slf: &Chroma,
-            set: Int | Empty if as "(@float & >=0 & <=255) | @empty" = {()},
+            set: Int if (>=0 & <=255) | Empty= {()},
         ) -> Int {
             match set {
                 SetValue::Int(n) => {
@@ -171,7 +171,7 @@ impl_type! {
         }
         fn a8(
             slf: &Chroma,
-            set: Int | Empty if as "(@float & >=0 & <=255) | @empty" = {()},
+            set: Int if (>=0 & <=255) | Empty = {()},
         ) -> Int {
             match set {
                 SetValue::Int(n) => {
@@ -185,7 +185,7 @@ impl_type! {
 
         fn h(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=1.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=1.0) | Empty = {()},
         ) -> Float {
             let (h, s, v) = {
                 let c = slf.get_ref(vm);
@@ -203,7 +203,7 @@ impl_type! {
         }
         fn s(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=1.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=1.0)| Empty = {()},
         ) -> Float {
             let (h, s, v) = {
                 let c = slf.get_ref(vm);
@@ -221,7 +221,7 @@ impl_type! {
         }
         fn v(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=1.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=1.0) | Empty = {()},
         ) -> Float {
             let (h, s, v) = {
                 let c = slf.get_ref(vm);
@@ -240,7 +240,7 @@ impl_type! {
 
         fn h2(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=360.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=360.0) | Empty = {()},
         ) -> Float {
             let (h, s, v) = {
                 let c = slf.get_ref(vm);
@@ -258,7 +258,7 @@ impl_type! {
         }
         fn s2(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=100.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=100.0) | Empty = {()},
         ) -> Float {
             let (h, s, v) = {
                 let c = slf.get_ref(vm);
@@ -276,7 +276,7 @@ impl_type! {
         }
         fn v2(
             slf: &Chroma,
-            set: Float | Empty if as "(@float & >=0.0 & <=100.0) | @empty" = {()},
+            set: Float if (>=0.0 & <=100.0) | Empty = {()},
         ) -> Float {
             let (h, s, v) = {
                 let c = slf.get_ref(vm);

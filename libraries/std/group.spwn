@@ -21,7 +21,7 @@ impl @group {
         easing_rate: @int = 2,
     ) {
         
-        $.add( trigger{
+        $.add(trigger {
             OBJ_ID: 901,
             TARGET: self,
             MOVE_X: x * 3,
