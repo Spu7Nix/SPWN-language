@@ -100,7 +100,7 @@ impl CodeArea {
     // }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Default, Serialize, Deserialize, Hash)]
 pub struct CodeSpan {
     pub start: usize,
     pub end: usize,
@@ -119,7 +119,7 @@ impl CodeSpan {
     }
 
     pub fn invalid() -> CodeSpan {
-        CodeSpan { start: 0, end: 1 }
+        CodeSpan { start: 1, end: 0 }
     }
 }
 

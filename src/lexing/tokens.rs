@@ -112,6 +112,7 @@ lexer! {
     ExclMark: text("!"),
 
     Hashtag: text("#"),
+    Epsilon: text("ε"),
 
     Ident: regex(r"[a-zA-Z_][a-zA-Z_0-9]*"),
 
@@ -215,6 +216,7 @@ impl Token {
             Self::Overload => "overload",
             Self::Unary => "unary",
             Self::Throw => "throw",
+            Self::Epsilon => "ε",
         }
     }
 }

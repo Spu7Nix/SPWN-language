@@ -1,4 +1,5 @@
 use std::fmt;
+use std::hash::Hash;
 
 use ahash::{AHashMap, AHashSet};
 
@@ -30,6 +31,23 @@ pub enum ObjParam {
     Text(String),
     GroupList(Vec<Id>),
     Epsilon,
+}
+
+impl Hash for ObjParam {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            ObjParam::Group(id)
+            | ObjParam::Channel(id)
+            | ObjParam::Block(id)
+            | ObjParam::Item(id) => id.hash(state),
+            ObjParam::Number(n) => n.to_bits().hash(state),
+            ObjParam::Bool(b) => b.hash(state),
+            ObjParam::Text(t) => t.hash(state),
+            ObjParam::GroupList(list) => list.hash(state),
+            ObjParam::Epsilon => (),
+        }
+    }
 }
 
 impl fmt::Display for ObjParam {
@@ -75,6 +93,15 @@ pub struct GdObject {
     pub mode: ObjectType,
 }
 
+impl Hash for GdObject {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let mut params = self.params.iter().collect::<Vec<_>>();
+        params.sort_by_key(|(k, _)| *k);
+        params.hash(state);
+        self.mode.hash(state);
+    }
+}
+
 pub struct Trigger {
     pub obj: GdObject,
     pub order: TriggerOrder,
@@ -85,6 +112,23 @@ impl Trigger {
         self.obj.params.insert(57, ObjParam::Group(context));
         self
     }
+}
+
+pub fn make_spawn_trigger(context: Id, target: Id, vm: &mut crate::vm::interpreter::Vm) -> Trigger {
+    let mut obj = GdObject {
+        params: AHashMap::default(),
+        mode: ObjectType::Trigger,
+    };
+
+    obj.params.insert(1, ObjParam::Number(1006.0));
+    //obj.params.insert(63, ObjParam::Number(0.0));
+    obj.params.insert(51, ObjParam::Group(target));
+
+    Trigger {
+        obj,
+        order: vm.trigger_order_count.next(),
+    }
+    .apply_context(context)
 }
 
 pub fn get_used_ids(ls: &str) -> [AHashSet<u16>; 4] {

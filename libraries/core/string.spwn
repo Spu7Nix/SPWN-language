@@ -68,7 +68,7 @@ impl @string {
 		},	
 	substr:
 		
-		(self: @string, start: @int & > 0, end: @int & > 0) {
+		(self: @string, start: @int & >0, end: @int & >0) {
     		/* compiler built-in */
 		},	
 	trim:

@@ -430,37 +430,37 @@ impl<'a> Compiler<'a> {
         let spwnc_path = import_base.join(format!(".spwnc/{name}.spwnc"));
 
         'from_cache: {
-            if spwnc_path.is_file() {
-                let source_bytes = std::fs::read(&spwnc_path).unwrap();
+            // if spwnc_path.is_file() {
+            //     let source_bytes = std::fs::read(&spwnc_path).unwrap();
 
-                let bytecode: Bytecode<Register> = match bincode::deserialize(&source_bytes) {
-                    Ok(b) => b,
-                    Err(_) => {
-                        break 'from_cache;
-                    },
-                };
+            //     let bytecode: Bytecode<Register> = match bincode::deserialize(&source_bytes) {
+            //         Ok(b) => b,
+            //         Err(_) => {
+            //             break 'from_cache;
+            //         },
+            //     };
 
-                if bytecode.source_hash == hash.into()
-                    && bytecode.spwn_ver == env!("CARGO_PKG_VERSION")
-                {
-                    for import in &bytecode.import_paths {
-                        self.compile_import(&import.value, import.span, import_src.clone())?;
-                    }
-                    for (k, (name, private)) in &bytecode.custom_types {
-                        self.custom_type_defs.insert(
-                            TypeDef {
-                                def_src: import_src.clone(),
-                                name: self.intern(&name.value),
-                                private: *private,
-                            },
-                            k.spanned(name.span),
-                        );
-                    }
+            //     if bytecode.source_hash == hash.into()
+            //         && bytecode.spwn_ver == env!("CARGO_PKG_VERSION")
+            //     {
+            //         for import in &bytecode.import_paths {
+            //             self.compile_import(&import.value, import.span, import_src.clone())?;
+            //         }
+            //         for (k, (name, private)) in &bytecode.custom_types {
+            //             self.custom_type_defs.insert(
+            //                 TypeDef {
+            //                     def_src: import_src.clone(),
+            //                     name: self.intern(&name.value),
+            //                     private: *private,
+            //                 },
+            //                 k.spanned(name.span),
+            //             );
+            //         }
 
-                    self.map.map.insert(import_src, bytecode);
-                    return Ok(());
-                }
-            }
+            //         self.map.map.insert(import_src, bytecode);
+            //         return Ok(());
+            //     }
+            // }
         }
 
         let mut parser = Parser::new(&code, import_src, Rc::clone(&self.interner));
@@ -1174,12 +1174,12 @@ impl<'a> Compiler<'a> {
                     Box::new(self.convert_const_pattern(a)?),
                     Box::new(self.convert_const_pattern(b)?),
                 ),
-                Pattern::Eq(v) => Pattern::Eq(self.convert_const_expr(v)?),
-                Pattern::Neq(v) => Pattern::Neq(self.convert_const_expr(v)?),
-                Pattern::Lt(v) => Pattern::Lt(self.convert_const_expr(v)?),
-                Pattern::Lte(v) => Pattern::Lte(self.convert_const_expr(v)?),
-                Pattern::Gt(v) => Pattern::Gt(self.convert_const_expr(v)?),
-                Pattern::Gte(v) => Pattern::Gte(self.convert_const_expr(v)?),
+                Pattern::Eq(v) => Pattern::Eq(self.convert_const_expr(v)?.spanned(pat.span)),
+                Pattern::Neq(v) => Pattern::Neq(self.convert_const_expr(v)?.spanned(pat.span)),
+                Pattern::Lt(v) => Pattern::Lt(self.convert_const_expr(v)?.spanned(pat.span)),
+                Pattern::Lte(v) => Pattern::Lte(self.convert_const_expr(v)?.spanned(pat.span)),
+                Pattern::Gt(v) => Pattern::Gt(self.convert_const_expr(v)?.spanned(pat.span)),
+                Pattern::Gte(v) => Pattern::Gte(self.convert_const_expr(v)?.spanned(pat.span)),
                 Pattern::MacroPattern { args, ret_type } => todo!(),
             },
         })
@@ -1617,6 +1617,9 @@ impl<'a> Compiler<'a> {
             },
             Expression::Empty => {
                 builder.load_empty(out_reg, expr.span);
+            },
+            Expression::Epsilon => {
+                builder.load_epsilon(out_reg, expr.span);
             },
             // Expression::AnyPattern => {
             //     builder.load_any(out_reg, expr.span);

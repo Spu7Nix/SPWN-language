@@ -331,7 +331,10 @@ fn run_spwn(
         Box::new(|_| Ok(())),
         ContextSplitMode::Allow,
     )
-    .map_err(|e| e.to_report(&vm))?;
+    .map_err(|e| {
+        let r = e.to_report(&vm);
+        r
+    })?;
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());
 

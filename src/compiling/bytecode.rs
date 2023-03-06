@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::str::FromStr;
@@ -137,15 +138,17 @@ impl Hash for Constant {
             Constant::Type(v) => v.hash(state),
             Constant::Array(v) => v.hash(state),
             Constant::Dict(v) => {
+                let v: BTreeMap<_, _> = v.iter().collect();
                 for (k, v) in v {
                     k.hash(state);
                     v.hash(state);
                 }
             },
             Constant::Maybe(v) => v.hash(state),
-            Constant::Builtins => "$".hash(state),
-            Constant::Empty => 0_u8.hash(state),
+            Constant::Builtins => (),
+            Constant::Empty => (),
             Constant::Instance(t, m) => {
+                let m: BTreeMap<_, _> = m.iter().collect();
                 t.hash(state);
                 for (k, v) in m {
                     k.hash(state);
@@ -1304,6 +1307,13 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }), span)
     }
 
+    pub fn load_epsilon(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::LoadEpsilon { dest: reg }),
+            span,
+        )
+    }
+
     // pub fn load_any(&mut self, reg: UnoptRegister, span: CodeSpan) {
     //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadAnyPattern { dest: reg }), span)
     // }
@@ -1551,7 +1561,10 @@ impl Bytecode<Register> {
                     Some(span) if span.start != usize::MAX => {
                         let mut s = format!("{:?}", &code[span.start..span.end]);
                         s = s[1..s.len() - 1].into();
-                        let last_char = &s[s.len() - 1..s.len()];
+                        if s.len() == 0 {
+                            s = " ".into();
+                        }
+                        let last_char = "";
 
                         if s.len() > 15 {
                             s = format!(

@@ -4,7 +4,7 @@
 */
 
 
-impl @builtins { // ur DUmb loo
+impl @builtins {
 	
 	print:
 		
@@ -34,6 +34,11 @@ impl @builtins { // ur DUmb loo
 	assert_eq:
 		
 		(self: @builtins, left, right) {
+    		/* compiler built-in */
+		},	
+	hash:
+		
+		(self: @builtins, value) -> @int {
     		/* compiler built-in */
 		},
 }

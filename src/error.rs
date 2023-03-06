@@ -164,7 +164,7 @@ impl RainbowColorGenerator {
     }
 
     pub fn next(&mut self) -> (u8, u8, u8) {
-        let h0 = self.h / 60.0;
+        let h0 = self.h / 360.0;
 
         self.h = (self.h + self.hue_shift).rem_euclid(360.0);
 

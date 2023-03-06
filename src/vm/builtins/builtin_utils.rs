@@ -228,7 +228,7 @@ macro_rules! impl_type {
                                                 },
 
                                                 {
-                                                    "" $(; format!(" & {}", stringify!( $($pat)* )))?
+                                                    "" $(; format!(" & {}", <[&'static str]>::join(&[$( stringify!($pat) ),*], "")))?
                                                 }
                                             ),
                                             {

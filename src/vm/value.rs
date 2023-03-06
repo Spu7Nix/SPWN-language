@@ -32,7 +32,22 @@ pub struct BuiltinFn(
     pub &'static (dyn Fn(Vec<ValueKey>, &mut Vm, CodeArea) -> RuntimeResult<Value>),
 );
 
-#[derive(Clone, Debug)]
+impl std::hash::Hash for BuiltinFn {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        (self.0 as *const dyn Fn(Vec<ValueKey>, &mut Vm, CodeArea) -> RuntimeResult<Value>)
+            .hash(state);
+    }
+}
+
+impl PartialEq for BuiltinFn {
+    fn eq(&self, other: &Self) -> bool {
+        (self.0 as *const dyn Fn(Vec<ValueKey>, &mut Vm, CodeArea) -> RuntimeResult<Value>)
+            .eq(&(other.0
+                as *const dyn Fn(Vec<ValueKey>, &mut Vm, CodeArea) -> RuntimeResult<Value>))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum MacroTarget {
     Macro {
         func: FuncCoord,
@@ -47,20 +62,14 @@ impl Debug for BuiltinFn {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MacroData {
     pub target: MacroTarget,
     pub args: Vec<MacroArg<Spanned<Spur>, ValueKey, ConstPattern>>,
     pub self_arg: Option<ValueKey>,
 }
 
-impl PartialEq for MacroData {
-    fn eq(&self, _other: &Self) -> bool {
-        false
-    }
-} // 🙂
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum IteratorData {
     Array {
         array: ValueKey,
@@ -358,6 +367,10 @@ value! {
 
     Iterator(IteratorData),
 
+    Chroma {
+        r: u8, g: u8, b: u8, a: u8,
+    },
+
     => Instance {
         typ: CustomTypeKey,
         items: AHashMap<Spur, (ValueKey, Visibility)>,
@@ -469,6 +482,7 @@ impl Value {
             Value::Block(id) => id.fmt("b"),
             Value::Item(id) => id.fmt("i"),
             Value::Builtins => "$".to_string(),
+            Value::Chroma { r, g, b, a } => format!("@chroma::rgb8({r}, {g}, {b}, {a})"),
             Value::Range(n1, n2, s) => {
                 if *s == 1 {
                     format!("{n1}..{n2}")

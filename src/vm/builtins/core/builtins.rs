@@ -1,3 +1,5 @@
+use std::hash::Hasher;
+
 use crate::gd::gd_object::{GdObject, Trigger};
 use crate::gd::ids::Id;
 use crate::parsing::ast::ObjectType;
@@ -82,6 +84,12 @@ impl_type! {
                 return Err(RuntimeError::AssertionFailed { area: call_area, call_stack: vm.get_call_stack() });
             }
             Value::Empty
+        }
+
+        fn hash(Builtins as self, value: ValueKey) -> Int {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            vm.hash_value(value, &mut hasher);
+            Value::Int(unsafe { std::mem::transmute::<u64, i64>(hasher.finish()) })
         }
     }
 }

@@ -324,6 +324,9 @@ opcodes! {
     #[delve(display = |d: &R| format!("() -> R{d}"))]
     LoadEmpty { => dest },
 
+    #[delve(display = |d: &R| format!("ε -> R{d}"))]
+    LoadEpsilon { => dest },
+
     #[delve(display = |d: &R| format!("{{}} -> R{d}"))]
     LoadEmptyDict { => dest },
 

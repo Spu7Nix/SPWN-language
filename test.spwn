@@ -1,10 +1,3 @@
-// import "test2.spwn" // ye at least for now
+std = import std
 
-let a = []
-$.print(a)
-a.push(1)
-$.print(a) // ti cannot see ?? ot literwlly epmty omg wow thats so cool i love tehnologoy
-
-
-
- make something in bender
+$.print(std.funny)

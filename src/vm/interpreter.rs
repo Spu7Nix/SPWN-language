@@ -1,7 +1,9 @@
 use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::hash::Hash;
 use std::rc::Rc;
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use colored::Colorize;
 use lasso::Spur;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
@@ -13,7 +15,7 @@ use super::value::{IteratorData, MacroTarget, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
 use crate::compiling::compiler::{CustomTypeKey, TypeDef};
-use crate::gd::gd_object::{GdObject, Trigger, TriggerOrder};
+use crate::gd::gd_object::{make_spawn_trigger, GdObject, Trigger, TriggerOrder};
 use crate::gd::ids::{IDClass, Id, SpecificId};
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{MacroArg, ModuleImport, ObjectType, Spannable, Spanned};
@@ -77,7 +79,7 @@ pub struct Vm<'a> {
     pub overloads: AHashMap<Operator, Vec<ValueKey>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum Visibility {
     Public,
     Private(SpwnSource),
@@ -807,8 +809,6 @@ impl<'a> Vm<'a> {
                     {
                         let span = self.get_span(func, ip);
 
-                        println!("google {:?}", span);
-
                         return Err(RuntimeError::ContextSplitDisallowed {
                             area: self.make_area(span, func.code),
                             call_stack: self.get_call_stack(),
@@ -869,6 +869,16 @@ impl<'a> Vm<'a> {
                         *dest,
                         StoredValue {
                             value: Value::Empty,
+                            area: self.make_area(span, func.code),
+                        },
+                    )
+                },
+                Opcode::LoadEpsilon { dest } => {
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Epsilon,
                             area: self.make_area(span, func.code),
                         },
                     )
@@ -1226,7 +1236,7 @@ impl<'a> Vm<'a> {
                     match typ {
                         ValueType::Custom(..) => (),
                         _ => {
-                            println!("🫵gorgonzola🫵 {:?}", self.programs[func.code].0);
+                            //println!("🫵gorgonzola🫵 {:?}", self.programs[func.code].0);
                             if !matches!(
                                 self.programs[func.code].0,
                                 SpwnSource::Core(_) | SpwnSource::Std(_)
@@ -1329,6 +1339,7 @@ impl<'a> Vm<'a> {
                                 call_area,
                                 Some(*dest),
                                 base.area,
+                                ContextSplitMode::Allow,
                             )?
                         },
                         _ => {
@@ -1602,6 +1613,8 @@ impl<'a> Vm<'a> {
                 let mut current = self.contexts.current_mut();
                 current.ip += 1;
             };
+
+            self.try_merge_contexts();
         }
 
         self.contexts.0.pop();
@@ -1624,6 +1637,7 @@ impl<'a> Vm<'a> {
 
         dest: Option<Register>,
         base_area: CodeArea,
+        split_mode: ContextSplitMode,
     ) -> RuntimeResult<()> {
         let mut param_map: AHashMap<Spur, ValueKey> = AHashMap::new();
 
@@ -1723,7 +1737,7 @@ impl<'a> Vm<'a> {
                     };
 
                     if let Some(pattern) = data.pattern() {
-                        if !pattern.value_matches(&self.memory[$v].value, $vm) {
+                        if !pattern.value_matches(&self.memory[$v].clone(), $vm, func.code)? {
                             return Err(RuntimeError::ArgumentPatternMismatch {
                                 call_area,
                                 macro_def_area: base_area,
@@ -1777,7 +1791,7 @@ impl<'a> Vm<'a> {
 
                         Ok(())
                     }),
-                    ContextSplitMode::Allow,
+                    split_mode,
                 )?;
 
                 Ok(())
@@ -1863,6 +1877,7 @@ impl<'a> Vm<'a> {
                 self.make_area(span, func.code),
                 dest,
                 base_area,
+                ContextSplitMode::Allow,
             )?;
             return Ok(true);
         }
@@ -1984,6 +1999,183 @@ impl<'a> Vm<'a> {
     pub fn next_id(&mut self, c: IDClass) -> u16 {
         self.id_counters[c as usize] += 1;
         self.id_counters[c as usize] as u16
+    }
+
+    pub fn hash_value(&self, val: ValueKey, state: &mut std::collections::hash_map::DefaultHasher) {
+        // hash numbers
+        match &self.memory[val].value {
+            Value::Int(a) => {
+                std::mem::discriminant(&Value::Float(0.0)).hash(state);
+                (*a as f64).to_bits().hash(state);
+                return;
+            }, // convert all ints to floats so float-int equality works
+            _ => (),
+        };
+
+        // hash enum discriminator
+        std::mem::discriminant(&self.memory[val].value).hash(state);
+
+        match &self.memory[val].value {
+            Value::Int(_) => unreachable!(),
+            Value::Float(a) => a.to_bits().hash(state),
+            Value::Bool(a) => a.hash(state),
+            Value::String(a) => a.hash(state),
+            Value::Array(a) => {
+                for v in a {
+                    self.hash_value(*v, state)
+                }
+            },
+            Value::Dict(a) => {
+                let a: BTreeMap<_, _> = a.iter().collect();
+                for (k, (v, vis)) in a {
+                    k.hash(state);
+                    vis.hash(state);
+                    self.hash_value(*v, state)
+                }
+            },
+            Value::Group(a) => a.hash(state),
+            Value::Channel(a) => a.hash(state),
+            Value::Block(a) => a.hash(state),
+            Value::Item(a) => a.hash(state),
+            Value::Builtins => (),
+            Value::Range(a, b, c) => (a, b, c).hash(state),
+            Value::Maybe(a) => {
+                if let Some(v) = a {
+                    self.hash_value(*v, state)
+                }
+            },
+            Value::Empty => (),
+            Value::Macro(a) => (),
+            // {
+            //     if let Some(slf_val) = a.self_arg {
+            //         self.hash_value(slf_val, state);
+            //     }
+
+            //     match &a.target {
+            //         MacroTarget::Macro { func, captured } => {
+            //             func.func.hash(state);
+            //             for c in captured {
+            //                 if c != &val {
+            //                     self.hash_value(*c, state);
+            //                 }
+            //             }
+            //         },
+            //         MacroTarget::Builtin(a) => a.hash(state),
+            //     }
+            // },
+            Value::Type(a) => a.hash(state),
+            Value::Module { exports, types } => (),
+            // {
+            //     let exports: BTreeMap<_, _> = exports.iter().collect();
+            //     for (k, v) in exports {
+            //         k.hash(state);
+            //         self.hash_value(*v, state)
+            //     }
+            //     for (t, b) in types {
+            //         t.hash(state);
+            //         b.hash(state);
+            //     }
+            // },
+            Value::TriggerFunction {
+                group: g,
+                prev_context: p,
+            } => (g, p).hash(state),
+            Value::Error(a) => a.hash(state),
+            Value::Object(a, t) => GdObject {
+                params: a.clone(),
+                mode: *t,
+            }
+            .hash(state),
+            Value::ObjectKey(a) => a.hash(state),
+            Value::Epsilon => (),
+            Value::Iterator(a) => a.hash(state),
+            Value::Instance { typ, items } => {
+                let items: BTreeMap<_, _> = items.iter().collect();
+                typ.hash(state);
+                for (k, (v, vis)) in items {
+                    k.hash(state);
+                    vis.hash(state);
+                    self.hash_value(*v, state)
+                }
+            },
+            Value::Chroma { r, g, b, a } => (r, g, b, a).hash(state),
+        }
+    }
+
+    fn try_merge_contexts(&mut self) {
+        let mut top = Vec::new();
+        {
+            let full_ctx = self.contexts.last_mut();
+
+            if full_ctx.contexts.len() <= 1 {
+                return;
+            }
+
+            // group by pos
+
+            let top_ip = full_ctx.current().ip;
+            loop {
+                if full_ctx.contexts.is_empty() {
+                    break;
+                }
+                if full_ctx.current().ip == top_ip {
+                    top.push(full_ctx.contexts.pop().unwrap());
+                } else {
+                    break;
+                }
+            }
+        }
+
+        if top.len() > 1 {
+            use std::hash::Hasher;
+
+            // for ctx in top.clone() {
+            //     // print all registers
+            //     println!(
+            //         "Registers: [{}]",
+            //         ctx.registers
+            //             .last()
+            //             .unwrap()
+            //             .iter()
+            //             .map(|v| self.memory[*v].value.runtime_display(self))
+            //             .collect::<Vec<_>>()
+            //             .join(", ")
+            //     );
+            // }
+            // println!();
+
+            // hash the contexts
+            let mut hashes = AHashMap::new();
+            for ctx in top {
+                let mut state = std::collections::hash_map::DefaultHasher::new();
+                for val in ctx.registers.last().unwrap() {
+                    //dbg!(self.memory[*val].value.runtime_display(self));
+                    self.hash_value(*val, &mut state);
+                }
+                let hash = state.finish();
+                hashes.entry(hash).or_insert_with(Vec::new).push(ctx);
+            }
+
+            // merge the contexts
+            for (_, ctxs) in hashes {
+                if ctxs.len() > 1 {
+                    let mut iter = ctxs.into_iter();
+                    let ctx = iter.next().unwrap();
+                    let target = ctx.group_stack.last().unwrap();
+                    for ctx2 in iter {
+                        // add a spawn trigger in this context to the merged context
+                        let trigger =
+                            make_spawn_trigger(*ctx2.group_stack.last().unwrap(), *target, self);
+                        self.triggers.push(trigger);
+                    }
+                    self.contexts.last_mut().contexts.push(ctx);
+                } else {
+                    self.contexts.last_mut().contexts.extend(ctxs);
+                }
+            }
+        } else {
+            self.contexts.last_mut().contexts.extend(top);
+        }
     }
 
     pub fn convert_type(

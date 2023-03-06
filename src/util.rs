@@ -50,7 +50,10 @@ pub fn hex_to_rgb(hex: u32) -> (u8, u8, u8) {
     )
 }
 
+/// all values in range `0-1`
 pub fn hsv_to_rgb(h: f64, s: f64, v: f64) -> (u8, u8, u8) {
+    let h = h * 6.0;
+
     let c = v * s;
     let x = c * (1.0 - (h.rem_euclid(2.0) - 1.0).abs());
 
@@ -72,6 +75,28 @@ pub fn hsv_to_rgb(h: f64, s: f64, v: f64) -> (u8, u8, u8) {
     let (r, g, b) = (r + m, g + m, b + m);
 
     ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+}
+
+pub fn rgb_to_hsv(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
+    let x_max = r.max(g).max(b);
+    let v = x_max;
+    let x_min = r.min(g).min(b);
+
+    let c = x_max - x_min;
+
+    let h: f64 = if v == r {
+        60.0 * ((g - b) / c).rem_euclid(6.0)
+    } else if v == g {
+        60.0 * ((b - r) / c + 2.0)
+    } else if v == b {
+        60.0 * ((r - g) / c + 4.0)
+    } else {
+        0.0
+    };
+
+    let s = if v == 0.0 { 0.0 } else { c / v };
+
+    (h / 360.0, s, v)
 }
 
 pub trait HexColorize {

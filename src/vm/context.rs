@@ -2,6 +2,7 @@ use std::cmp::{Ordering, PartialOrd};
 use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
 
+use ahash::AHashMap;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use super::interpreter::{FuncCoord, ValueKey};
@@ -21,7 +22,7 @@ pub struct CallInfo {
 pub struct Context {
     pub ip: usize,
 
-    group_stack: Vec<Id>,
+    pub group_stack: Vec<Id>,
     pub registers: Vec<Vec<ValueKey>>,
 }
 
@@ -32,6 +33,10 @@ impl Context {
             ip: 0,
             group_stack: vec![Id::Specific(0)],
         }
+    }
+
+    pub fn hash(&self) -> u64 {
+        0
     }
 }
 
@@ -70,21 +75,6 @@ impl FullContext {
     pub fn current(&self) -> &Context {
         self.contexts.peek().unwrap()
     }
-
-    // pub fn increment_current(&mut self, func_len: usize) {
-    //     {
-    //         let mut current = self.current_mut();
-    //         let ip = &mut current.ip;
-    //         *ip += 1;
-
-    //         if *ip >= func_len {
-    //             current.pos_stack.pop();
-    //         }
-    //     }
-    //     if self.current().pos_stack.is_empty() {
-    //         self.contexts.pop();
-    //     }
-    // }
 
     pub fn jump_current(&mut self, pos: usize) {
         self.current_mut().ip = pos

@@ -231,6 +231,7 @@ pub enum Expression {
 
     Builtins,
     Empty,
+    Epsilon,
 
     Import(ImportType),
 
@@ -241,7 +242,7 @@ pub enum Expression {
     Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
 }
 
-#[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash)]
 pub enum ObjectType {
     Object,
     Trigger,
@@ -370,7 +371,7 @@ pub struct Ast {
     pub file_attributes: Vec<ScriptAttribute>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Hash, Eq)]
 pub struct Spanned<T> {
     pub value: T,
     pub span: CodeSpan,

@@ -1,15 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-use super::interpreter::{RuntimeResult, ValueKey, Vm};
-use super::value::{Value, ValueType};
+use super::interpreter::{BytecodeKey, RuntimeResult, ValueKey, Vm};
+use super::value::{StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Constant;
 use crate::gd::object_keys::ObjectKey;
-use crate::parsing::ast::Pattern;
+use crate::parsing::ast::{Pattern, Spanned};
+use crate::sources::CodeSpan;
 
 #[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConstPattern {
-    pub pat: Pattern<ValueType, Box<ConstPattern>, Constant>,
+    pub pat: Pattern<ValueType, Box<ConstPattern>, Spanned<Constant>>,
 }
 
 impl Constant {
@@ -66,24 +67,89 @@ impl ConstPattern {
                 format!("({} & {})", a.runtime_display(vm), b.runtime_display(vm))
             },
             Pattern::Any => "_".into(),
-            Pattern::Eq(c) => format!("=={}", c.runtime_display(vm)),
-            Pattern::Neq(c) => format!("!={}", c.runtime_display(vm)),
-            Pattern::Gt(c) => format!(">{}", c.runtime_display(vm)),
-            Pattern::Gte(c) => format!(">={}", c.runtime_display(vm)),
-            Pattern::Lt(c) => format!("<{}", c.runtime_display(vm)),
-            Pattern::Lte(c) => format!("<={}", c.runtime_display(vm)),
+            Pattern::Eq(c) => format!("=={}", c.value.runtime_display(vm)),
+            Pattern::Neq(c) => format!("!={}", c.value.runtime_display(vm)),
+            Pattern::Gt(c) => format!(">{}", c.value.runtime_display(vm)),
+            Pattern::Gte(c) => format!(">={}", c.value.runtime_display(vm)),
+            Pattern::Lt(c) => format!("<{}", c.value.runtime_display(vm)),
+            Pattern::Lte(c) => format!("<={}", c.value.runtime_display(vm)),
             _ => todo!(),
         }
     }
 
-    pub fn value_matches(&self, v: &Value, vm: &Vm) -> bool {
-        match &self.pat {
-            Pattern::Type(t) => v.get_type() == *t,
-            Pattern::Either(a, b) => a.value_matches(v, vm) || b.value_matches(v, vm),
-            Pattern::Both(a, b) => a.value_matches(v, vm) && b.value_matches(v, vm),
+    pub fn value_matches(
+        &self,
+        v: &StoredValue,
+        vm: &mut Vm,
+        code: BytecodeKey,
+    ) -> RuntimeResult<bool> {
+        let mut to_stored_value = |c: &Spanned<Constant>| {
+            let area = vm.make_area(c.span, code);
+            StoredValue {
+                value: Value::from_const(&c.value, vm, &area),
+                area,
+            }
+        };
+
+        let unwrap_bool = |v: &Value| {
+            if let Value::Bool(b) = &v {
+                *b
+            } else {
+                unreachable!()
+            }
+        };
+
+        Ok(match &self.pat {
+            Pattern::Type(t) => v.value.get_type() == *t,
+            Pattern::Either(a, b) => {
+                a.value_matches(v, vm, code)? || b.value_matches(v, vm, code)?
+            },
+            Pattern::Both(a, b) => a.value_matches(v, vm, code)? && b.value_matches(v, vm, code)?,
             Pattern::Any => true,
+            Pattern::Eq(n) => unwrap_bool(&value_ops::eq_op(
+                v,
+                &to_stored_value(n),
+                CodeSpan::internal(),
+                vm,
+                code,
+            )?),
+            Pattern::Neq(n) => unwrap_bool(&value_ops::neq_op(
+                v,
+                &to_stored_value(n),
+                CodeSpan::internal(),
+                vm,
+                code,
+            )?),
+            Pattern::Lt(n) => unwrap_bool(&value_ops::lt(
+                v,
+                &to_stored_value(n),
+                CodeSpan::internal(),
+                vm,
+                code,
+            )?),
+            Pattern::Lte(n) => unwrap_bool(&value_ops::lte(
+                v,
+                &to_stored_value(n),
+                CodeSpan::internal(),
+                vm,
+                code,
+            )?),
+            Pattern::Gt(n) => unwrap_bool(&value_ops::gt(
+                v,
+                &to_stored_value(n),
+                CodeSpan::internal(),
+                vm,
+                code,
+            )?),
+            Pattern::Gte(n) => unwrap_bool(&value_ops::gte(
+                v,
+                &to_stored_value(n),
+                CodeSpan::internal(),
+                vm,
+                code,
+            )?),
             _ => todo!(),
-        }
+        })
     }
 }
 

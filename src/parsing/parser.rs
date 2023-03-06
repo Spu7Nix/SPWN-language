@@ -567,6 +567,10 @@ impl Parser<'_> {
                     self.next();
                     Expression::Bool(false).spanned(start)
                 },
+                Token::Epsilon => {
+                    self.next();
+                    Expression::Epsilon.spanned(start)
+                },
                 Token::Ident => {
                     self.next();
                     let var_name = self.slice_interned();
