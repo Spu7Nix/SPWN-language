@@ -1583,7 +1583,10 @@ impl<'a> Compiler<'a> {
                 })?;
                 builder.pop_context_group(out_reg, expr.span);
             },
-            Expression::TriggerFuncCall(_) => todo!(),
+            Expression::TriggerFuncCall(e) => {
+                let reg = self.compile_expr(e, scope, builder, ExprType::Normal)?;
+                builder.call_trigger_func(reg);
+            },
             Expression::Ternary {
                 cond,
                 if_true,

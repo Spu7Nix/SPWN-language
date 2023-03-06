@@ -1414,6 +1414,10 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::YeetContext))
     }
 
+    pub fn call_trigger_func(&mut self, reg: usize) {
+        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::CallTriggerFunc { func: reg }))
+    }
+
     pub fn call(
         &mut self,
         base: UnoptRegister,
@@ -1538,10 +1542,10 @@ impl Bytecode<Register> {
                     },
                     Opcode::Import { dest, src } => {
                         format!(
-                            "import {} -> R{dest}",
-                            format!("{:?}", &self.import_paths[*src as usize].value)
-                                .bright_cyan()
-                                .bold()
+                            "import  -> R{dest}",
+                            // format!("{:?}", &self.import_paths[*src as usize].value)
+                            //     .bright_cyan()
+                            //     .bold()
                         )
                     },
                     _ => {

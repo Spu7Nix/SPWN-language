@@ -740,11 +740,9 @@ impl<'a> Vm<'a> {
                 Opcode::Range { left, right, dest } => {
                     self.bin_op(vo::range, func, ip, left, right, dest, BinOp::Range)?
                 },
-                Opcode::In {
-                    left: _,
-                    right: _,
-                    dest: _,
-                } => todo!(),
+                Opcode::In { left, right, dest } => {
+                    self.bin_op(vo::in_op, func, ip, left, right, dest, BinOp::In)?
+                },
                 Opcode::As { left, right, dest } => {
                     let span = self.get_span(func, ip);
 
@@ -1488,6 +1486,23 @@ impl<'a> Vm<'a> {
 
                     self.contexts.pop_groups_until(prev_group);
                 },
+                Opcode::CallTriggerFunc { func: f } => {
+                    let v = self.get_reg(*f);
+                    let target = match v.value {
+                        Value::TriggerFunction { group, .. } => group,
+                        Value::Group(g) => g,
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: (v.value.get_type(), v.area.clone()),
+                                area: self.get_area(func, ip),
+                                expected: ValueType::TriggerFunction, // OR group idk how to make this error do that
+                                call_stack: self.get_call_stack(),
+                            });
+                        },
+                    };
+                    let trigger = make_spawn_trigger(self.contexts.group(), target, self);
+                    self.triggers.push(trigger);
+                },
                 Opcode::MakeTriggerFunc { src, dest } => {
                     let group = match &self.get_reg(*src).value {
                         Value::Group(g) => *g,
@@ -1580,12 +1595,7 @@ impl<'a> Vm<'a> {
                         },
                     )
                 },
-                // Opcode::PatEq { src, dest } => todo!(),
-                // Opcode::PatNeq { src, dest } => todo!(),
-                // Opcode::PatGt { src, dest } => todo!(),
-                // Opcode::PatGte { src, dest } => todo!(),
-                // Opcode::PatLt { src, dest } => todo!(),
-                // Opcode::PatLte { src, dest } => todo!(),
+
                 Opcode::Throw { err } => {
                     let area = self.get_area(func, ip);
                     let err = self.get_reg(*err);
@@ -1824,37 +1834,39 @@ impl<'a> Vm<'a> {
         &mut self,
         op: Operator,
         values: [Register; N],
+        code: BytecodeKey,
     ) -> Option<(MacroData, CodeArea)> {
-        // if let Some(overloads) = self.overloads.get(&op).cloned() {
-        //     'overloads: for overload in overloads.iter().rev() {
-        //         let data = match &self.memory[*overload].value {
-        //             Value::Macro(data) => {
-        //                 data.clone()
-        //                 // if values
-        //                 //     .into_iter()
-        //                 //     .zip(&data.args)
-        //                 //     .all(|(v, arg)| arg.pattern().as_ref().unwrap().value_matches(v, self))
-        //                 // {
-        //                 //     return Some((data.clone(), self.memory[*overload].area.clone()));
-        //                 // }
-        //             }
-        //             _ => unreachable!(),
-        //         };
-        //         for (v, arg) in values.into_iter().zip(&data.args) {
-        //             if !arg
-        //                 .pattern()
-        //                 .as_ref()
-        //                 .unwrap()
-        //                 .value_matches(&self.get_reg(v).value.clone(), self)
-        //                 .unwrap()
-        //             // lol
-        //             {
-        //                 continue 'overloads;
-        //             }
-        //         }
-        //         return Some((data.clone(), self.memory[*overload].area.clone()));
-        //     }
-        // }
+        if let Some(overloads) = self.overloads.get(&op).cloned() {
+            'overloads: for overload in overloads.iter().rev() {
+                let data = match &self.memory[*overload].value {
+                    Value::Macro(data) => {
+                        data.clone()
+                        // if values
+                        //     .into_iter()
+                        //     .zip(&data.args)
+                        //     .all(|(v, arg)| arg.pattern().as_ref().unwrap().value_matches(v, self))
+                        // {
+                        //     return Some((data.clone(), self.memory[*overload].area.clone()));
+                        // }
+                    },
+                    _ => unreachable!(),
+                };
+                for (v, arg) in values.into_iter().zip(&data.args) {
+                    let v = self.get_reg(v).clone();
+                    if !arg
+                        .pattern()
+                        .as_ref()
+                        .unwrap()
+                        .value_matches(&v, self, code)
+                        .unwrap()
+                    // lol
+                    {
+                        continue 'overloads;
+                    }
+                }
+                return Some((data.clone(), self.memory[*overload].area.clone()));
+            }
+        }
         None
     }
 
@@ -1867,7 +1879,7 @@ impl<'a> Vm<'a> {
         dest: Option<u8>,
     ) -> Result<bool, RuntimeError> {
         if let Some((data, base_area)) = // .map(|a| &self.get_reg(a).value)
-            self.find_overload(operator, regs)
+            self.find_overload(operator, regs, func.code)
         {
             self.run_macro(
                 data,

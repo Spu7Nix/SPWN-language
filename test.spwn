@@ -1,8 +1,0 @@
-
-
-let fuck = @chroma::from_hex(0xff80e4);
-$.print(fuck);
-$.print(fuck.h());
-$.print(fuck.h(74.0 / 360.0));
-$.print(fuck);
-$.print(fuck.h());

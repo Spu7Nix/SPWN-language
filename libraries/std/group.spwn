@@ -1,0 +1,36 @@
+
+wait = (time: @int | @float | @epsilon = $.epsilon()) {
+	if time == $.epsilon() || time > 0 {
+		$.add( trigger{
+			OBJ_ID: 1268,
+			SPAWN_DURATION: time,
+			TARGET: !{
+				-> return
+			},
+		})
+	}
+}
+
+impl @group {
+    move: (
+        self,
+        x: @int | @float,
+        y: @int | @float,
+        duration: @int | @float = 0,
+        easing: @int = 0,
+        easing_rate: @int = 2,
+    ) {
+        
+        $.add( trigger{
+            OBJ_ID: 901,
+            TARGET: self,
+            MOVE_X: x * 3,
+            MOVE_Y: y * 3,
+            DURATION: duration,
+            EASING: easing,
+            EASING_RATE: easing_rate,
+        })
+        
+        wait(duration)
+    },
+}

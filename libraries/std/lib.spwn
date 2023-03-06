@@ -8,5 +8,4 @@
 // impl @linked {}
 
 
-
-return {funny: "yes"}
+import "group.spwn"

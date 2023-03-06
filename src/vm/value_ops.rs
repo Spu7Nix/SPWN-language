@@ -133,6 +133,34 @@ pub fn as_op(
     })
 }
 
+pub fn in_op(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
+    Ok(match (&a.value, &b.value) {
+        (a, Value::Array(b)) => {
+            todo!("context shit overloading boboggl") // context shit overloading boboggl
+        },
+
+        (Value::String(s), Value::Dict(d)) => {
+            Value::Bool(d.contains_key(&vm.intern(&s.iter().collect::<String>())))
+        },
+
+        _ => {
+            return Err(RuntimeError::InvalidOperands {
+                op: BinOp::In,
+                a: (a.value.get_type(), a.area.clone()),
+                b: (b.value.get_type(), b.area.clone()),
+                area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
+            })
+        },
+    })
+}
+
 pub fn add(
     a: &StoredValue,
     b: &StoredValue,
