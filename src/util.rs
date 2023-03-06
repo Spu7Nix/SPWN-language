@@ -38,16 +38,24 @@ impl From<md5::Digest> for Digest {
     }
 }
 
-pub fn hex_to_rgb(hex: u32) -> (u8, u8, u8) {
-    if hex > 0xffffff {
-        panic!("invalid hex number")
+pub fn hex_to_rgb(hex: u64) -> Option<(u8, u8, u8, u8)> {
+    if hex > 0xffffffff {
+        None
+    } else if hex > 0xffffff {
+        Some((
+            (hex >> 24) as u8,
+            ((hex % 0x1000000) >> 16) as u8,
+            ((hex % 0x10000) >> 8) as u8,
+            (hex % 0x100) as u8,
+        ))
+    } else {
+        Some((
+            (hex >> 16) as u8,
+            ((hex % 0x10000) >> 8) as u8,
+            (hex % 0x100) as u8,
+            255,
+        ))
     }
-
-    (
-        (hex >> 16) as u8,
-        ((hex % 0x10000) >> 8) as u8,
-        (hex % 0x100) as u8,
-    )
 }
 
 /// all values in range `0-1`
@@ -106,12 +114,12 @@ pub trait HexColorize {
 
 impl<T: Colorize> HexColorize for T {
     fn color_hex(self, c: u32) -> ColoredString {
-        let (r, g, b) = hex_to_rgb(c);
+        let (r, g, b, _) = hex_to_rgb(c as u64).unwrap();
         self.truecolor(r, g, b)
     }
 
     fn on_color_hex(self, c: u32) -> ColoredString {
-        let (r, g, b) = hex_to_rgb(c);
+        let (r, g, b, _) = hex_to_rgb(c as u64).unwrap();
         self.on_truecolor(r, g, b)
     }
 }

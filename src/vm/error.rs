@@ -387,5 +387,24 @@ error_maker! {
             area: CodeArea,
             [call_stack]
         },
+
+
+
+        // ============================ BUILTIN FUNC ERRORS ============================
+
+
+
+        /////////
+        #[
+            Message: "Invalid hex code", Note: None;
+            Labels: [
+                area => "{}": => (msg);
+            ]
+        ]
+        InvalidHexString {
+            area: CodeArea,
+            msg: String,
+            [call_stack]
+        },
     }
 }

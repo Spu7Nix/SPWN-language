@@ -47,6 +47,7 @@ macro_rules! impl_type {
                         )?
 
                     $(if ( $($pat:tt)* ) )?
+                    $(if as $pat_as:literal )?
                         
                     $(
                         = { $($default:tt)* }
@@ -168,6 +169,11 @@ macro_rules! impl_type {
                                                             s
                                                         }
                                                     }
+
+                                                    let pat_override: Option<String> = None;
+                                                    
+                                                    $(let pat_override: Option<String> = Some(format!(": {}", $pat_as));)?
+
                                                     $(
                                                         format!("{}: @{}", 
                                                             stringify!($binder),
@@ -178,23 +184,27 @@ macro_rules! impl_type {
                                                         format!("...{}{}",
                                                             rename_self(&stringify!([<$name:snake>])),
                                                             {
-                                                                let types: &[String] = &[
-                                                                    $(
-                                                                        {
-                                                                            let name = $(stringify!([<$spread_deref_ty:snake>]))? $(stringify!([<$spread_ref_ty:snake>]))?;
-                                                                            if ["value", "value_key"].contains(&name) {
-                                                                                "".into()
-                                                                            } else {
-                                                                                format!("@{name}")
-                                                                            }
-                                                                        },
-                                                                    )*
-                                                                ];
-                                                                let types = types.iter().filter(|n| n.len() != 0).cloned().collect::<Vec<_>>();
-                                                                if types.is_empty() {
-                                                                    "".into()
+                                                                if let Some(s) = pat_override {
+                                                                    s
                                                                 } else {
-                                                                    format!(": {}", types.join(" | "))
+                                                                    let types: &[String] = &[
+                                                                        $(
+                                                                            {
+                                                                                let name = $(stringify!([<$spread_deref_ty:snake>]))? $(stringify!([<$spread_ref_ty:snake>]))?;
+                                                                                if ["value", "value_key"].contains(&name) {
+                                                                                    "".into()
+                                                                                } else {
+                                                                                    format!("@{name}")
+                                                                                }
+                                                                            },
+                                                                        )*
+                                                                    ];
+                                                                    let types = types.iter().filter(|n| n.len() != 0).cloned().collect::<Vec<_>>();
+                                                                    if types.is_empty() {
+                                                                        "".into()
+                                                                    } else {
+                                                                        format!(": {}", types.join(" | "))
+                                                                    }
                                                                 }
                                                             }
                                                         )
@@ -204,23 +214,27 @@ macro_rules! impl_type {
                                                         format!("{}{}",
                                                             rename_self(&stringify!([<$name:snake>])),
                                                             {
-                                                                let types: &[String] = &[
-                                                                    $(
-                                                                        {
-                                                                            let name = $(stringify!([<$deref_ty:snake>]))? $(stringify!([<$ref_ty:snake>]))?;
-                                                                            if ["value", "value_key"].contains(&name) {
-                                                                                "".into()
-                                                                            } else {
-                                                                                format!("@{name}")
-                                                                            }
-                                                                        },
-                                                                    )*
-                                                                ];
-                                                                let types = types.iter().filter(|n| n.len() != 0).cloned().collect::<Vec<_>>();
-                                                                if types.is_empty() {
-                                                                    "".into()
+                                                                if let Some(s) = pat_override {
+                                                                    s
                                                                 } else {
-                                                                    format!(": {}", types.join(" | "))
+                                                                    let types: &[String] = &[
+                                                                        $(
+                                                                            {
+                                                                                let name = $(stringify!([<$deref_ty:snake>]))? $(stringify!([<$ref_ty:snake>]))?;
+                                                                                if ["value", "value_key"].contains(&name) {
+                                                                                    "".into()
+                                                                                } else {
+                                                                                    format!("@{name}")
+                                                                                }
+                                                                            },
+                                                                        )*
+                                                                    ];
+                                                                    let types = types.iter().filter(|n| n.len() != 0).cloned().collect::<Vec<_>>();
+                                                                    if types.is_empty() {
+                                                                        "".into()
+                                                                    } else {
+                                                                        format!(": {}", types.join(" | "))
+                                                                    }
                                                                 }
                                                             }
                                                         )
@@ -368,6 +382,9 @@ macro_rules! impl_type {
 
     (@extra Area ($name:ident, $vm:ident, $args:ident, $arg_index:ident) ) => {
         let $name = $vm.memory[$args[$arg_index]].area.clone();
+    };
+    (@extra Key ($name:ident, $vm:ident, $args:ident, $arg_index:ident) ) => {
+        let $name = $args[$arg_index];
     };
 }
 
