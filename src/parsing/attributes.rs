@@ -47,8 +47,6 @@ macro_rules! attributes {
             )*
         }
     ) => {
-
-
         #[derive(Debug, Clone, PartialEq, Eq)]
         pub enum $enum {
             $(
@@ -290,7 +288,7 @@ attributes! {
 }
 
 attributes! {
-    pub enum ScriptAttribute {
+    pub enum FileAttribute {
         CacheOutput,
         NoStd,
     }

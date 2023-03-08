@@ -17,7 +17,7 @@ use crate::parsing::ast::{
     DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, ObjKeyType,
     Pattern, PatternNode, Spannable, Spanned, Statement, StmtNode, StringContent,
 };
-use crate::parsing::attributes::ScriptAttribute;
+use crate::parsing::attributes::FileAttribute;
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
@@ -273,7 +273,7 @@ impl<'a> Compiler<'a> {
     pub fn compile(
         &mut self,
         stmts: Vec<StmtNode>,
-        entry: Option<Vec<ScriptAttribute>>,
+        entry: Option<Vec<FileAttribute>>,
         span: CodeSpan,
     ) -> CompileResult<&Bytecode<Register>> {
         let mut builder = BytecodeBuilder::new();
@@ -300,7 +300,7 @@ impl<'a> Compiler<'a> {
                     )
                 }
                 if let Some(attrs) = entry {
-                    if !attrs.iter().any(|a| *a == ScriptAttribute::NoStd) {
+                    if !attrs.iter().any(|a| *a == FileAttribute::NoStd) {
                         let import_type =
                             ImportType::Module(BUILTIN_DIR.join("std/lib.spwn"), ModuleImport::Std);
                         self.compile_import(&import_type, CodeSpan::internal(), self.src.clone())?;

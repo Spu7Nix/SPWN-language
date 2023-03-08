@@ -12,7 +12,7 @@ use super::ast::{
     Ast, DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjectType, Pattern,
     PatternNode, Spannable, Spanned, Statement, Statements, StmtNode, StringContent, StringType, ModuleImport,
 };
-use super::attributes::{ExprAttribute, IsValidOn, ParseAttribute, ScriptAttribute, StmtAttribute};
+use super::attributes::{ExprAttribute, IsValidOn, ParseAttribute, FileAttribute, StmtAttribute};
 use super::error::SyntaxError;
 use super::utils::operators::{self, unary_prec};
 use crate::gd::ids::IDClass;
@@ -185,7 +185,7 @@ impl Parser<'_> {
                 _ => (),
             }
         }
-        s.parse::<i64>().unwrap()
+        s.replace('_', "").parse::<i64>().unwrap()
     }
 
     fn parse_id(&self, s: &str) -> (IDClass, Option<u16>) {
@@ -1465,9 +1465,8 @@ impl Parser<'_> {
             self.next();
             self.next();
 
-            println!("lesex");
 
-            self.parse_attributes::<ScriptAttribute>()?
+            self.parse_attributes::<FileAttribute>()?
         } else {
             vec![]
         };

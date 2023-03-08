@@ -5,23 +5,26 @@ use delve::{EnumDisplay, EnumToStr};
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
-use super::attributes::{ExprAttribute, ScriptAttribute, StmtAttribute};
+use super::attributes::{ExprAttribute, FileAttribute, StmtAttribute};
 use super::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
 use crate::sources::CodeSpan;
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub enum StringContent {
     Normal(Spur),
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub struct StringType {
     pub s: StringContent,
     pub bytes: bool,
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum ModuleImport {
     Regular,
@@ -34,6 +37,7 @@ impl ModuleImport {
     }
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ImportType {
     Module(PathBuf, ModuleImport),
@@ -81,6 +85,7 @@ impl ImportType {
     }
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub enum MacroCode {
     Normal(Statements),
@@ -94,6 +99,14 @@ pub struct ExprNode {
     pub span: CodeSpan,
 }
 
+#[cfg(test)]
+impl PartialEq for ExprNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.expr == other.expr && self.attributes == other.attributes
+    }
+}
+
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub struct StmtNode {
     pub stmt: Box<Statement>,
@@ -101,6 +114,7 @@ pub struct StmtNode {
     pub span: CodeSpan,
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub struct PatternNode {
     pub pat: Box<Pattern<Spur, PatternNode, ExprNode>>,
@@ -163,6 +177,7 @@ impl<N, D, P> MacroArg<N, D, P> {
     }
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone, EnumToStr)]
 pub enum Expression {
     Int(i64),
@@ -256,6 +271,7 @@ pub enum ObjKeyType {
     Num(u8),
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone, EnumToStr)]
 pub enum Statement {
     Expr(ExprNode),
@@ -368,7 +384,7 @@ impl StmtNode {
 #[derive(Debug)]
 pub struct Ast {
     pub statements: Vec<StmtNode>,
-    pub file_attributes: Vec<ScriptAttribute>,
+    pub file_attributes: Vec<FileAttribute>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Hash, Eq)]
