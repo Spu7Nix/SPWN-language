@@ -387,10 +387,18 @@ pub struct Ast {
     pub file_attributes: Vec<FileAttribute>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Hash, Eq)]
+#[cfg_attr(not(test), derive(PartialEq))]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq)]
 pub struct Spanned<T> {
     pub value: T,
     pub span: CodeSpan,
+}
+
+#[cfg(test)]
+impl<T: PartialEq> PartialEq for Spanned<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
 }
 
 impl<T> Spanned<T> {

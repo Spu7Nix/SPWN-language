@@ -18,14 +18,14 @@ mod tests {
         Ast, ExprNode, Expression as Ex, Statement as St, StmtNode, StringContent, StringType,
     };
     use super::parser::Parser;
-    use super::utils::operators::BinOp;
+    use super::utils::operators::{BinOp, UnaryOp};
     use crate::gd::ids::IDClass;
+    use crate::parsing::ast::Spanned;
     use crate::parsing::attributes::FileAttribute;
     use crate::parsing::parser::ParseResult;
     use crate::sources::{CodeSpan, SpwnSource};
     use crate::RandomState;
 
-    #[derive(Debug)]
     struct Interner(Rc<RefCell<Rodeo<Spur, RandomState>>>);
     impl std::ops::Deref for Interner {
         type Target = Rc<RefCell<Rodeo<Spur, RandomState>>>;
@@ -84,25 +84,35 @@ mod tests {
         () => {};
     }
 
+    macro_rules! span {
+        ($expr:expr) => {{
+            Spanned {
+                value: $expr,
+                span: CodeSpan::internal(),
+            }
+        }};
+    }
+
+    macro_rules! spur {
+        ($str:literal) => {{
+            let v = INTERNER.write().unwrap();
+            let mut i = v.borrow_mut();
+            i.get_or_intern($str)
+        }};
+    }
+
     macro_rules! string {
-        ($str:literal $(, $is_bytes:literal)?) => {
+        ($str:literal $(, $is_bytes:literal)?) => {{
             Ex::String(StringType {
-                s: StringContent::Normal(
-                    (&*INTERNER.write().unwrap())
-                        .borrow_mut()
-                        .get_or_intern($str),
-                ),
+                s: StringContent::Normal( spur!($str) ),
                 bytes: { false $(; $is_bytes)?},
             })
-        };
+        }};
     }
 
     fn parse(code: &'static str) -> ParseResult<Ast> {
-        let mut parser = Parser::new(
-            code,
-            SpwnSource::File("<test>".into()),
-            Rc::clone(&*INTERNER.write().unwrap()),
-        );
+        let i = INTERNER.write().unwrap();
+        let mut parser = Parser::new(code, SpwnSource::File("<test>".into()), Rc::clone(&*i));
 
         parser.parse()
     }
@@ -384,5 +394,98 @@ mod tests {
         Ok(())
     }
 
-    // and more
+    #[test]
+    fn test_unary_op() -> ParseResult<()> {
+        match UnaryOp::Minus {
+            UnaryOp::BinNot => (),
+            UnaryOp::ExclMark => (),
+            UnaryOp::Minus => (),
+        }
+
+        let t = parse("~true")?;
+        expr_eq!(t, Ex::Unary(UnaryOp::BinNot, Ex::Bool(true).into()));
+
+        let t = parse("!0")?;
+        expr_eq!(t, Ex::Unary(UnaryOp::ExclMark, Ex::Int(0).into()));
+
+        let t = parse("-10.2")?;
+        expr_eq!(t, Ex::Unary(UnaryOp::Minus, Ex::Float(10.2).into()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_var() -> ParseResult<()> {
+        let t = parse("a")?;
+        expr_eq!(t, Ex::Var(spur!("a")));
+
+        let t = parse("p_b")?;
+        expr_eq!(t, Ex::Var(spur!("p_b")));
+
+        let t = parse("a123")?;
+        expr_eq!(t, Ex::Var(spur!("a123")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_type() -> ParseResult<()> {
+        let t = parse("@a")?;
+        expr_eq!(t, Ex::Type(spur!("a")));
+
+        let t = parse("@p_b")?;
+        expr_eq!(t, Ex::Type(spur!("p_b")));
+
+        let t = parse("@a123")?;
+        expr_eq!(t, Ex::Type(spur!("a123")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_array() -> ParseResult<()> {
+        let t = parse(r#"[10, a, true, "aa", 1.2, @a, [1, 2], a in b, !false]"#)?;
+        expr_eq!(
+            t,
+            Ex::Array(vec![
+                Ex::Int(10).into(),
+                Ex::Var(spur!("a")).into(),
+                Ex::Bool(true).into(),
+                string!("aa").into(),
+                Ex::Float(1.2).into(),
+                Ex::Type(spur!("a")).into(),
+                Ex::Array(vec![Ex::Int(1).into(), Ex::Int(2).into(),]).into(),
+                Ex::Op(
+                    Ex::Var(spur!("a")).into(),
+                    BinOp::In,
+                    Ex::Var(spur!("b")).into()
+                )
+                .into(),
+                Ex::Unary(UnaryOp::ExclMark, Ex::Bool(false).into()).into(),
+            ])
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_dict() -> ParseResult<()> {
+        let t = parse(
+            r#"{
+            a,
+            b: 10,
+            "c": "a",
+        }"#,
+        )?;
+        expr_eq!(
+            t,
+            Ex::Dict(vec![
+                (span!(spur!("a")), None, false),
+                (span!(spur!("b")), Some(Ex::Int(10).into()), false),
+                (span!(spur!("c")), Some(string!("a").into()), false),
+            ])
+        );
+
+        Ok(())
+    }
 }
