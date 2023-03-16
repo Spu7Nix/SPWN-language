@@ -4,7 +4,6 @@ use crate::vm::value::{StoredValue, Value};
 use crate::vm::value_ops;
 
 impl_type! {
-    // most of these are implemented in spwn in the std because Context stuff is skrunly to make in rust
     impl Int {
         Constants:
 

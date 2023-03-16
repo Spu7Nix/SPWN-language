@@ -9,8 +9,8 @@
 /// dfsdf
 ///
 
-dbg @error::TYPE_MISMATCH;
-
+// @error::register_error("aaa", "POOPOO")
+// @error::CUSTOM.aa.POOPOO
 
 // try_catches: Vec<...>
 

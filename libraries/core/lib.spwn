@@ -1,6 +1,7 @@
 import "array.spwn"
 import "builtins.spwn"
 import "chroma.spwn"
+import "error.spwn"
 import "float.spwn"
 import "int.spwn"
 import "string.spwn"

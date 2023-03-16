@@ -1,0 +1,9 @@
+impl @error {
+    private used_ids: -0,
+    CUSTOM: {},
+
+    register_error: (namespace: @string, error: @string) {
+        @error::used_ids -= 1;
+        //@error::CUSTOM.get_or_insert(namespace, (errors) => errors[error] = @error::used_ids, {}.insert(namespace, error))
+    }
+}

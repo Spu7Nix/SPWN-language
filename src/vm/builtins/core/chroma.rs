@@ -7,7 +7,6 @@ impl_type! {
 
     impl Chroma {
         Constants:
-        const GAGA = Int(56);
 
         Functions(vm, call_area):
 
