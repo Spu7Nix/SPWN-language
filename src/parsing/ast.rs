@@ -92,18 +92,12 @@ pub enum MacroCode {
     Lambda(ExprNode),
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub struct ExprNode {
     pub expr: Box<Expression>,
     pub attributes: Vec<ExprAttribute>,
     pub span: CodeSpan,
-}
-
-#[cfg(test)]
-impl PartialEq for ExprNode {
-    fn eq(&self, other: &Self) -> bool {
-        self.expr == other.expr && self.attributes == other.attributes
-    }
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -388,22 +382,10 @@ pub struct Ast {
     pub file_attributes: Vec<FileAttribute>,
 }
 
-#[allow(clippy::derived_hash_with_manual_eq)]
-#[allow(renamed_and_removed_lints)]
-#[allow(unknown_lints)]
-#[allow(clippy::derive_hash_xor_eq)]
-#[cfg_attr(not(test), derive(PartialEq))]
-#[derive(Clone, Debug, Hash, Serialize, Deserialize, Eq)]
+#[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Spanned<T> {
     pub value: T,
     pub span: CodeSpan,
-}
-
-#[cfg(test)]
-impl<T: PartialEq> PartialEq for Spanned<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
-    }
 }
 
 impl<T> Spanned<T> {

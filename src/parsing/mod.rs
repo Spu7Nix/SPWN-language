@@ -20,9 +20,13 @@ mod tests {
     use super::parser::Parser;
     use super::utils::operators::{BinOp, UnaryOp};
     use crate::gd::ids::IDClass;
-    use crate::parsing::ast::Spanned;
+    use crate::gd::object_keys::ObjectKey;
+    use crate::parsing::ast::{
+        ImportType, ModuleImport, ObjKeyType, ObjectType, Pattern, PatternNode, Spanned,
+    };
     use crate::parsing::attributes::FileAttribute;
     use crate::parsing::parser::ParseResult;
+    use crate::parsing::utils::operators::AssignOp;
     use crate::sources::{CodeSpan, SpwnSource};
     use crate::RandomState;
 
@@ -56,6 +60,16 @@ mod tests {
         }
     }
 
+    type Pt = Pattern<Spur, PatternNode, ExprNode>;
+    impl Into<PatternNode> for Pt {
+        fn into(self) -> PatternNode {
+            PatternNode {
+                pat: Box::new(self),
+                span: CodeSpan::internal(),
+            }
+        }
+    }
+
     lazy_static! {
         static ref INTERNER: RwLock<Interner> = RwLock::new(Interner(Rc::new(RefCell::new(
             Rodeo::with_hasher(RandomState::new())
@@ -80,9 +94,9 @@ mod tests {
         };
     }
 
-    macro_rules! stmt {
-        () => {};
-    }
+    // macro_rules! stmt {
+    //     () => {};
+    // }
 
     macro_rules! span {
         ($expr:expr) => {{
@@ -410,6 +424,12 @@ mod tests {
         Ok(())
     }
 
+    // #[test]
+    // fn test_assign_op() -> ParseResult<()> {
+    //     todo!();
+    //     Ok(())
+    // }
+
     #[test]
     fn test_var() -> ParseResult<()> {
         let t = parse("a")?;
@@ -484,6 +504,321 @@ mod tests {
                 (span!(spur!("c")), Some(string!("a").into()), false),
             ])
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_maybe() -> ParseResult<()> {
+        let t = parse("?")?;
+        expr_eq!(t, Ex::Maybe(None));
+
+        let t = parse("10?")?;
+        expr_eq!(t, Ex::Maybe(Some(Ex::Int(10).into())));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_pattern() -> ParseResult<()> {
+        match Pt::Any {
+            Pattern::Any => (),
+            Pattern::Type(_) => (),
+            Pattern::Either(..) => (),
+            Pattern::Both(..) => (),
+            Pattern::Eq(_) => (),
+            Pattern::Neq(_) => (),
+            Pattern::Lt(_) => (),
+            Pattern::Lte(_) => (),
+            Pattern::Gt(_) => (),
+            Pattern::Gte(_) => (),
+            Pattern::MacroPattern { .. } => (),
+        };
+
+        let e: ExprNode = Ex::Int(1).into();
+
+        let t = parse("1 is _")?;
+        expr_eq!(t, Ex::Is(e.clone(), Pt::Any.into()));
+
+        let t = parse("1 is @test")?;
+        expr_eq!(t, Ex::Is(e.clone(), Pt::Type(spur!("test")).into()));
+
+        let t = parse("1 is @int|@float")?;
+        expr_eq!(
+            t,
+            Ex::Is(
+                e.clone(),
+                Pt::Either(
+                    Pt::Type(spur!("int")).into(),
+                    Pt::Type(spur!("float")).into(),
+                )
+                .into()
+            )
+        );
+
+        let t = parse("1 is ==1")?;
+        expr_eq!(t, Ex::Is(e.clone(), Pt::Eq(Ex::Int(1).into()).into()));
+        let t = parse("1 is !=1")?;
+        expr_eq!(t, Ex::Is(e.clone(), Pt::Neq(Ex::Int(1).into()).into()));
+        let t = parse("1 is <1")?;
+        expr_eq!(t, Ex::Is(e.clone(), Pt::Lt(Ex::Int(1).into()).into()));
+        let t = parse("1 is <=1")?;
+        expr_eq!(t, Ex::Is(e.clone(), Pt::Lte(Ex::Int(1).into()).into()));
+        let t = parse("1 is >1")?;
+        expr_eq!(t, Ex::Is(e.clone(), Pt::Gt(Ex::Int(1).into()).into()));
+        let t = parse("1 is >=1")?;
+        expr_eq!(t, Ex::Is(e, Pt::Gte(Ex::Int(1).into()).into()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_index() -> ParseResult<()> {
+        let t = parse("a[200]")?;
+        expr_eq!(
+            t,
+            Ex::Index {
+                base: Ex::Var(spur!("a")).into(),
+                index: Ex::Int(200).into()
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_member() -> ParseResult<()> {
+        let t = parse("foo.bar")?;
+        expr_eq!(
+            t,
+            Ex::Member {
+                base: Ex::Var(spur!("foo")).into(),
+                name: span!(spur!("bar")),
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_type_member() -> ParseResult<()> {
+        let t = parse("foo.@bar")?;
+        expr_eq!(
+            t,
+            Ex::TypeMember {
+                base: Ex::Var(spur!("foo")).into(),
+                name: span!(spur!("bar")),
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_associated_member() -> ParseResult<()> {
+        let t = parse("@foo::bar")?;
+        expr_eq!(
+            t,
+            Ex::Associated {
+                base: Ex::Type(spur!("foo")).into(),
+                name: span!(spur!("bar")),
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_call() -> ParseResult<()> {
+        let t = parse("a()")?;
+        expr_eq!(
+            t,
+            Ex::Call {
+                base: Ex::Var(spur!("a")).into(),
+                params: vec![],
+                named_params: vec![],
+            }
+        );
+
+        let t = parse("a(10)")?;
+        expr_eq!(
+            t,
+            Ex::Call {
+                base: Ex::Var(spur!("a")).into(),
+                params: vec![Ex::Int(10).into()],
+                named_params: vec![],
+            }
+        );
+
+        let t = parse("a(foo = 20)")?;
+        expr_eq!(
+            t,
+            Ex::Call {
+                base: Ex::Var(spur!("a")).into(),
+                params: vec![],
+                named_params: vec![(span!(spur!("foo")), Ex::Int(20).into())],
+            }
+        );
+
+        let t = parse("a(10, 20, foo = 30)")?;
+        expr_eq!(
+            t,
+            Ex::Call {
+                base: Ex::Var(spur!("a")).into(),
+                params: vec![Ex::Int(10).into(), Ex::Int(20).into()],
+                named_params: vec![(span!(spur!("foo")), Ex::Int(30).into())],
+            }
+        );
+
+        Ok(())
+    }
+
+    // #[test]
+    // fn test_macro() -> ParseResult<()> {
+    //     todo!();
+
+    //     Ok(())
+    // }
+
+    #[test]
+    fn test_trigger_func() -> ParseResult<()> {
+        let t = parse(
+            "!{
+            a = 10
+        }",
+        )?;
+        expr_eq!(
+            t,
+            Ex::TriggerFunc {
+                attributes: vec![],
+                code: vec![St::AssignOp(
+                    Ex::Var(spur!("a")).into(),
+                    AssignOp::Assign,
+                    Ex::Int(10).into()
+                )
+                .into()]
+            }
+        );
+
+        let t = parse("a!")?;
+        expr_eq!(t, Ex::TriggerFuncCall(Ex::Var(spur!("a")).into()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ternary() -> ParseResult<()> {
+        let t = parse("1 if true else 2")?;
+        expr_eq!(
+            t,
+            Ex::Ternary {
+                cond: Ex::Bool(true).into(),
+                if_true: Ex::Int(1).into(),
+                if_false: Ex::Int(2).into(),
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_typeof() -> ParseResult<()> {
+        let t = parse("2.type")?;
+        expr_eq!(t, Ex::Typeof(Ex::Int(2).into()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_import() -> ParseResult<()> {
+        let t = parse(r#"import foobar"#)?;
+        expr_eq!(t, Ex::Import(ImportType::Library("foobar".into())));
+
+        let t = parse(r#"import "foobar.spwn""#)?;
+        expr_eq!(
+            t,
+            Ex::Import(ImportType::Module(
+                "foobar.spwn".into(),
+                ModuleImport::Regular
+            ))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_instance() -> ParseResult<()> {
+        let t = parse("@foo::{a: 10, b}")?;
+        expr_eq!(
+            t,
+            Ex::Instance {
+                base: Ex::Type(spur!("foo")).into(),
+                items: vec![
+                    (span!(spur!("a")), Some(Ex::Int(10).into()), false,),
+                    (span!(spur!("b")), None, false),
+                ]
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_obj() -> ParseResult<()> {
+        let t = parse(
+            "obj {
+            OBJ_ID: 10,
+            GROUPS: [20g],
+            5: false
+        }",
+        )?;
+        expr_eq!(
+            t,
+            Ex::Obj(
+                ObjectType::Object,
+                vec![
+                    (
+                        span!(ObjKeyType::Name(ObjectKey::ObjId)),
+                        Ex::Int(10).into()
+                    ),
+                    (
+                        span!(ObjKeyType::Name(ObjectKey::Groups)),
+                        Ex::Array(vec![Ex::Id(IDClass::Group, Some(20)).into()]).into()
+                    ),
+                    (span!(ObjKeyType::Num(5)), Ex::Bool(false).into())
+                ]
+            )
+        );
+
+        let t = parse(
+            "trigger {
+            OBJ_ID: 10,
+        }",
+        )?;
+        expr_eq!(
+            t,
+            Ex::Obj(
+                ObjectType::Trigger,
+                vec![(
+                    span!(ObjKeyType::Name(ObjectKey::ObjId)),
+                    Ex::Int(10).into()
+                )],
+            )
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_misc() -> ParseResult<()> {
+        let t = parse("$")?;
+        expr_eq!(t, Ex::Builtins);
+
+        let t = parse("()")?;
+        expr_eq!(t, Ex::Empty);
+
+        let t = parse("ε")?;
+        expr_eq!(t, Ex::Epsilon);
 
         Ok(())
     }

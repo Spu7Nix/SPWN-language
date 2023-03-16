@@ -100,10 +100,22 @@ impl CodeArea {
     // }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy, Default, Serialize, Deserialize, Hash)]
+#[allow(clippy::derived_hash_with_manual_eq)]
+#[allow(renamed_and_removed_lints)]
+#[allow(unknown_lints)]
+#[allow(clippy::derive_hash_xor_eq)]
+#[cfg_attr(not(test), derive(PartialEq))]
+#[derive(Debug, Clone, Eq, Copy, Default, Serialize, Deserialize, Hash)]
 pub struct CodeSpan {
     pub start: usize,
     pub end: usize,
+}
+
+#[cfg(test)]
+impl PartialEq for CodeSpan {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
 }
 
 impl CodeSpan {

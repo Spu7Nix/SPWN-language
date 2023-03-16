@@ -8,14 +8,14 @@ repos:
       - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: trailing-whitespace
-#   - repo: local
-#     hooks:
-#       - id: fmt
-#         name: fmt
-#         entry: cargo +nightly fmt
-#         language: system
-#         types: [rust]
-#         args: ["--"]
+  - repo: local
+    hooks:
+      - id: fmt
+        name: fmt
+        entry: cargo +nightly fmt
+        language: system
+        types: [rust]
+        args: ["--"]
 #       - id: clippy
 #         name: clippy
 #         entry: cargo clippy
