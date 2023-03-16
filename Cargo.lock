@@ -739,19 +739,8 @@ dependencies = [
  "serde",
  "slotmap",
  "spinoff",
- "spwn-codegen",
  "strum",
  "unindent",
-]
-
-[[package]]
-name = "spwn-codegen"
-version = "0.1.0"
-dependencies = [
- "Inflector",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

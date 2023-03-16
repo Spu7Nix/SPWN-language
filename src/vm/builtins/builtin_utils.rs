@@ -51,11 +51,11 @@ macro_rules! impl_type {
                         )?
 
                     //$(if as $pat_as:literal )?
-                        
+
                     $(
                         = { $($default:tt)* }
                     )?
-                
+
                     $(
                         where $($extra:ident($extra_bind:ident))+
                     )?
@@ -79,7 +79,7 @@ macro_rules! impl_type {
                         let mut __arg_idx = 0usize;
 
                         $(
-                            
+
                             $(
                                 impl_type! { @union ($name, $vm, __args, __arg_idx) $( $($deref_ty)? $(&$ref_ty)? )|+ }
                             )?
@@ -124,12 +124,14 @@ macro_rules! impl_type {
         paste::paste! {
             #[cfg(test)]
             mod [<$impl_var:snake _core_gen>] {
+                use delve::VariantNames;
+
                 #[test]
                 pub fn [<$impl_var:snake _core_gen>]() {
                     let path = std::path::PathBuf::from(format!("{}{}.spwn", $crate::CORE_PATH, stringify!( [<$impl_var:snake>] )));
 
                     //#[doc(u{const_doc:?})]
-                    let consts: &[String] = &[
+                    let mut consts: Vec<String> = vec![
                         $(
                             indoc::formatdoc!("\t{const_raw}
                                 \t
@@ -144,6 +146,16 @@ macro_rules! impl_type {
                             ),
                         )*
                     ];
+
+                    if stringify!($impl_var) == "Error" {
+                        for (i, name) in $crate::vm::error::ErrorDiscriminants::VARIANT_NAMES.iter().enumerate() {
+                            consts.push(
+                                indoc::formatdoc!("
+                                    \n\t{name}: {i},",
+                                )
+                            )
+                        }
+                    }
 
                     //#[doc(u{macro_doc:?})]
                     let macros: &[String] = &[
@@ -172,7 +184,7 @@ macro_rules! impl_type {
                                                 }
 
                                                 $(
-                                                    format!("{}: @{}{}", 
+                                                    format!("{}: @{}{}",
                                                         stringify!($binder),
                                                         rename_self(&stringify!([<$name:snake>])),
                                                         {
@@ -210,7 +222,7 @@ macro_rules! impl_type {
                                                         }
                                                     )
                                                 )?
-                                    
+
                                                 $(
                                                     format!("{}{}",
                                                         rename_self(&stringify!([<$name:snake>])),
@@ -247,7 +259,7 @@ macro_rules! impl_type {
                                             }
                                         ),
                                     )*
-                                ], ", "), 
+                                ], ", "),
                                 macro_ret = {
                                     " " $(; format!(" -> @{} ", stringify!([<$ret_type:snake>])))?
                                 },
@@ -262,7 +274,7 @@ macro_rules! impl_type {
                              * Do not modify or your changes will be overwritten!
                             */
                             {impl_raw}
-                            
+
                             impl @{typ} {{{consts}
                             {macros}
                             }}
@@ -329,9 +341,9 @@ macro_rules! impl_type {
             };
         }
     };
-    
 
-    
+
+
     (@union ($name:ident, $vm:ident, $args:ident, $arg_index:ident) Value) => {
         impl_type! {@union [let] ($name, $vm, $args, $arg_index) Value }
     };
@@ -341,12 +353,12 @@ macro_rules! impl_type {
     (@union ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $($dederef_ty:ident)? $(&$deref_ty:ident)?) => {
         impl_type! {@union [let] ($name, $vm, $args, $arg_index) $($dederef_ty)? $(&$deref_ty)? }
     };
-    
+
     (@union ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $( $($dederef_ty:ident)? $(&$deref_ty:ident)? )|+) => {
         impl_type! { @union [type] ($name, $vm, $args, $arg_index) $( $($dederef_ty)? $(&$deref_ty)? )|+ }
         impl_type! { @union [let] ($name, $vm, $args, $arg_index) $( $($dederef_ty)? $(&$deref_ty)? )|+ }
     };
-    
+
     (@... ($name:ident, $vm:ident, $args:ident, $arg_index:ident) Value) => {
         let $name = match &$vm.memory[$args[$arg_index]].value {
             $crate::vm::value::Value::Array(v) => {

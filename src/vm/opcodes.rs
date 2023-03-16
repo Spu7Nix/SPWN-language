@@ -56,6 +56,7 @@ pub type JumpPos = u16;
 pub type AllocSize = u16;
 pub type FunctionID = u16;
 pub type ImportID = u16;
+pub type TryCatchID = u16;
 
 macro_rules! opcodes {
     (
@@ -243,8 +244,6 @@ opcodes! {
     Not { => src, => dest },
     #[delve(display = |s: &R, d: &R| format!("-R{s} -> R{d}"))]
     Negate { => src, => dest },
-    #[delve(display = |s: &R, d: &R| format!("~R{s} -> R{d}"))]
-    BinNot { => src, => dest },
 
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} == R{b} -> R{x}"))]
     Eq { => left, => right, => dest },
@@ -280,6 +279,11 @@ opcodes! {
     },
     #[delve(display = |s: &R, to: &JumpPos| format!("if not R{s}, to {to}"))]
     JumpIfFalse {
+        => src,
+        to: JumpPos,
+    },
+    #[delve(display = |s: &R, to: &JumpPos| format!("if R{s} == (), to {to}"))]
+    JumpIfEmpty {
         => src,
         to: JumpPos,
     },
@@ -361,6 +365,12 @@ opcodes! {
     #[delve(display = |a: &R, o: &Operator| format!("overload {} with {{R{a}}}", o.to_str()))]
     Overload { => array, op: Operator },
 
-    #[delve(display = |reg: &R| format!("convert R{reg} to byte array"))]
+    #[delve(display = |r: &R| format!("convert R{r} to byte array"))]
     MakeByteArray { => reg },
+
+    #[delve(display = |i: &TryCatchID, r: &R| format!("try {{ ... }}#{i} catch -> R{r}"))]
+    StartTryCatch {
+        id: TryCatchID,
+        => reg
+    },
 }

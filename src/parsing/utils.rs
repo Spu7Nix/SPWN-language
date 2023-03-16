@@ -174,7 +174,6 @@ operators! {
     // Left => [Is];
     Left => [BinOr, Or];
     Left => [BinAnd, And];
-    Unary => [BinNot];
     // Unary => [Eq, Neq, Gt, Gte, Lt, Lte];
     Unary => [ExclMark];
     Left => [Eq, Neq, Gt, Gte, Lt, Lte];

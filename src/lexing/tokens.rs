@@ -63,14 +63,12 @@ lexer! {
 
     BinAndEq: text("&="),
     BinOrEq: text("|="),
-    BinNotEq: text("~="),
 
     ShiftLeftEq: text("<<="),
     ShiftRightEq: text(">>="),
 
     BinAnd: text("&"),
     BinOr: text("|"),
-    BinNot: text("~"),
 
     ShiftLeft: text("<<"),
     ShiftRight: text(">>"),
@@ -195,10 +193,8 @@ impl Token {
             Self::As => "as",
             Self::BinAndEq => "&=",
             Self::BinOrEq => "|=",
-            Self::BinNotEq => "~=",
             Self::BinAnd => "&",
             Self::BinOr => "|",
-            Self::BinNot => "~",
             Self::And => "&&",
             Self::Or => "||",
             Self::ShiftLeftEq => "<<=",

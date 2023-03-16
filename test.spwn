@@ -1,1 +1,45 @@
-"aaaa\"
+// try {
+//     sgdfhkjhjksdgfhjksgdf
+//     //..
+// }
+
+// fn sdds -> Result {
+
+// }
+/// dfsdf
+///
+
+dbg @error::TYPE_MISMATCH;
+
+
+// try_catches: Vec<...>
+
+// if in_try_catch {
+//     let err = sdds();
+//     self.memory[].insert(err.id)
+//     //df dfdf
+// } else {
+//     sdds()?;
+// }
+
+// try {
+//     func()
+// }
+
+// if let Some(t) = try_catches.get(0) {
+//     try_catches.pop()
+// }
+
+// START_TRY_CATCH 1
+// fgdfsg
+// dsf
+// g
+// dfgdfg
+// dfgsdf
+// g
+// sdf
+// gdf
+// f
+// END_TRY_CATCH 1
+
+// Vec<(u16, u32)>

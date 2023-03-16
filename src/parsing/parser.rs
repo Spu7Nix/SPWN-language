@@ -9,10 +9,11 @@ use lasso::Spur;
 use unindent::unindent;
 
 use super::ast::{
-    Ast, DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjectType, Pattern,
-    PatternNode, Spannable, Spanned, Statement, Statements, StmtNode, StringContent, StringType, ModuleImport,
+    Ast, DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport,
+    ObjectType, Pattern, PatternNode, Spannable, Spanned, Statement, Statements, StmtNode,
+    StringContent, StringType,
 };
-use super::attributes::{ExprAttribute, IsValidOn, ParseAttribute, FileAttribute, StmtAttribute};
+use super::attributes::{ExprAttribute, FileAttribute, IsValidOn, ParseAttribute, StmtAttribute};
 use super::error::SyntaxError;
 use super::utils::operators::{self, unary_prec};
 use crate::gd::ids::IDClass;
@@ -423,8 +424,9 @@ impl Parser<'_> {
             Token::String => {
                 self.next();
                 ImportType::Module(
-                    self.resolve(&self.parse_plain_string(self.slice(), self.span())?).into(),
-                    ModuleImport::Regular
+                    self.resolve(&self.parse_plain_string(self.slice(), self.span())?)
+                        .into(),
+                    ModuleImport::Regular,
                 )
             },
             Token::Ident => {
@@ -988,8 +990,6 @@ impl Parser<'_> {
                     self.expect_tok(Token::Else)?;
                     let if_false = self.parse_expr(allow_macros)?;
 
-                    // also we not parsing `if is` ternarise?????
-                    
                     Expression::Ternary {
                         cond,
                         if_true: value,
@@ -1268,36 +1268,44 @@ impl Parser<'_> {
 
                 let try_code = self.parse_block()?;
 
-                let mut found_catch_all: Option<CodeSpan> = None;
+                let mut catch_all: Option<(Statements, CodeSpan)> = None;
 
                 while self.next_is(Token::Catch) {
                     self.next();
 
-                    let error_typ = if self.next_is(Token::LBracket) {
-                        if let Some(s) = found_catch_all {
-                            return Err(SyntaxError::DuplicateCatchAll { area: self.make_area(s), second_area: self.make_area(self.span()) })
-                        } else {
-                            found_catch_all = Some(self.span());
+                    if self.next_is(Token::LBracket) {
+                        if let Some((_, s)) = catch_all {
+                            return Err(SyntaxError::DuplicateCatchAll {
+                                area: self.make_area(s),
+                                second_area: self.make_area(self.span()),
+                            });
                         }
-                        None
+                        let catch_span = self.span();
+
+                        let catch_all_code = self.parse_block()?;
+
+                        catch_all = Some((catch_all_code, catch_span))
                     } else {
                         #[allow(clippy::collapsible_else_if)]
-                        if let Some(s) = found_catch_all {
-                            return Err(SyntaxError::CatchAllNotFinal { area: self.make_area(s), named_catch_area: self.make_area(self.span()) })
+                        let error_typ = if let Some((_, s)) = catch_all {
+                            return Err(SyntaxError::CatchAllNotFinal {
+                                area: self.make_area(s),
+                                named_catch_area: self.make_area(self.span()),
+                            });
                         } else {
                             self.next();
-                            Some(self.parse_expr(true)?)
-                        }
-                    };
+                            self.parse_expr(true)?
+                        };
 
-                    let catch_code = self.parse_block()?;
-
-                    branches.push((error_typ, catch_code));
+                        let catch_code = self.parse_block()?;
+                        branches.push((error_typ, catch_code));
+                    }
                 }
 
                 Statement::TryCatch {
                     try_code,
                     branches,
+                    catch_all: catch_all.map(|(v, _)| v),
                 }
             },
             Token::Return => {
@@ -1464,7 +1472,6 @@ impl Parser<'_> {
         let file_attributes = if self.next_are(&[Token::Hashtag, Token::ExclMark]) {
             self.next();
             self.next();
-
 
             self.parse_attributes::<FileAttribute>()?
         } else {

@@ -7,13 +7,14 @@ use super::value::ValueType;
 use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;
-use crate::util::hyperlink;
 
 error_maker! {
     Title: "Runtime Error"
     Extra: {
         vm: &Vm,
     }
+    #[derive(strum::EnumDiscriminants)]
+    #[strum_discriminants(name(ErrorDiscriminants), derive(delve::EnumVariantNames), delve(rename_variants = "SCREAMING_SNAKE_CASE"))]
     pub enum RuntimeError {
         /////////
         #[

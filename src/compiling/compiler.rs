@@ -738,64 +738,50 @@ impl<'a> Compiler<'a> {
                     })
                 },
             },
-            Statement::TryCatch { try_code, branches } => {
-                /*
+            Statement::TryCatch {
+                try_code,
+                branches,
+                catch_all,
+            } => {
+                let error_reg = builder.next_reg();
+                builder.load_empty(error_reg, stmt.span);
+                builder.start_try_catch(error_reg, stmt.span);
+                builder.block(|b| {
+                    let inner_scope = self.derive_scope(scope, None);
+                    self.compile_stmts(try_code, inner_scope, b)?;
+                    Ok(())
+                })?;
 
-                #[
-                    Message: "Type mismatch", Note: None;
-                    Labels: [
-                        area => "Expected {}, found {}": expected.runtime_display(vm), v.0.runtime_display(vm);
-                        v.1 => "Value defined as {} here": v.0.runtime_display(vm);
-                    ]
-                ]
-                TypeMismatch {
-                    v: (ValueType, CodeArea),
-                    area: CodeArea,
-                    expected: ValueType,
-                    [call_stack]
-                },
+                builder.block(|outer_b| {
+                    outer_b.exit_if_empty(error_reg, stmt.span);
 
-                class NameError(Exception)
+                    for (err_catch, code) in branches {
+                        let outer_path = outer_b.block_path.clone();
+                        let inner_scope = self.derive_scope(scope, None);
 
-                type @error
+                        outer_b.block(|b| {
+                            let err_catch_reg =
+                                self.compile_expr(err_catch, scope, b, ExprType::Normal)?;
 
-                impl @error {
-                    TYPE_MISMATCH: 0
-                }
+                            let cond_reg = b.next_reg();
+                            b.eq(err_catch_reg, error_reg, cond_reg, stmt.span);
 
-                try {
+                            b.exit_if_false(cond_reg, err_catch.span);
+                            self.compile_stmts(code, inner_scope, b)?;
 
-                } catch @error::TYPE_MISMATCH {
+                            b.exit_other_block(outer_path);
 
-                } catch
-
-                .to_error() -> Value
-
-                Error(@error::TYPE_MISMATCH)
-
-
-                try {
-
-                    type @error
-
-                    impl @error {
-                        TYPE_MISMATCH: @error::new()
-
-                        code:
-                        message:
-                        description:
-                        ...
-
-                        new: () {}
+                            Ok(())
+                        })?;
                     }
 
-                    <!!! 😡 TYPE_MISMATCH 😡 !!!>
+                    if let Some(code) = catch_all {
+                        let inner_scope = self.derive_scope(scope, None);
+                        self.compile_stmts(code, inner_scope, outer_b)?;
+                    }
 
-                } catch is @error::TYPE_MISMATCH {
-                    @error >SEX< >.< OwO :() :)))))))))))))))) :( :) )))) ) :(  : ) P : : )) )))) ) ) )
-                }
-
-                */
+                    Ok(())
+                })?;
             },
             Statement::Arrow(statement) => {
                 builder.block(|b| {
@@ -1269,15 +1255,8 @@ impl<'a> Compiler<'a> {
             Expression::Unary(op, value) => {
                 let v = self.compile_expr(value, scope, builder, ExprType::Normal)?;
                 match op {
-                    UnaryOp::BinNot => builder.unary_bin_not(v, out_reg, expr.span),
                     UnaryOp::ExclMark => builder.unary_not(v, out_reg, expr.span),
                     UnaryOp::Minus => builder.unary_negate(v, out_reg, expr.span),
-                    // UnaryOp::Eq => builder.unary_pat_eq(v, out_reg, expr.span),
-                    // UnaryOp::Neq => builder.unary_pat_neq(v, out_reg, expr.span),
-                    // UnaryOp::Gt => builder.unary_pat_gt(v, out_reg, expr.span),
-                    // UnaryOp::Gte => builder.unary_pat_gte(v, out_reg, expr.span),
-                    // UnaryOp::Lt => builder.unary_pat_lt(v, out_reg, expr.span),
-                    // UnaryOp::Lte => builder.unary_pat_lte(v, out_reg, expr.span),
                 }
             },
             Expression::Var(name) => match self.get_var(*name, scope) {

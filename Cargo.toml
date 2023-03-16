@@ -3,12 +3,7 @@ name = "spwn"
 version = "0.9.0"
 edition = "2021"
 
-[workspace]
-members = ["codegen"]
-
 [dependencies]
-spwn-codegen = { version = "0.1.0", path = "codegen" }
-
 ariadne = { git = "https://github.com/zesterer/ariadne.git", features = ["auto-color"] }
 concolor = { version = "0.0.11", features = ["auto"] }
 

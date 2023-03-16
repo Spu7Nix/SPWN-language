@@ -5,74 +5,74 @@
 
 
 impl @string {
-	
+
 	contains:
-		
+
 		(self: @string, substr: @string) {
     		/* compiler built-in */
-		},	
+		},
 	ends_with:
-		
+
 		(self: @string, suffix: @string) {
     		/* compiler built-in */
-		},	
+		},
 	starts_with:
-		
+
 		(self: @string, prefix: @string) {
     		/* compiler built-in */
-		},	
+		},
 	index:
-		
+
 		(self: @string, substr: @string) {
     		/* compiler built-in */
-		},	
+		},
 	is_digit:
-		
+
 		(self: @string) {
     		/* compiler built-in */
-		},	
+		},
 	is_empty:
-		
+
 		(self: @string) {
     		/* compiler built-in */
-		},	
+		},
 	is_lower:
-		
+
 		(self: @string) {
     		/* compiler built-in */
-		},	
+		},
 	is_upper:
-		
+
 		(self: @string) {
     		/* compiler built-in */
-		},	
+		},
 	lowercase:
-		
+
 		(self: @string) {
     		/* compiler built-in */
-		},	
+		},
 	uppercase:
-		
+
 		(self: @string) {
     		/* compiler built-in */
-		},	
+		},
 	reversed:
-		
+
 		(self: @string) {
     		/* compiler built-in */
-		},	
+		},
 	split:
-		
+
 		(self: @string, sep: @string) {
     		/* compiler built-in */
-		},	
+		},
 	substr:
-		
+
 		(self: @string, start: @int & >0, end: @int & >0) {
     		/* compiler built-in */
-		},	
+		},
 	trim:
-		
+
 		(self: @string) {
     		/* compiler built-in */
 		},

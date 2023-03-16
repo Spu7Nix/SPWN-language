@@ -31,7 +31,6 @@ use lasso::Rodeo;
 use slotmap::SecondaryMap;
 use spinoff::spinners::SpinnerFrames;
 use spinoff::{Spinner as SSpinner, *};
-use spwn_codegen::def_type;
 
 use crate::cli::{Arguments, Command};
 use crate::compiling::compiler::{Compiler, TypeDefMap};

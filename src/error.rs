@@ -65,6 +65,7 @@ macro_rules! error_maker {
                 $extra_arg:ident: $extra_type:ty,
             )*
         }
+        $(#[$($meta:tt)*])*
         pub enum $enum:ident {
             $(
                 #[
@@ -87,6 +88,7 @@ macro_rules! error_maker {
         }
     ) => {
         #[derive(Debug, Clone)]
+        $(#[$($meta)*])*
         pub enum $enum {
             $(
                 $err_name {

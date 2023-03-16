@@ -319,6 +319,8 @@ pub fn unary_not(
 ) -> RuntimeResult<Value> {
     Ok(match &v.value {
         Value::Bool(b) => Value::Bool(!b),
+        Value::Int(i) => Value::Int(!i),
+        Value::Float(f) => Value::Float((!f.to_bits()) as f64),
         _ => {
             return Err(RuntimeError::InvalidUnaryOperand {
                 v: (v.value.get_type(), v.area.clone()),

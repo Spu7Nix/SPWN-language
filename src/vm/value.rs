@@ -175,7 +175,7 @@ macro_rules! value {
                 $( #[$($meta)* ])?
                 $name,
             )*
-            
+
             #[delve(skip)]
             Custom(CustomTypeKey),
         }
@@ -184,7 +184,7 @@ macro_rules! value {
             pub fn get_type(&self) -> ValueType {
                 match self {
                     Self::Instance { typ, .. } => ValueType::Custom(*typ),
-                    
+
                     $(
                         Self::$name {..} => ValueType::$name,
                     )*
@@ -258,7 +258,7 @@ macro_rules! value {
             }
         }
     };
-    
+
     (@struct $name:ident $(<$lt:lifetime>)?) => {
         #[derive(Clone, Debug, PartialEq)]
         pub struct $name $(<$lt> (std::marker::PhantomData<&$lt ()>) )?;
@@ -282,11 +282,11 @@ macro_rules! value {
     (@match ($a:ident, $b:ident, $c:ident, $d:ident) [$($path:tt)*] ($t1:ty, $t2:ty, $t3:ty) $(+ $extra:expr)? ) => { $($path)* ($a, $b, $c $(, $extra )? ) };
     (@match ($a:ident, $b:ident, $c:ident, $d:ident) [$($path:tt)*] ($t1:ty, $t2:ty, $t3:ty, $t4:ty) $(+ $extra:expr)? ) => { $($path)* ($a, $b, $c, $d $(, $extra )? ) };
     (@match ($a:ident, $b:ident, $c:ident, $d:ident) [$($path:tt)*] { $( $n:ident: $t1:ty ),* } $(+ $extra:expr)? ) => { $($path)* { $($n),* $(, _pd: $extra )? } };
-     
+
     (#try_deref $name:ident, &$lt:lifetime mut $t:ty) => {
         impl std::ops::Deref for $name<'_> {
             type Target = $t;
-            
+
             fn deref(&self) -> &Self::Target { &self.0 }
         }
         impl std::ops::DerefMut for $name<'_> {
@@ -296,14 +296,14 @@ macro_rules! value {
     (#try_deref $name:ident, &$lt:lifetime $t:ty) => {
         impl std::ops::Deref for $name<'_> {
             type Target = $t;
-            
+
             fn deref(&self) -> &Self::Target { &self.0 }
         }
     };
     (#try_deref $name:ident, $t:ty) => {
         impl std::ops::Deref for $name {
             type Target = $t;
-    
+
             fn deref(&self) -> &Self::Target { &self.0 }
         }
     };

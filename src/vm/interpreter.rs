@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use ahash::{AHashMap, AHashSet};
@@ -716,9 +716,6 @@ impl<'a> Vm<'a> {
                 Opcode::Negate { src, dest } => {
                     self.unary_op(vo::unary_negate, func, ip, src, dest, UnaryOp::Minus)?
                 },
-
-                Opcode::BinNot { src: _, dest: _ } => todo!(),
-
                 Opcode::Eq { left, right, dest } => {
                     self.bin_op(vo::eq_op, func, ip, left, right, dest, BinOp::Mod)?
                 },
@@ -783,6 +780,13 @@ impl<'a> Vm<'a> {
                 Opcode::JumpIfFalse { src, to } => {
                     let span = self.get_span(func, ip);
                     if !vo::to_bool(self.get_reg(*src), span, self, func.code)? {
+                        self.contexts.jump_current(*to as usize);
+                        continue;
+                    }
+                },
+                Opcode::JumpIfEmpty { src, to } => {
+                    let span = self.get_span(func, ip);
+                    if self.get_reg(*src).value == Value::Empty {
                         self.contexts.jump_current(*to as usize);
                         continue;
                     }
@@ -1617,6 +1621,7 @@ impl<'a> Vm<'a> {
                         },
                     )
                 },
+                Opcode::StartTryCatch { id, reg } => {},
             }
 
             {
@@ -2141,8 +2146,6 @@ impl<'a> Vm<'a> {
         }
 
         if top.len() > 1 {
-            use std::hash::Hasher;
-
             // for ctx in top.clone() {
             //     // print all registers
             //     println!(

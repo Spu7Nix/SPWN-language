@@ -18,7 +18,9 @@ use crate::parsing::ast::{ImportType, MacroArg, ObjKeyType, ObjectType, Spannabl
 use crate::parsing::utils::operators::Operator;
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
-use crate::vm::opcodes::{FunctionID, ImportID, Opcode, Register, UnoptOpcode, UnoptRegister};
+use crate::vm::opcodes::{
+    FunctionID, ImportID, Opcode, Register, TryCatchID, UnoptOpcode, UnoptRegister,
+};
 use crate::vm::pattern::ConstPattern;
 use crate::vm::value::ValueType;
 
@@ -196,6 +198,7 @@ enum ProtoOpcode {
 
     Jump(JumpTo),
     JumpIfFalse(UnoptRegister, JumpTo),
+    JumpIfEmpty(UnoptRegister, JumpTo),
     UnwrapOrJump(UnoptRegister, JumpTo),
     LoadConst(UnoptRegister, ConstKey),
 
@@ -257,6 +260,8 @@ pub struct BytecodeBuilder {
     import_paths: Vec<Spanned<ImportType>>,
 
     custom_types: SlotMap<CustomTypeKey, (Spanned<String>, bool)>,
+
+    try_catch_count: TryCatchID,
 }
 
 pub struct FuncBuilder<'a> {
@@ -274,6 +279,7 @@ impl BytecodeBuilder {
             funcs: vec![],
             import_paths: vec![],
             custom_types: SlotMap::default(),
+            try_catch_count: 0,
         }
     }
 
@@ -401,6 +407,10 @@ impl BytecodeBuilder {
                                         to: get_jump_pos(to) as u16,
                                     },
                                     ProtoOpcode::JumpIfFalse(r, to) => UnoptOpcode::JumpIfFalse {
+                                        src: *r,
+                                        to: get_jump_pos(to) as u16,
+                                    },
+                                    ProtoOpcode::JumpIfEmpty(r, to) => UnoptOpcode::JumpIfEmpty {
                                         src: *r,
                                         to: get_jump_pos(to) as u16,
                                     },
@@ -1190,10 +1200,6 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Negate { src, dest }), span)
     }
 
-    pub fn unary_bin_not(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinNot { src, dest }), span)
-    }
-
     // pub fn unary_pat_eq(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
     //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatEq { src, dest }), span)
     // }
@@ -1252,6 +1258,11 @@ impl<'a> FuncBuilder<'a> {
     pub fn exit_if_false(&mut self, reg: UnoptRegister, span: CodeSpan) {
         let path = self.block_path.clone();
         self.push_opcode_spanned(ProtoOpcode::JumpIfFalse(reg, JumpTo::End(path)), span)
+    }
+
+    pub fn exit_if_empty(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        let path = self.block_path.clone();
+        self.push_opcode_spanned(ProtoOpcode::JumpIfEmpty(reg, JumpTo::End(path)), span)
     }
 
     pub fn unwrap_or_exit(&mut self, reg: UnoptRegister, span: CodeSpan) {
@@ -1321,6 +1332,15 @@ impl<'a> FuncBuilder<'a> {
     pub fn load_empty_dict(&mut self, reg: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(
             ProtoOpcode::Raw(UnoptOpcode::LoadEmptyDict { dest: reg }),
+            span,
+        )
+    }
+
+    pub fn start_try_catch(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        let id = self.code_builder.try_catch_count;
+        self.code_builder.try_catch_count += 1;
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::StartTryCatch { id, reg }),
             span,
         )
     }

@@ -20,7 +20,7 @@ impl @group {
         easing: @int = 0,
         easing_rate: @int = 2,
     ) {
-        
+
         $.add(trigger {
             OBJ_ID: 901,
             TARGET: self,
@@ -30,7 +30,7 @@ impl @group {
             EASING: easing,
             EASING_RATE: easing_rate,
         })
-        
+
         wait(duration)
     },
 }

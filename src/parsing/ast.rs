@@ -295,7 +295,8 @@ pub enum Statement {
         try_code: Statements,
         // error_var: Option<Spur>,
         // catch_code: Statements,
-        branches: Vec<(Option<ExprNode>, Statements)>,
+        branches: Vec<(ExprNode, Statements)>,
+        catch_all: Option<Statements>,
     },
 
     Arrow(Box<StmtNode>),
@@ -387,8 +388,12 @@ pub struct Ast {
     pub file_attributes: Vec<FileAttribute>,
 }
 
+#[allow(clippy::derived_hash_with_manual_eq)]
+#[allow(renamed_and_removed_lints)]
+#[allow(unknown_lints)]
+#[allow(clippy::derive_hash_xor_eq)]
 #[cfg_attr(not(test), derive(PartialEq))]
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq)]
+#[derive(Clone, Debug, Hash, Serialize, Deserialize, Eq)]
 pub struct Spanned<T> {
     pub value: T,
     pub span: CodeSpan,

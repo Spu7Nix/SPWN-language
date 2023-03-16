@@ -5,39 +5,39 @@
 
 
 impl @builtins {
-	
+
 	print:
-		
+
 		(self: @builtins, ...args, end: @string = "\n", sep: @string = " ") {
     		/* compiler built-in */
-		},	
+		},
 	add:
-		
+
 		(self: @builtins, object: @object, ignore_context: @bool = false) {
     		/* compiler built-in */
-		},	
+		},
 	epsilon:
-		
+
 		(self: @builtins) -> @epsilon {
     		/* compiler built-in */
-		},	
+		},
 	trigger_fn_context:
-		
+
 		(self: @builtins) -> @group {
     		/* compiler built-in */
-		},	
+		},
 	assert:
-		
+
 		(self: @builtins, value: @bool) {
     		/* compiler built-in */
-		},	
+		},
 	assert_eq:
-		
+
 		(self: @builtins, left, right) {
     		/* compiler built-in */
-		},	
+		},
 	hash:
-		
+
 		(self: @builtins, value) -> @int {
     		/* compiler built-in */
 		},

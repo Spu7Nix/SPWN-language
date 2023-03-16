@@ -8,7 +8,7 @@ use crate::gd::object_keys::ObjectKey;
 use crate::parsing::ast::{Pattern, Spanned};
 use crate::sources::CodeSpan;
 
-#[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ConstPattern {
     pub pat: Pattern<ValueType, Box<ConstPattern>, Spanned<Constant>>,
 }

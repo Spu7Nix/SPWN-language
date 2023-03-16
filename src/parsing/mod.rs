@@ -397,13 +397,9 @@ mod tests {
     #[test]
     fn test_unary_op() -> ParseResult<()> {
         match UnaryOp::Minus {
-            UnaryOp::BinNot => (),
             UnaryOp::ExclMark => (),
             UnaryOp::Minus => (),
         }
-
-        let t = parse("~true")?;
-        expr_eq!(t, Ex::Unary(UnaryOp::BinNot, Ex::Bool(true).into()));
 
         let t = parse("!0")?;
         expr_eq!(t, Ex::Unary(UnaryOp::ExclMark, Ex::Int(0).into()));
@@ -444,6 +440,9 @@ mod tests {
 
     #[test]
     fn test_array() -> ParseResult<()> {
+        let t = parse(r#"[10,]"#)?;
+        expr_eq!(t, Ex::Array(vec![Ex::Int(10).into(),]));
+
         let t = parse(r#"[10, a, true, "aa", 1.2, @a, [1, 2], a in b, !false]"#)?;
         expr_eq!(
             t,
