@@ -134,6 +134,12 @@ impl std::fmt::Display for BasicError {
     }
 }
 
+#[cfg(debug_assertions)]
+lazy_static! {
+    pub static ref BUILTIN_DIR: PathBuf = std::env::current_dir().unwrap().join("libraries");
+}
+
+#[cfg(not(debug_assertions))]
 lazy_static! {
     pub static ref BUILTIN_DIR: PathBuf = home::home_dir().expect("no home dir").join(format!(
         ".spwn/versions/{}/libraries/",
