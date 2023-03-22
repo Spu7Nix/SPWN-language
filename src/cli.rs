@@ -10,6 +10,9 @@ pub struct Arguments {
 
     #[arg(short = 'r', long)]
     pub no_color: bool,
+
+    #[arg(short = 'a', long)]
+    pub use_ascii_errors: bool,
 }
 
 #[derive(Subcommand, Debug)]
