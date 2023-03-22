@@ -18,7 +18,7 @@ impl_type! {
         fn sqrt(Int(n) as self) -> Float {
             Value::Float((n as f64).sqrt())
         }
-        fn log(Int(n) as self, Float(base) as base = {2.7182818284590452353602874713527}) -> Float {
+        fn log(Int(n) as self, Float(base) as base = {std::f64::consts::E}) -> Float {
             Value::Float((n as f64).log(base))
         }
         fn clamp(Int(n) as self, Int(min) as min, Int(max) as max) -> Float {

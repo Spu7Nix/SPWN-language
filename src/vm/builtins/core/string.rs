@@ -9,21 +9,13 @@ impl_type! {
         Functions(vm, call_area):
 
 
-        // todo: better time complexiyt lol
-        /// Returns `true` if the string contains the given substring (`O(nm)` time complexity)
+        /// Returns `true` if the string contains the given substring
         fn contains(String(s) as self, String(substr) as substr) {
-            for i in 0..s.len() {
-                let mut j = i;
-                let mut k = 0;
-                while substr[k] == s[j] {
-                    j += 1;
-                    k += 1;
-                    if k == substr.len() {
-                        return Ok(Value::Bool(true));
-                    }
-                }
-            }
-            Value::Bool(false)
+            Value::Bool(
+                s.iter().collect::<String>().contains(
+                    &substr.iter().collect::<String>()
+                )
+            )
         }
 
         /// Returns `true`  if the string ends with the given suffix
@@ -36,24 +28,18 @@ impl_type! {
             Value::Bool(s.starts_with(&prefix))
         }
 
-        // todo: better time complexiyt lol
-        /// Returns the index of the first occurrence of the given substring (`O(nm)` time complexity)
+        /// Returns the index of the first occurrence of the given substring
         fn index(String(s) as self, String(substr) as substr) {
-            for i in 0..s.len() {
-                let mut j = i;
-                let mut k = 0;
-                while substr[k] == s[j] {
-                    j += 1;
-                    k += 1;
-                    if k == substr.len() {
-                        return Ok(Value::Maybe(Some(vm.memory.insert(StoredValue {
-                            value: Value::Int(i as i64),
-                            area: call_area
-                        }))));
-                    }
-                }
-            }
-            Value::Maybe(None)
+            s.iter().collect::<String>().find( // todo: this returns the byte address, not the character index
+                &substr.iter().collect::<String>()
+            )
+            .map_or(
+                Value::Maybe(None),
+                |i| Value::Maybe(Some(vm.memory.insert(StoredValue {
+                    value: Value::Int(i as i64),
+                    area: call_area
+                })))
+            )
         }
 
         /// Returns `true` if the string is numeric
