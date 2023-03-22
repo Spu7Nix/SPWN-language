@@ -1,6 +1,6 @@
 use std::io::{BufWriter, Write};
 
-use ariadne::{sources, Label, Report, ReportKind};
+use ariadne::{sources, Label, Report, ReportKind, Config, CharSet};
 
 use crate::sources::CodeArea;
 use crate::util::hsv_to_rgb;
@@ -18,7 +18,12 @@ impl std::fmt::Display for ErrorReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut label_colors = RainbowColorGenerator::new(308.0, 0.5, 0.95, 35.0);
 
-        let mut report = Report::build(ReportKind::Error, "", 0).with_message(&self.message);
+        let charset = match std::env::var("USE_ASCII").ok() {
+            Some(_) => CharSet::Ascii,
+            None => CharSet::Unicode
+        };
+
+        let mut report = Report::build(ReportKind::Error, "", 0).with_config(Config::default().with_char_set(charset)).with_message(&self.message);
 
         let mut source_vec = vec![];
 

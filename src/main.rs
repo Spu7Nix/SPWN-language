@@ -101,6 +101,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::env::set_var("NO_COLOR", "true");
     }
 
+    if args.use_ascii_errors {
+        std::env::set_var("USE_ASCII", "true");
+    }
+
     match args.command {
         Command::Build { file, settings } => {
             let gd_path = if !settings.no_level {
