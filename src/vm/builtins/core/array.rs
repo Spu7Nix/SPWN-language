@@ -100,5 +100,49 @@ impl_type! {
             slf.get_mut_ref(vm).insert(0, cloned);
             Value::Empty
         }
+
+        fn pick(Array(array) as self, quantity: Empty | Int if (>0) = {()}, Bool(duplicates) as allow_duplicates = {false}) {
+            use rand::prelude::*;
+
+            let mut rng = rand::thread_rng();
+
+            match quantity {
+                QuantityValue::Empty(_) => {
+                    array.choose(&mut rng).map_or(Value::Maybe(None), |v| {
+                        let value_key =  vm.deep_clone_key_insert(*v);
+                        vm.memory[value_key].value.clone()
+                    })
+                },
+                QuantityValue::Int(q) => {
+                    if array.is_empty() { return Ok(Value::Array(vec![])) }
+
+                    if duplicates {
+                        let mut output = vec![];
+                        for i in 0..q.0 {
+                            output.push(vm.deep_clone_key_insert(*array.choose(&mut rng).unwrap()))
+                        }
+                        Value::Array(output)
+                    } else {
+                        let mut cloned_array: Vec<_> = array.iter().map(|v| vm.deep_clone_key_insert(*v)).collect();
+                        let mut output = vec![];
+                        for i in 0..q.0.min(cloned_array.len() as i64) {
+                            output.push(cloned_array.remove(rng.gen_range(0..cloned_array.len())))
+                        }
+                        Value::Array(output)
+                    }
+                },
+            }
+        }
+
+        fn shuffle(Array(array) as self) {
+            use rand::prelude::*;
+
+            let mut rng = rand::thread_rng();
+
+            let mut cloned_array = array.iter().map(|v| vm.deep_clone_key_insert(*v)).collect::<Vec<_>>();
+            cloned_array.shuffle(&mut rng);
+
+            Value::Array(cloned_array)
+        }
     }
 }

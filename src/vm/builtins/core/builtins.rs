@@ -102,5 +102,25 @@ impl_type! {
                 }
             }
         }
+
+        fn random(Builtins as self, input: Array | Range | Empty = {()}) -> Float {
+            use rand::prelude::*;
+
+            let mut rng = rand::thread_rng();
+
+            match input {
+                InputValue::Array(array) =>
+                    array.choose(&mut rng).map_or(Value::Maybe(None), |v| {
+                        let value_key =  vm.deep_clone_key_insert(*v);
+                        vm.memory[value_key].value.clone()
+                    }),
+                InputValue::Range(RangeDeref(start, end, step)) =>
+                    Value::Int((start..end).step_by(step).choose(&mut rng).unwrap_or(0)),
+                InputValue::Empty(_) =>
+                    Value::Float(rng.gen::<f64>()), // 0.0..1.0
+                _ =>
+                    unreachable!(),
+            }
+        }
     }
 }
