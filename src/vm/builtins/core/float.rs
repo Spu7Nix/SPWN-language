@@ -32,7 +32,7 @@ impl_type! {
         fn sqrt(Float(n) as self) -> Float {
             Value::Float(n.sqrt())
         }
-        fn log(Float(n) as self, Float(base) as base = {std::f64::consts::E}) -> Float {
+        fn log(Float(n) as self, Float(base) as base = {2.71828182845904523536028747135266250}) -> Float {
             Value::Float(n.log(base))
         }
 

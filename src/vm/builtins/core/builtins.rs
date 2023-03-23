@@ -1,4 +1,5 @@
 use std::hash::Hasher;
+use std::time::SystemTime;
 
 use crate::gd::gd_object::{GdObject, Trigger};
 use crate::gd::ids::Id;
@@ -90,6 +91,16 @@ impl_type! {
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             vm.hash_value(value, &mut hasher);
             Value::Int(unsafe { std::mem::transmute::<u64, i64>(hasher.finish()) })
+        }
+
+        fn time(Builtins as self) -> Int {
+            match std::time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(time) => Value::Float(time.as_secs_f64()),
+                Err(e) => {
+                    // return Err(Runti) // not sure if there needs to be added a new error for this, idk
+                    Value::Float(0.0)
+                }
+            }
         }
     }
 }
