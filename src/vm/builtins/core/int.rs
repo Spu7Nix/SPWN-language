@@ -27,5 +27,16 @@ impl_type! {
         fn wrap(Int(n) as self, Int(min) as min, Int(max) as max) -> Float {
             Value::Int(((n - min) % (max - min)) + min)
         }
+        fn ordinal(Int(n) as self) -> String {
+            let n = n.abs();
+            let last_digit = n % 10;
+            let is_ten = n / 10 % 10 == 1;
+            Value::String((n.to_string() + match (last_digit, is_ten) {
+                (1, false) => "st",
+                (2, false) => "nd",
+                (3, false) => "rd",
+                (_, _) => "th",
+            }).chars().collect())
+        }
     }
 }
