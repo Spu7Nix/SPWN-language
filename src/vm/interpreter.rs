@@ -77,6 +77,8 @@ pub struct Vm<'a> {
 
     pub impls: AHashMap<ValueType, AHashMap<Spur, (ValueKey, Visibility)>>,
     pub overloads: AHashMap<Operator, Vec<ValueKey>>,
+    
+    pub early_exit: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -137,6 +139,7 @@ impl<'a> Vm<'a> {
             impls: AHashMap::new(),
             overloads: AHashMap::new(),
             trigger_order_count: TriggerOrder::new(),
+            early_exit: false,
         }
     }
 
@@ -348,7 +351,7 @@ impl<'a> Vm<'a> {
 
         let mut has_implicitly_returned = false;
 
-        while self.contexts.valid() {
+        while self.contexts.valid() && !self.early_exit {
             let ip = self.contexts.ip();
 
             if ip >= opcodes.len() {

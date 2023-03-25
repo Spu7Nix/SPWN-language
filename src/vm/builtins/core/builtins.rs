@@ -64,6 +64,11 @@ impl_type! {
             Value::Empty
         }
 
+        fn exit(Builtins as self) {
+            vm.early_exit = true;
+            Value::Empty
+        }
+
         fn epsilon(Builtins as self) -> Epsilon {
             Value::Epsilon
         }
