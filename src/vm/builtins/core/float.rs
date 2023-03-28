@@ -25,11 +25,14 @@ impl_type! {
         fn floor(Float(n) as self) -> Float {
             Value::Float(n.floor())
         }
+        fn trunc(Float(n) as self) -> Float {
+            Value::Float(n.trunc())
+        }
 
         fn sqrt(Float(n) as self) -> Float {
             Value::Float(n.sqrt())
         }
-        fn log(Float(n) as self, Float(base) as base = {2.7182818284590452353602874713527}) -> Float {
+        fn log(Float(n) as self, Float(base) as base = {2.71828182845904523536028747135266250}) -> Float {
             Value::Float(n.log(base))
         }
 
