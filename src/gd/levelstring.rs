@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use base64::engine::general_purpose;
 use base64::Engine;
 use colored::Colorize;
+use levenshtein::levenshtein;
 use libflate::{gzip, zlib};
 use quick_xml::events::{BytesText, Event};
 use quick_xml::{Reader, Writer};
@@ -60,6 +61,11 @@ fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
     }
 }
 
+pub struct Name {
+    pub name: String,
+    pub distance: usize
+}
+
 pub fn get_level_string(
     ls: Vec<u8>,
     level_name: Option<&String>,
@@ -76,6 +82,8 @@ pub fn get_level_string(
     let mut k4_detected = false;
     let mut k2_detected = false;
     let mut level_detected = false;
+
+    let mut names: Vec<String> = vec![];
 
     let mut level_name_out = String::new();
 
@@ -103,6 +111,8 @@ pub fn get_level_string(
                     }
 
                     level_name_out = text.clone();
+
+                    names.push(level_name_out.clone());
 
                     k2_detected = false
                 }
@@ -133,7 +143,40 @@ pub fn get_level_string(
         ).into());
     } else if !k4_detected {
         if let Some(level_name) = level_name {
-            return Err(BasicError(format!("Level named \"{level_name}\" was not found")).into());
+            let mut close: Vec<Name> = vec![];
+
+            for name in &names {
+                let lev = levenshtein(level_name, name);
+                if lev <= 3 {
+                    close.push(Name {name: name.to_string(), distance: lev});
+                }
+            }
+
+            close.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+
+            let mut suggestions = close.iter()
+            .map(|n| n.name.clone())
+            .collect::<Vec<String>>();
+
+            let last_suggestion = suggestions.pop();
+
+            let message = match close.len() {
+                0 => String::new(),
+                1 => format!("Did you mean: \"{}\"?", match last_suggestion {
+                    Some(suggestion) => format!("{}", suggestion),
+                    None => String::new()
+                }),
+                _ => format!(
+                    "Did you mean: \"{}{}",
+                    suggestions.join("\", \""),
+                    match last_suggestion {
+                        Some(suggestion) => format!("\" or \"{}\"?", suggestion),
+                        None => String::new(),
+                    }
+                )
+            };
+
+            return Err(BasicError(format!("Level named \"{level_name}\" was not found. {message}")).into());
         } else {
             return Err(BasicError(
                 "No level found! Please create a level for SPWN to operate on".to_string(),
