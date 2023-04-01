@@ -18,13 +18,17 @@ impl_type! {
         }
 
         fn cwd() -> Path {
-            Value::Path(env::current_dir().unwrap()) // TODO: handle error
+            Value::Path(env::current_dir().unwrap_or(PathBuf::from("./")))
         }
 
         // MODIFY 
         // returned
-        fn join(Path(path) as self, sub_path: String) -> Path {
-            Value::Path(path.join(sub_path.iter().collect::<String>()))
+        fn join(Path(path) as self, sub_path: String | Path) -> Path {
+            let sub_path = match sub_path {
+                SubPathValue::String(string) => PathBuf::from(string.iter().collect::<String>()),
+                SubPathValue::Path(path) => path.to_path_buf(),
+            };
+            Value::Path(path.join(sub_path))
         }
         fn parent(Path(path) as self) -> Path {
             let mut path = path.clone();
@@ -32,8 +36,12 @@ impl_type! {
             Value::Path(path)
         }
         // in-place
-        fn push(slf: &Path, sub_path: String) {
-            slf.get_mut_ref(vm).push(sub_path.0.iter().collect::<String>());
+        fn push(slf: &Path, sub_path: String | Path) {
+            let path = match sub_path {
+                SubPathValue::String(string) => PathBuf::from(string.iter().collect::<String>()),
+                SubPathValue::Path(path) => path.to_path_buf(),
+            };
+            slf.get_mut_ref(vm).push(path);
             Value::Empty
         }
         fn pop(slf: &Path) {
