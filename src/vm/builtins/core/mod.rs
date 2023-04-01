@@ -6,3 +6,4 @@ pub mod error;
 pub mod float;
 pub mod int;
 pub mod string;
+pub mod path;

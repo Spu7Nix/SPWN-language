@@ -1,4 +1,5 @@
 use std::hash::Hasher;
+use std::time::SystemTime;
 
 use crate::gd::gd_object::{GdObject, Trigger};
 use crate::gd::ids::Id;
@@ -90,6 +91,36 @@ impl_type! {
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             vm.hash_value(value, &mut hasher);
             Value::Int(unsafe { std::mem::transmute::<u64, i64>(hasher.finish()) })
+        }
+
+        fn time(Builtins as self) -> Int {
+            match std::time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(time) => Value::Float(time.as_secs_f64()),
+                Err(e) => {
+                    // return Err(Runti) // not sure if there needs to be added a new error for this, idk
+                    Value::Float(0.0)
+                }
+            }
+        }
+
+        fn random(Builtins as self, input: Array | Range | Empty = {()}) -> Float {
+            use rand::prelude::*;
+
+            let mut rng = rand::thread_rng();
+
+            match input {
+                InputValue::Array(array) =>
+                    array.choose(&mut rng).map_or(Value::Maybe(None), |v| {
+                        let value_key =  vm.deep_clone_key_insert(*v);
+                        vm.memory[value_key].value.clone()
+                    }),
+                InputValue::Range(RangeDeref(start, end, step)) =>
+                    Value::Int((start..end).step_by(step).choose(&mut rng).unwrap_or(0)),
+                InputValue::Empty(_) =>
+                    Value::Float(rng.gen::<f64>()), // 0.0..1.0
+                _ =>
+                    unreachable!(),
+            }
         }
     }
 }

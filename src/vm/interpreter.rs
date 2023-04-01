@@ -2118,6 +2118,7 @@ impl<'a> Vm<'a> {
                 }
             },
             Value::Chroma { r, g, b, a } => (r, g, b, a).hash(state),
+            Value::Path(path) => path.hash(state),
         }
     }
 
