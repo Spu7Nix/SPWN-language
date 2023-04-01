@@ -78,6 +78,9 @@ macro_rules! impl_type {
 
                         let mut __arg_idx = 0usize;
 
+                        impl_type!(@macro dict [$] $vm);
+                        impl_type!(@macro array [$] $vm);
+
                         $(
 
                             $(
@@ -394,6 +397,51 @@ macro_rules! impl_type {
     };
     (@extra Key ($name:ident, $vm:ident, $args:ident, $arg_index:ident) ) => {
         let $name = $args[$arg_index];
+    };
+
+    (@macro dict [$dollar:tt] $vm:ident) => {
+        macro_rules! dict {
+            { $dollar($key:ident: $value:expr $dollar(,)?)* } => {
+                use ahash::AHashMap;
+                use lasso::Spur;
+                use crate::vm::interpreter::{ValueKey, Visibility};
+                let mut dict: AHashMap<Spur, (ValueKey, Visibility)> = AHashMap::new();
+                $dollar(
+                    dict.insert(
+                        $vm.intern(stringify!($key)),
+                        (
+                            $vm.memory.insert(StoredValue {
+                                value: $value,
+                                area: CodeArea {
+                                    src: crate::sources::SpwnSource::Core(Default::default()),
+                                    span: crate::sources::CodeSpan { start: 0, end: 0 }
+                                }
+                            }),
+                            Visibility::Public,
+                        )
+                    );
+                )*
+                Value::Dict(dict)
+            }
+        }
+    };
+    (@macro array [$dollar:tt] $vm:ident) => {
+        macro_rules! array {
+            [ $dollar($value:expr $dollar(,)?)* ] => {
+                let mut array: Vec<$crate::vm::interpreter::ValueKey> = Vec::new();
+                $dollar(
+                    array.push(
+                        $vm.memory.insert(StoredValue {
+                            value: $value,
+                            area: CodeArea {
+                                src: crate::sources::SpwnSource::Core(Default::default()),
+                                span: crate::sources::CodeSpan { start: 0, end: 0 }
+                            }
+                        }),
+                    );
+                )*
+            }
+        }
     };
 }
 

@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::str::FromStr;
+use std::path::PathBuf;
 
 use ahash::AHashMap;
 use delve::{FieldNames, ModifyField, VariantNames};
@@ -371,6 +372,8 @@ value! {
         r: u8, g: u8, b: u8, a: u8,
     },
 
+    Path(PathBuf),
+
     => Instance {
         typ: CustomTypeKey,
         items: AHashMap<Spur, (ValueKey, Visibility)>,
@@ -558,6 +561,7 @@ impl Value {
             ),
             Value::Iterator(_) => "<iterator>".into(),
             Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
+            Value::Path(path) => path.to_str().unwrap_or("<path>").to_string(),
             Value::Error(_) => todo!(),
         }
     }
