@@ -170,7 +170,7 @@ operators! {
     // Right => [Assign];
     // Right => [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];
     Left => [Range];
-    Left => [In];
+    Left => [In, Has];
     // Left => [Is];
     Left => [BinOr, Or];
     Left => [BinAnd, And];

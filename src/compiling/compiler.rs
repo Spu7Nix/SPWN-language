@@ -1246,6 +1246,9 @@ impl<'a> Compiler<'a> {
                 BinOp::In => {
                     bin_op!(left in_op right)
                 },
+                BinOp::Has => {
+                    bin_op!(left has_op right)
+                }
                 BinOp::As => {
                     bin_op!(left as_op right)
                 },

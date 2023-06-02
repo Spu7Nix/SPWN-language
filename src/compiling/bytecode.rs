@@ -1094,6 +1094,19 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
+    pub fn has_op(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Has { left, right, dest }),
+            span,
+        )
+    }
+
     pub fn as_op(
         &mut self,
         left: UnoptRegister,

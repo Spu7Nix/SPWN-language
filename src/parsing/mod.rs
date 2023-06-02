@@ -270,6 +270,7 @@ mod tests {
         match BinOp::And {
             BinOp::Range => (),
             BinOp::In => (),
+            BinOp::Has => (),
             BinOp::BinOr => (),
             BinOp::Or => (),
             BinOp::BinAnd => (),
@@ -310,6 +311,12 @@ mod tests {
         expr_eq!(
             t,
             Ex::Op(Ex::Float(1.2).into(), BinOp::In, Ex::Float(2.2).into())
+        );
+
+        let t = parse("6.9 has 4.20")?;
+        expr_eq!(
+            t,
+            Ex::Op(Ex::Float(6.9).into(), BinOp::Has, Ex::Float(4.2).into())
         );
 
         let t = parse("0b01 | 0b10")?;
@@ -463,7 +470,20 @@ mod tests {
         let t = parse(r#"[10,]"#)?;
         expr_eq!(t, Ex::Array(vec![Ex::Int(10).into(),]));
 
-        let t = parse(r#"[10, a, true, "aa", 1.2, @a, [1, 2], a in b, !false]"#)?;
+        let t = parse(r#"
+            [
+                10,
+                a,
+                true,
+                "aa",
+                1.2,
+                @a,
+                [1, 2],
+                a in b,
+                !false,
+                {} has "hi",
+            ]
+        "#)?;
         expr_eq!(
             t,
             Ex::Array(vec![
@@ -481,6 +501,11 @@ mod tests {
                 )
                 .into(),
                 Ex::Unary(UnaryOp::ExclMark, Ex::Bool(false).into()).into(),
+                Ex::Op(
+                    Ex::Dict(vec![]).into(),
+                    BinOp::Has,
+                    string!("hi").into(),
+                ).into(),
             ])
         );
 
