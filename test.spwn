@@ -1,17 +1,23 @@
-
-// import "test2.spwn"
-
-
-
-func = () {
-    let a = [];
-    for i in 0..100 {
-        a.push(i);
-    }
+wait = (time: @int | @float | @epsilon = $.epsilon()) {
+	if time == $.epsilon() || time > 0 {
+		$.add( trigger{
+			OBJ_ID: 1268,
+			SPAWN_DURATION: time,
+			TARGET: !{
+				-> return
+			},
+		})
+	}
 }
 
-while true {
-    func()
-    func()
-}
 
+
+
+wait(1)
+wait(1)
+wait(1)
+
+10g.move(10, 10, 0.5)
+10g.move(-10, 10, 0.5)
+10g.move(10, -10, 0.5)
+10g.move(-10, -10, 0.5)

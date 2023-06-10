@@ -17,7 +17,7 @@ pub struct CallInfo {
     pub call_area: Option<CodeArea>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
     pub ip: usize,
 
@@ -27,7 +27,11 @@ pub struct Context {
 
 impl Context {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            ip: 0,
+            group_stack: vec![Id::Specific(0)],
+            registers: vec![],
+        }
     }
 
     pub fn hash(&self) -> u64 {

@@ -411,7 +411,7 @@ impl<'a> Compiler<'a> {
 
         let is_module = matches!(typ, ImportType::Module { .. });
 
-        println!("jbi: {:?}", import_src);
+        //println!("jbi: {:?}", import_src);
         let code = match import_src.read() {
             Some(s) => s,
             None => {
