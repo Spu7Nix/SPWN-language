@@ -15,7 +15,7 @@ use super::value::{IteratorData, MacroTarget, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
 use crate::compiling::compiler::{CustomTypeKey, TypeDef};
-use crate::gd::gd_object::{make_spawn_trigger, GdObject, Trigger, TriggerOrder};
+use crate::gd::gd_object::{make_spawn_trigger, GdObject, TriggerObject, TriggerOrder};
 use crate::gd::ids::{IDClass, Id, SpecificId};
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{MacroArg, ModuleImport, ObjectType, Spannable, Spanned};
@@ -50,9 +50,26 @@ impl FuncCoord {
     }
 }
 
+pub struct ValueCollect {
+    pub val: StoredValue,
+    pub will_collect: bool,
+}
+
+impl StoredValue {
+    pub fn into_collect(self) -> ValueCollect {
+        ValueCollect {
+            val: self,
+            will_collect: true,
+        }
+    }
+}
+
+const DELTA_COLLECT: usize = 15000;
+
 pub struct Vm<'a> {
     // 256 registers per function
-    pub memory: SlotMap<ValueKey, StoredValue>,
+    pub memory: SlotMap<ValueKey, ValueCollect>,
+    pub last_memory_size: usize,
 
     pub programs: SlotMap<
         BytecodeKey,
@@ -70,7 +87,7 @@ pub struct Vm<'a> {
 
     pub contexts: ContextStack,
     pub objects: Vec<GdObject>,
-    pub triggers: Vec<Trigger>,
+    pub triggers: Vec<TriggerObject>,
     pub trigger_order_count: TriggerOrder,
 
     pub types: SecondaryMap<CustomTypeKey, Spanned<TypeDef>>,
@@ -126,6 +143,7 @@ impl<'a> Vm<'a> {
 
         Self {
             memory: SlotMap::default(),
+            last_memory_size: 0,
             interner,
             programs,
             id_counters: [0; 4],
@@ -153,8 +171,102 @@ impl<'a> Vm<'a> {
         self.intern(&s)
     }
 
+    pub fn garbage_collect(&mut self) {
+        fn mark_value(vm: &mut Vm, v: ValueKey) {
+            // let vm = unsafe { vm.as_mut().unwrap() };
+
+            // println!("bibi: {:?}", v);
+            if vm.memory[v].will_collect {
+                vm.memory[v].will_collect = false;
+
+                let mut keys = vec![];
+
+                match &vm.memory[v].val.value {
+                    Value::Array(v) => {
+                        for k in v {
+                            keys.push(*k)
+                        }
+                    },
+                    Value::Dict(v) => {
+                        for (_, (k, _)) in v {
+                            keys.push(*k)
+                        }
+                    },
+                    Value::Maybe(Some(k)) => keys.push(*k),
+                    Value::Macro(data) => {
+                        if let MacroTarget::Macro { captured, .. } = &data.target {
+                            for k in captured {
+                                keys.push(*k)
+                            }
+                        }
+                        for arg in &data.args {
+                            match arg {
+                                MacroArg::Single {
+                                    default: Some(d), ..
+                                } => keys.push(*d),
+                                _ => (),
+                            }
+                        }
+                        if let Some(k) = data.self_arg {
+                            keys.push(k)
+                        }
+                    },
+                    Value::Module { exports, .. } => {
+                        for (_, k) in exports {
+                            keys.push(*k)
+                        }
+                    },
+                    Value::Iterator(iter) => {
+                        match iter {
+                            IteratorData::Array { array, .. } => keys.push(*array),
+                            IteratorData::String { string, .. } => keys.push(*string),
+                            IteratorData::Dictionary { map, .. } => keys.push(*map),
+                            IteratorData::Custom(k) => keys.push(*k),
+                            _ => (),
+                        };
+                    },
+                    Value::Instance { items, .. } => {
+                        for (_, (k, _)) in items {
+                            keys.push(*k)
+                        }
+                    },
+                    _ => (),
+                }
+
+                for k in keys {
+                    mark_value(vm, k);
+                }
+            }
+        }
+
+        // let ptr = self as *mut Self;
+
+        let v = self
+            .contexts
+            .0
+            .iter()
+            .flat_map(|c| {
+                c.contexts
+                    .iter()
+                    .flat_map(|c| c.registers.iter().flat_map(|v| v))
+            })
+            .copied()
+            .collect::<Vec<_>>();
+
+        for i in v {
+            mark_value(self, i)
+        }
+        self.memory.retain(|_, v| {
+            if !v.will_collect {
+                v.will_collect = true;
+                return true;
+            }
+            false
+        });
+    }
+
     pub fn deep_clone_key(&mut self, k: ValueKey) -> StoredValue {
-        let v = self.memory[k].clone();
+        let v = self.memory[k].val.clone();
 
         let value = match v.value {
             Value::Array(arr) => Value::Array(
@@ -173,7 +285,7 @@ impl<'a> Vm<'a> {
 
     pub fn deep_clone_key_insert(&mut self, k: ValueKey) -> ValueKey {
         let v = self.deep_clone_key(k);
-        self.memory.insert(v)
+        self.memory.insert(v.into_collect())
     }
 
     pub fn deep_clone_reg(&mut self, reg: Register) -> StoredValue {
@@ -182,11 +294,11 @@ impl<'a> Vm<'a> {
 
     pub fn deep_clone_reg_insert(&mut self, reg: Register) -> ValueKey {
         let v = self.deep_clone_reg(reg);
-        self.memory.insert(v)
+        self.memory.insert(v.into_collect())
     }
 
     pub fn get_reg(&self, reg: Register) -> &StoredValue {
-        &self.memory[self.contexts.current().registers.last().unwrap()[reg as usize]]
+        &self.memory[self.contexts.current().registers.last().unwrap()[reg as usize]].val
     }
 
     pub fn get_reg_key(&self, reg: Register) -> ValueKey {
@@ -194,11 +306,12 @@ impl<'a> Vm<'a> {
     }
 
     pub fn get_reg_mut(&mut self, reg: Register) -> &mut StoredValue {
-        &mut self.memory[self.contexts.current_mut().registers.last().unwrap()[reg as usize]]
+        &mut self.memory[self.contexts.current_mut().registers.last().unwrap()[reg as usize]].val
     }
 
     pub fn set_reg(&mut self, reg: Register, v: StoredValue) {
-        self.memory[self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize]] = v
+        self.memory[self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize]] =
+            v.into_collect()
     }
 
     pub fn change_reg_key(&mut self, reg: Register, k: ValueKey) {
@@ -206,10 +319,13 @@ impl<'a> Vm<'a> {
     }
 
     pub fn reset_reg(&mut self, reg: Register, func: FuncCoord) {
-        let k = self.memory.insert(StoredValue {
-            value: Value::Empty,
-            area: self.make_area(CodeSpan::invalid(), func.code),
-        });
+        let k = self.memory.insert(
+            StoredValue {
+                value: Value::Empty,
+                area: self.make_area(CodeSpan::invalid(), func.code),
+            }
+            .into_collect(),
+        );
         self.change_reg_key(reg, k);
     }
 
@@ -330,10 +446,15 @@ impl<'a> Vm<'a> {
             let mut regs = Vec::with_capacity(regs_used);
 
             for _ in 0..regs_used {
-                regs.push(self.memory.insert(StoredValue {
-                    value: Value::Empty,
-                    area: self.make_area(CodeSpan::invalid(), func.code),
-                }))
+                regs.push(
+                    self.memory.insert(
+                        StoredValue {
+                            value: Value::Empty,
+                            area: self.make_area(CodeSpan::invalid(), func.code),
+                        }
+                        .into_collect(),
+                    ),
+                )
             }
 
             context.registers.push(regs);
@@ -391,6 +512,12 @@ impl<'a> Vm<'a> {
                 continue;
             }
             let opcode = &opcodes[ip];
+
+            // println!("COCK: {:?}", opcode);
+            // if self.memory.len() > self.last_memory_size + DELTA_COLLECT {
+            self.garbage_collect();
+            //     self.last_memory_size = self.memory.len();
+            // }
 
             match opcode {
                 Opcode::LoadConst { dest, id } => {
@@ -532,10 +659,13 @@ impl<'a> Vm<'a> {
                     let val = Value::Array(
                         s.bytes()
                             .map(|c| {
-                                self.memory.insert(StoredValue {
-                                    value: Value::Int(c as i64),
-                                    area: area.clone(),
-                                })
+                                self.memory.insert(
+                                    StoredValue {
+                                        value: Value::Int(c as i64),
+                                        area: area.clone(),
+                                    }
+                                    .into_collect(),
+                                )
                             })
                             .collect(),
                     );
@@ -557,7 +687,7 @@ impl<'a> Vm<'a> {
                         let mut valid = false;
 
                         for t in types {
-                            match (t, &self.memory[push].value) {
+                            match (t, &self.memory[push].val.value) {
                                 (ObjectKeyValueType::Int, Value::Int(_))
                                 | (ObjectKeyValueType::Float, Value::Float(_) | Value::Int(_))
                                 | (ObjectKeyValueType::Bool, Value::Bool(_))
@@ -576,7 +706,7 @@ impl<'a> Vm<'a> {
 
                                 (ObjectKeyValueType::GroupArray, Value::Array(v))
                                     if v.iter().all(|k| {
-                                        matches!(&self.memory[*k].value, Value::Group(_))
+                                        matches!(&self.memory[*k].val.value, Value::Group(_))
                                     }) =>
                                 {
                                     valid = true;
@@ -588,13 +718,13 @@ impl<'a> Vm<'a> {
                         }
 
                         if !valid {
-                            println!("{:?} {:?}", types, &self.memory[push].value);
-                            todo!()
-                            //panic!("\n\nOk   heres the deal!!! I not this yet XDXDC😭😭🤣🤣 \nLOl")
+                            println!("{:?} {:?}", types, &self.memory[push].val.value);
+                            // todo!()
+                            todo!("\n\nOk   heres the deal!!! I not this yet XDXDC😭😭🤣🤣 \nLOl")
                         }
 
                         vo::to_obj_param(
-                            &self.memory[push],
+                            &self.memory[push].val,
                             self.get_span(func, ip),
                             self,
                             func.code,
@@ -617,7 +747,7 @@ impl<'a> Vm<'a> {
                     let push = self.deep_clone_reg_insert(*elem);
 
                     let param = vo::to_obj_param(
-                        &self.memory[push],
+                        &self.memory[push].val,
                         self.get_span(func, ip),
                         self,
                         func.code,
@@ -826,7 +956,7 @@ impl<'a> Vm<'a> {
 
                         if let Some(r) = return_dest {
                             self.memory[current.registers.last_mut().unwrap()[r as usize]] =
-                                ret_val;
+                                ret_val.into_collect();
                         }
                     }
 
@@ -984,10 +1114,13 @@ impl<'a> Vm<'a> {
                                 map.insert(
                                     self.intern(n),
                                     (
-                                        self.memory.insert(StoredValue {
-                                            value: Value::ObjectKey(*k),
-                                            area: self.make_area(span, func.code),
-                                        }),
+                                        self.memory.insert(
+                                            StoredValue {
+                                                value: Value::ObjectKey(*k),
+                                                area: self.make_area(span, func.code),
+                                            }
+                                            .into_collect(),
+                                        ),
                                         Visibility::Public,
                                     ),
                                 );
@@ -1259,7 +1392,9 @@ impl<'a> Vm<'a> {
                     for (name, (k, _)) in &items {
                         let name = self.resolve(name);
 
-                        if let Value::Macro(MacroData { target, .. }) = &mut self.memory[*k].value {
+                        if let Value::Macro(MacroData { target, .. }) =
+                            &mut self.memory[*k].val.value
+                        {
                             if let Some(f) = typ.get_override_fn(&name) {
                                 *target = MacroTarget::Builtin(f)
                             }
@@ -1313,16 +1448,16 @@ impl<'a> Vm<'a> {
 
                             match std::mem::take({
                                 let k = self.get_reg_key(*args);
-                                &mut self.memory[k].value
+                                &mut self.memory[k].val.value
                             }) {
                                 Value::Array(v) => {
-                                    match std::mem::take(&mut self.memory[v[0]].value) {
+                                    match std::mem::take(&mut self.memory[v[0]].val.value) {
                                         Value::Array(v) => {
                                             pos_args = v;
                                         },
                                         _ => unreachable!(),
                                     }
-                                    match std::mem::take(&mut self.memory[v[1]].value) {
+                                    match std::mem::take(&mut self.memory[v[1]].val.value) {
                                         Value::Dict(m) => {
                                             named_args =
                                                 m.into_iter().map(|(s, (k, _))| (s, k)).collect();
@@ -1438,8 +1573,6 @@ impl<'a> Vm<'a> {
                         import.value.module_import_type(),
                     );
 
-                    // println!("🫵😳GUNKY😳🫵 {src:?}");
-
                     let coord = FuncCoord {
                         func: 0,
                         code: self.src_map[&src],
@@ -1544,7 +1677,7 @@ impl<'a> Vm<'a> {
                     let span = self.get_span(func, ip);
                     let val = self.get_reg_key(*src);
                     let stored_val = &self.memory[val];
-                    let iterator = match &stored_val.value {
+                    let iterator = match &stored_val.val.value {
                         Value::Array(_) => Value::Iterator(IteratorData::Array {
                             array: val,
                             index: 0,
@@ -1559,7 +1692,7 @@ impl<'a> Vm<'a> {
                         }),
                         _ => {
                             return Err(RuntimeError::CannotIterate {
-                                v: (stored_val.value.get_type(), stored_val.area.clone()),
+                                v: (stored_val.val.value.get_type(), stored_val.val.area.clone()),
                                 area: self.make_area(span, func.code),
                                 call_stack: self.get_call_stack(),
                             })
@@ -1582,7 +1715,7 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     }
                     .map(|v| {
-                        let k = self.memory.insert(v);
+                        let k = self.memory.insert(v.into_collect());
                         self.deep_clone_key_insert(k)
                     });
 
@@ -1664,10 +1797,13 @@ impl<'a> Vm<'a> {
             if let MacroArg::Spread { name, .. } = arg {
                 param_map.insert(
                     name.value,
-                    self.memory.insert(StoredValue {
-                        value: Value::Array(vec![]),
-                        area: self.make_area(name.span, func.code),
-                    }),
+                    self.memory.insert(
+                        StoredValue {
+                            value: Value::Array(vec![]),
+                            area: self.make_area(name.span, func.code),
+                        }
+                        .into_collect(),
+                    ),
                 );
             }
         }
@@ -1696,7 +1832,7 @@ impl<'a> Vm<'a> {
                         passed_idx += 1;
                     },
                     MacroArg::Spread { name, .. } => {
-                        match &mut self.memory[param_map[&name.value]].value {
+                        match &mut self.memory[param_map[&name.value]].val.value {
                             Value::Array(v) => v.push(param),
                             _ => unreachable!(),
                         }
@@ -1752,15 +1888,15 @@ impl<'a> Vm<'a> {
                     };
 
                     if let Some(pattern) = data.pattern() {
-                        if !pattern.value_matches(&self.memory[$v].clone(), $vm, func.code)? {
+                        if !pattern.value_matches(&self.memory[$v].val.clone(), $vm, func.code)? {
                             return Err(RuntimeError::ArgumentPatternMismatch {
                                 call_area,
                                 macro_def_area: base_area,
                                 arg_name: $vm.resolve(&data.name().value),
                                 pattern: pattern.clone(),
                                 v: (
-                                    self.memory[$v].value.get_type(),
-                                    self.memory[$v].area.clone(),
+                                    self.memory[$v].val.value.get_type(),
+                                    self.memory[$v].val.area.clone(),
                                 ),
                                 call_stack: $vm.get_call_stack(),
                             });
@@ -1845,7 +1981,7 @@ impl<'a> Vm<'a> {
     ) -> Option<(MacroData, CodeArea)> {
         if let Some(overloads) = self.overloads.get(&op).cloned() {
             'overloads: for overload in overloads.iter().rev() {
-                let data = match &self.memory[*overload].value {
+                let data = match &self.memory[*overload].val.value {
                     Value::Macro(data) => {
                         data.clone()
                         // if values
@@ -1871,7 +2007,7 @@ impl<'a> Vm<'a> {
                         continue 'overloads;
                     }
                 }
-                return Some((data.clone(), self.memory[*overload].area.clone()));
+                return Some((data.clone(), self.memory[*overload].val.area.clone()));
             }
         }
         None
@@ -1980,7 +2116,7 @@ impl<'a> Vm<'a> {
             func.code,
         )?;
         let k = self.get_reg_key(*left);
-        self.memory[k].value = value;
+        self.memory[k].val.value = value;
         Ok(())
     }
 
@@ -2022,7 +2158,7 @@ impl<'a> Vm<'a> {
 
     pub fn hash_value(&self, val: ValueKey, state: &mut std::collections::hash_map::DefaultHasher) {
         // hash numbers
-        match &self.memory[val].value {
+        match &self.memory[val].val.value {
             Value::Int(a) => {
                 std::mem::discriminant(&Value::Float(0.0)).hash(state);
                 (*a as f64).to_bits().hash(state);
@@ -2032,9 +2168,9 @@ impl<'a> Vm<'a> {
         };
 
         // hash enum discriminator
-        std::mem::discriminant(&self.memory[val].value).hash(state);
+        std::mem::discriminant(&self.memory[val].val.value).hash(state);
 
-        match &self.memory[val].value {
+        match &self.memory[val].val.value {
             Value::Int(_) => unreachable!(),
             Value::Float(a) => a.to_bits().hash(state),
             Value::Bool(a) => a.hash(state),
@@ -2234,10 +2370,13 @@ impl<'a> Vm<'a> {
             (Value::String(s), ValueType::Array) => Value::Array(
                 s.iter()
                     .map(|c| {
-                        self.memory.insert(StoredValue {
-                            value: Value::String(vec![*c]),
-                            area: v.area.clone(),
-                        })
+                        self.memory.insert(
+                            StoredValue {
+                                value: Value::String(vec![*c]),
+                                area: v.area.clone(),
+                            }
+                            .into_collect(),
+                        )
                     })
                     .collect(),
             ),

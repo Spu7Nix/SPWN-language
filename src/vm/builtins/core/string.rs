@@ -49,7 +49,7 @@ impl_type! {
                         return Ok(Value::Maybe(Some(vm.memory.insert(StoredValue {
                             value: Value::Int(i as i64),
                             area: call_area
-                        }))));
+                        }.into_collect()))));
                     }
                 }
             }
@@ -103,7 +103,7 @@ impl_type! {
                         StoredValue {
                             value: Value::String(s.chars().collect()),
                             area: call_area.clone(),
-                        }
+                        }.into_collect()
                     )
                 }).collect()
             )

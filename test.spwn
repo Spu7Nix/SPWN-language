@@ -1,45 +1,17 @@
-// try {
-//     sgdfhkjhjksdgfhjksgdf
-//     //..
+
+// import "test2.spwn"
+
+
+
+// func = () {
+//     let a = [];
+//     for i in 0..100 {
+//         a.push(i);
+//     }
 // }
 
-// fn sdds -> Result {
-
-// }
-/// dfsdf
-///
-
-// @error::register_error("aaa", "POOPOO")
-// @error::CUSTOM.aa.POOPOO
-
-// try_catches: Vec<...>
-
-// if in_try_catch {
-//     let err = sdds();
-//     self.memory[].insert(err.id)
-//     //df dfdf
-// } else {
-//     sdds()?;
-// }
-
-// try {
+// while true {
 //     func()
 // }
 
-// if let Some(t) = try_catches.get(0) {
-//     try_catches.pop()
-// }
-
-// START_TRY_CATCH 1
-// fgdfsg
-// dsf
-// g
-// dfgdfg
-// dfgsdf
-// g
-// sdf
-// gdf
-// f
-// END_TRY_CATCH 1
-
-// Vec<(u16, u32)>
+$.print(1)

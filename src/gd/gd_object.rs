@@ -6,8 +6,8 @@ use ahash::{AHashMap, AHashSet};
 use super::ids::*;
 use crate::parsing::ast::ObjectType;
 
-#[derive(Clone, Copy)]
-pub struct TriggerOrder(f64);
+#[derive(Clone, Copy, Debug)]
+pub struct TriggerOrder(pub f64);
 
 impl TriggerOrder {
     pub fn new() -> Self {
@@ -102,19 +102,32 @@ impl Hash for GdObject {
     }
 }
 
-pub struct Trigger {
+#[derive(Clone, Debug)]
+pub struct TriggerObject {
     pub obj: GdObject,
     pub order: TriggerOrder,
 }
 
-impl Trigger {
+impl TriggerObject {
     pub fn apply_context(mut self, context: Id) -> Self {
         self.obj.params.insert(57, ObjParam::Group(context));
         self
     }
+
+    pub fn params(&self) -> &AHashMap<u8, ObjParam> {
+        &self.obj.params
+    }
+
+    pub fn params_mut(&mut self) -> &mut AHashMap<u8, ObjParam> {
+        &mut self.obj.params
+    }
 }
 
-pub fn make_spawn_trigger(context: Id, target: Id, vm: &mut crate::vm::interpreter::Vm) -> Trigger {
+pub fn make_spawn_trigger(
+    context: Id,
+    target: Id,
+    vm: &mut crate::vm::interpreter::Vm,
+) -> TriggerObject {
     let mut obj = GdObject {
         params: AHashMap::default(),
         mode: ObjectType::Trigger,
@@ -124,7 +137,7 @@ pub fn make_spawn_trigger(context: Id, target: Id, vm: &mut crate::vm::interpret
     //obj.params.insert(63, ObjParam::Number(0.0));
     obj.params.insert(51, ObjParam::Group(target));
 
-    Trigger {
+    TriggerObject {
         obj,
         order: vm.trigger_order_count.next(),
     }
@@ -447,7 +460,7 @@ const MAX_HEIGHT: u16 = 40;
 
 const DELTA_X: u16 = 1;
 
-pub fn apply_triggers(mut triggers: Vec<Trigger>) -> Vec<GdObject> {
+pub fn apply_triggers(mut triggers: Vec<TriggerObject>) -> Vec<GdObject> {
     //println!("{:?}", trigger);
 
     let mut full_obj_list = Vec::<GdObject>::new();
@@ -456,7 +469,7 @@ pub fn apply_triggers(mut triggers: Vec<Trigger>) -> Vec<GdObject> {
     let possible_height = MAX_HEIGHT - START_HEIGHT; //30 is max (TODO: case for if y_offset is more than 30)
     triggers.sort_by(|x, y| x.order.0.partial_cmp(&y.order.0).unwrap());
 
-    for (i, Trigger { obj, .. }) in triggers.iter().enumerate() {
+    for (i, TriggerObject { obj, .. }) in triggers.iter().enumerate() {
         match obj.mode {
             ObjectType::Object => {
                 full_obj_list.push(obj.clone());

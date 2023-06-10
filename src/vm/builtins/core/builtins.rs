@@ -1,6 +1,6 @@
 use std::hash::Hasher;
 
-use crate::gd::gd_object::{GdObject, Trigger};
+use crate::gd::gd_object::{GdObject, TriggerObject};
 use crate::gd::ids::Id;
 use crate::parsing::ast::ObjectType;
 use crate::vm::builtins::builtin_utils::impl_type;
@@ -53,7 +53,7 @@ impl_type! {
                     vm.objects.push(obj)
                 }
                 ObjectType::Trigger => vm.triggers.push(
-                    Trigger {
+                    TriggerObject {
                         obj,
                         order: vm.trigger_order_count.next(),
                     }

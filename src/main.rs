@@ -26,7 +26,7 @@ use std::rc::Rc;
 use clap::Parser as _;
 use cli::Settings;
 use colored::Colorize;
-use gd::gd_object::{GdObject, Trigger};
+use gd::gd_object::{GdObject, TriggerObject};
 use lasso::Rodeo;
 use slotmap::SecondaryMap;
 use spinoff::spinners::SpinnerFrames;
@@ -48,23 +48,29 @@ const CORE_PATH: &str = "./libraries/core/";
 
 struct Spinner {
     frames: SpinnerFrames,
+    disabled: bool,
     spinner: Option<(SSpinner, String)>,
 }
 impl Spinner {
-    pub fn new() -> Self {
+    pub fn new(disabled: bool) -> Self {
         Self {
             frames: spinner!(["◜ ", "◠ ", "◝ ", "◞ ", "◡ ", "◟ "], 50),
             spinner: None,
+            disabled,
         }
     }
 
     pub fn start(&mut self, msg: String) {
-        self.spinner = Some((SSpinner::new(self.frames.clone(), msg.clone(), None), msg));
+        if self.disabled {
+            println!("{msg}");
+        } else {
+            self.spinner = Some((SSpinner::new(self.frames.clone(), msg.clone(), None), msg));
+        }
     }
 
     pub fn fail(&mut self, msg: Option<String>) {
         if let Some((spinner, curr_msg)) = self.spinner.take() {
-            spinner.stop_with_message(&format!("{curr_msg} ❌",));
+            spinner.stop_with_message(&format!("{curr_msg} ❌"));
         } else {
             println!("\n{}", "══════════════════════════════════".dimmed().bold());
         }
@@ -74,14 +80,18 @@ impl Spinner {
     }
 
     pub fn complete(&mut self, msg: Option<String>) {
-        let (spinner, curr_msg) = self.spinner.take().unwrap();
-
+        if let Some((spinner, curr_msg)) = self.spinner.take() {
+            if let Some(m) = msg {
+                spinner.stop_with_message(&format!("{curr_msg} ✅",));
+                println!("{m}");
+            } else {
+                spinner.clear();
+                println!("{curr_msg} ✅")
+            }
+            return;
+        }
         if let Some(m) = msg {
-            spinner.stop_with_message(&format!("{curr_msg} ✅",));
             println!("{m}");
-        } else {
-            spinner.clear();
-            println!("{curr_msg} ✅")
         }
     }
 }
@@ -95,7 +105,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
 
     let args = Arguments::parse();
-    let mut spinner = Spinner::new();
 
     if args.no_color {
         std::env::set_var("NO_COLOR", "true");
@@ -107,6 +116,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match args.command {
         Command::Build { file, settings } => {
+            let mut spinner = Spinner::new(args.no_spinner);
+
             let gd_path = if !settings.no_level {
                 Some(if let Some(ref sf) = settings.save_file {
                     sf.clone()
@@ -231,7 +242,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         new_ls,
                         level_string,
                         gd_path,
-                        settings.level_name,
+                        &settings.level_name,
                     )?;
 
                     spinner.complete(Some(format!(
@@ -252,7 +263,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 struct SpwnOutput {
     pub objects: Vec<GdObject>,
-    pub triggers: Vec<Trigger>,
+    pub triggers: Vec<TriggerObject>,
     pub id_counters: [usize; 4],
 }
 

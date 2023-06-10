@@ -25,10 +25,10 @@ impl_type! {
         fn join(Array(a) as self, String(sep) as sep) {
             let mut s = Vec::new();
             for (i, el) in a.iter().enumerate() {
-                match &vm.memory[*el].value {
+                match &vm.memory[*el].val.value {
                     Value::String(s2) => s.extend(s2),
                     _ => return Err(RuntimeError::TypeMismatch {
-                        v: (vm.memory[*el].value.get_type(), vm.memory[*el].area.clone()),
+                        v: (vm.memory[*el].val.value.get_type(), vm.memory[*el].val.area.clone()),
                         area: call_area,
                         expected: crate::vm::value::ValueType::String,
                         call_stack: vm.get_call_stack(),

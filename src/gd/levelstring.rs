@@ -1,12 +1,10 @@
 use std::error::Error;
-use std::fmt::Display;
 use std::fs;
 use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
 use base64::engine::general_purpose;
 use base64::Engine;
-use colored::Colorize;
 use libflate::{gzip, zlib};
 use quick_xml::events::{BytesText, Event};
 use quick_xml::{Reader, Writer};
@@ -156,7 +154,7 @@ pub fn encrypt_level_string(
     ls: String,
     old_ls: String,
     path: PathBuf,
-    level_name: Option<String>,
+    level_name: &Option<String>,
 ) -> Result<(), Box<dyn Error>> {
     let mut file = fs::File::open(path.clone())?;
 

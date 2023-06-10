@@ -12,6 +12,7 @@ use slotmap::{new_key_type, SlotMap};
 use super::bytecode::{Bytecode, BytecodeBuilder, Constant, FuncBuilder, Function};
 use super::error::CompilerError;
 use crate::cli::Settings;
+use crate::gd::ids::IDClass::Group;
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
     DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, ObjKeyType,
@@ -304,11 +305,11 @@ impl<'a> Compiler<'a> {
                         let import_type =
                             ImportType::Module(BUILTIN_DIR.join("std/lib.spwn"), ModuleImport::Std);
                         self.compile_import(&import_type, CodeSpan::internal(), self.src.clone())?;
-                        f.import(
-                            builtin_import_reg,
-                            import_type.spanned(CodeSpan::internal()),
-                            CodeSpan::internal(),
-                        )
+                        // f.import(
+                        //     builtin_import_reg,
+                        //     import_type.spanned(CodeSpan::internal()),
+                        //     CodeSpan::internal(),
+                        // )
                     }
                 }
 
@@ -1547,7 +1548,6 @@ impl<'a> Compiler<'a> {
             },
             // Expression::MacroPattern { args, ret_type } => todo!(),
             Expression::TriggerFunc { attributes, code } => {
-                use crate::gd::ids::IDClass::Group;
                 let group_reg = builder.next_reg();
                 builder.load_id(None, Group, group_reg, expr.span);
                 builder.make_trigger_function(group_reg, out_reg, expr.span);

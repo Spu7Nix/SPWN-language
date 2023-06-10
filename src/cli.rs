@@ -11,6 +11,9 @@ pub struct Arguments {
     #[arg(short = 'r', long)]
     pub no_color: bool,
 
+    #[arg(short = 's', long)]
+    pub no_spinner: bool,
+
     #[arg(short = 'a', long)]
     pub use_ascii_errors: bool,
 }

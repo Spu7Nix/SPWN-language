@@ -95,8 +95,8 @@ impl IteratorData {
     pub fn next(&self, vm: &Vm, area: CodeArea) -> Option<StoredValue> {
         match self {
             IteratorData::Array { array, index } => {
-                match &vm.memory[*array].value {
-                    Value::Array(values) => values.get(*index).map(|k| vm.memory[*k].clone()),
+                match &vm.memory[*array].val.value {
+                    Value::Array(values) => values.get(*index).map(|k| vm.memory[*k].val.clone()),
                     _ => todo!(), // maybe add error here incase its mutated???
                 }
             },
@@ -117,7 +117,7 @@ impl IteratorData {
                 })
             },
             IteratorData::String { string, index } => {
-                match &vm.memory[*string].value {
+                match &vm.memory[*string].val.value {
                     Value::String(s) => s.get(*index).map(|c| StoredValue {
                         value: Value::String(vec![*c]),
                         area,
@@ -204,14 +204,14 @@ macro_rules! value {
 
                     impl [<$name Getter>] {
                         pub fn get_ref<'a>(&self, vm: &'a Vm) -> [<$name Ref>]<'a> {
-                            match &vm.memory[self.0].value {
+                            match &vm.memory[self.0].val.value {
                                 value! { @match (a, b, c, d) [Value::$name] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? }
                                     => value! { @match (a, b, c, d) [[<$name Ref>]] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? + std::marker::PhantomData },
                                 _ => panic!("ValueKey does not point to value of correct type")
                             }
                         }
                         pub fn get_mut_ref<'a>(&self, vm: &'a mut Vm) -> [<$name MutRef>]<'a> {
-                            match &mut vm.memory[self.0].value {
+                            match &mut vm.memory[self.0].val.value {
                                 value! { @match (a, b, c, d) [Value::$name] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? }
                                     => value! { @match (a, b, c, d) [[<$name MutRef>]] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ),* } )? + std::marker::PhantomData },
                                 _ => panic!("ValueKey does not point to value of correct type")
@@ -398,10 +398,13 @@ impl Value {
                 arr.iter()
                     .map(|c| {
                         let value = Value::from_const(c, vm, area);
-                        vm.memory.insert(StoredValue {
-                            value,
-                            area: area.clone(),
-                        })
+                        vm.memory.insert(
+                            StoredValue {
+                                value,
+                                area: area.clone(),
+                            }
+                            .into_collect(),
+                        )
                     })
                     .collect(),
             ),
@@ -412,10 +415,13 @@ impl Value {
                         (
                             vm.intern(s),
                             (
-                                vm.memory.insert(StoredValue {
-                                    value,
-                                    area: area.clone(),
-                                }),
+                                vm.memory.insert(
+                                    StoredValue {
+                                        value,
+                                        area: area.clone(),
+                                    }
+                                    .into_collect(),
+                                ),
                                 Visibility::Public,
                             ),
                         )
@@ -424,10 +430,13 @@ impl Value {
             ),
             Constant::Maybe(o) => Value::Maybe(o.clone().map(|c| {
                 let value = Value::from_const(&c, vm, area);
-                vm.memory.insert(StoredValue {
-                    value,
-                    area: area.clone(),
-                })
+                vm.memory.insert(
+                    StoredValue {
+                        value,
+                        area: area.clone(),
+                    }
+                    .into_collect(),
+                )
             })),
             Constant::Builtins => Value::Builtins,
             Constant::Empty => Value::Empty,
@@ -440,10 +449,13 @@ impl Value {
                         (
                             vm.intern(s),
                             (
-                                vm.memory.insert(StoredValue {
-                                    value,
-                                    area: area.clone(),
-                                }),
+                                vm.memory.insert(
+                                    StoredValue {
+                                        value,
+                                        area: area.clone(),
+                                    }
+                                    .into_collect(),
+                                ),
                                 Visibility::Public,
                             ),
                         )
@@ -462,7 +474,7 @@ impl Value {
             Value::Array(arr) => format!(
                 "[{}]",
                 arr.iter()
-                    .map(|k| vm.memory[*k].value.runtime_display(vm))
+                    .map(|k| vm.memory[*k].val.value.runtime_display(vm))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
@@ -472,7 +484,7 @@ impl Value {
                     .map(|(s, (k, _))| format!(
                         "{}: {}",
                         vm.interner.borrow().resolve(s),
-                        vm.memory[*k].value.runtime_display(vm)
+                        vm.memory[*k].val.value.runtime_display(vm)
                     ))
                     .collect::<Vec<_>>()
                     .join(", ")
@@ -491,7 +503,7 @@ impl Value {
                 }
             },
             Value::Maybe(o) => match o {
-                Some(k) => format!("({})?", vm.memory[*k].value.runtime_display(vm)),
+                Some(k) => format!("({})?", vm.memory[*k].val.value.runtime_display(vm)),
                 None => "?".into(),
             },
             Value::Empty => "()".into(),
@@ -525,7 +537,7 @@ impl Value {
                     .map(|(s, k)| format!(
                         "{}: {}",
                         vm.interner.borrow().resolve(s),
-                        vm.memory[*k].value.runtime_display(vm)
+                        vm.memory[*k].val.value.runtime_display(vm)
                     ))
                     .collect::<Vec<_>>()
                     .join(", "),
@@ -551,7 +563,7 @@ impl Value {
                     .map(|(s, (k, _))| format!(
                         "{}: {}",
                         vm.interner.borrow().resolve(s),
-                        vm.memory[*k].value.runtime_display(vm)
+                        vm.memory[*k].val.value.runtime_display(vm)
                     ))
                     .collect::<Vec<_>>()
                     .join(", "),

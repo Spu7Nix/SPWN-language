@@ -45,7 +45,7 @@ pub fn to_obj_param(
             Value::Array(v) => {
                 let mut arr = vec![];
                 for k in v {
-                    match &vm.memory[*k].value {
+                    match &vm.memory[*k].val.value {
                         Value::Group(g) => arr.push(*g),
                         _ => break 'm None,
                     }
@@ -73,9 +73,9 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
             if v1.len() != v2.len() {
                 false
             } else {
-                v1.iter()
-                    .zip(v2)
-                    .all(|(k1, k2)| equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm))
+                v1.iter().zip(v2).all(|(k1, k2)| {
+                    equality(&vm.memory[*k1].val.value, &vm.memory[*k2].val.value, vm)
+                })
             }
         },
         (Value::Dict(v1), Value::Dict(v2)) => {
@@ -85,7 +85,8 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
                 for (k, k1) in v1 {
                     match v2.get(k) {
                         Some(k2) => {
-                            if !equality(&vm.memory[k1.0].value, &vm.memory[k2.0].value, vm) {
+                            if !equality(&vm.memory[k1.0].val.value, &vm.memory[k2.0].val.value, vm)
+                            {
                                 return false;
                             }
                         },
@@ -96,7 +97,7 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
             }
         },
         (Value::Maybe(Some(k1)), Value::Maybe(Some(k2))) => {
-            equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm)
+            equality(&vm.memory[*k1].val.value, &vm.memory[*k2].val.value, vm)
         },
         _ => a == b,
     }

@@ -92,7 +92,7 @@ macro_rules! impl_type {
                                         $(
                                             { $( $v_n $(: $v_val_s)? ,)* }
                                         )?
-                                    = $vm.memory[__args[__arg_idx]].value.clone() else {
+                                    = $vm.memory[__args[__arg_idx]].val.value.clone() else {
                                         unreachable!()
                                     };
                                 }
@@ -311,7 +311,7 @@ macro_rules! impl_type {
 
 
     (@union [let] ($name:ident, $vm:ident, $args:ident, $arg_index:ident) Value) => {
-        let $name = $vm.memory[$args[$arg_index]].value.clone();
+        let $name = $vm.memory[$args[$arg_index]].val.value.clone();
     };
     (@union [let] ($name:ident, $vm:ident, $args:ident, $arg_index:ident) ValueKey) => {
         let $name = $args[$arg_index];
@@ -319,7 +319,7 @@ macro_rules! impl_type {
     (@union [let] ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $($dederef_ty:ident)? $(&$deref_ty:ident)?) => {
         paste::paste! {
             $(
-                let $name: [<$dederef_ty Deref>] = $vm.memory[$args[$arg_index]].value.clone().into();
+                let $name: [<$dederef_ty Deref>] = $vm.memory[$args[$arg_index]].val.value.clone().into();
             )?
             $(
                 let $name = [<$deref_ty Getter>] ($args[$arg_index]);
@@ -328,7 +328,7 @@ macro_rules! impl_type {
     };
     (@union [let] ($name:ident, $vm:ident, $args:ident, $arg_index:ident) $( $($dederef_ty:ident)? $(&$deref_ty:ident)? )|+) => {
         paste::paste! {
-            let $name = match &$vm.memory[$args[$arg_index]].value {
+            let $name = match &$vm.memory[$args[$arg_index]].val.value {
                 $(
                     $(
                         v @ $crate::vm::value::Value::$dederef_ty {..} => [<$name:camel Value>]::$dederef_ty(v.clone().into()),
@@ -360,9 +360,9 @@ macro_rules! impl_type {
     };
 
     (@... ($name:ident, $vm:ident, $args:ident, $arg_index:ident) Value) => {
-        let $name = match &$vm.memory[$args[$arg_index]].value {
+        let $name = match &$vm.memory[$args[$arg_index]].val.value {
             $crate::vm::value::Value::Array(v) => {
-                v.iter().map(|k| $vm.memory[*k].value.clone()).collect::<Vec<_>>()
+                v.iter().map(|k| $vm.memory[*k].val.value.clone()).collect::<Vec<_>>()
             }
             _ => unreachable!(),
         };

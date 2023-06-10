@@ -4,15 +4,17 @@ pub mod error;
 pub mod parser;
 pub mod utils;
 
+/// these tests must be ran with only a single thread (they are not thread safe)
+/// cargo test
+
 #[cfg(test)]
 #[allow(clippy::from_over_into)]
 mod tests {
     use std::cell::RefCell;
+    use std::path::PathBuf;
     use std::rc::Rc;
-    use std::sync::RwLock;
 
     use lasso::{Rodeo, Spur};
-    use lazy_static::lazy_static;
 
     use super::ast::{
         Ast, ExprNode, Expression as Ex, Statement as St, StmtNode, StringContent, StringType,
@@ -22,24 +24,15 @@ mod tests {
     use crate::gd::ids::IDClass;
     use crate::gd::object_keys::ObjectKey;
     use crate::parsing::ast::{
-        ImportType, ModuleImport, ObjKeyType, ObjectType, Pattern, PatternNode, Spanned,
+        ImportType, MacroArg, MacroCode, ModuleImport, ObjKeyType, ObjectType, Pattern,
+        PatternNode, Spanned,
     };
     use crate::parsing::attributes::FileAttribute;
     use crate::parsing::parser::ParseResult;
     use crate::parsing::utils::operators::AssignOp;
     use crate::sources::{CodeSpan, SpwnSource};
+    use crate::util::Interner;
     use crate::RandomState;
-
-    struct Interner(Rc<RefCell<Rodeo<Spur, RandomState>>>);
-    impl std::ops::Deref for Interner {
-        type Target = Rc<RefCell<Rodeo<Spur, RandomState>>>;
-
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-    unsafe impl Send for Interner {}
-    unsafe impl Sync for Interner {}
 
     impl Into<ExprNode> for Ex {
         fn into(self) -> ExprNode {
@@ -70,11 +63,7 @@ mod tests {
         }
     }
 
-    lazy_static! {
-        static ref INTERNER: RwLock<Interner> = RwLock::new(Interner(Rc::new(RefCell::new(
-            Rodeo::with_hasher(RandomState::new())
-        ))));
-    }
+    static mut INTERNER: Option<Rc<RefCell<Interner>>> = None;
 
     macro_rules! expr_eq {
         ($ast:ident,[$($exprs:expr),*]) => {
@@ -94,9 +83,18 @@ mod tests {
         };
     }
 
-    // macro_rules! stmt {
-    //     () => {};
-    // }
+    macro_rules! stmt_eq {
+        ($ast:ident,[$($stmts:expr),*]) => {
+            let _stmts = &[$($stmts),*];
+            for (i, stmt) in $ast.statements.iter().enumerate() {
+                assert_eq!(&_stmts[i], &*stmt.stmt);
+            }
+        };
+
+        ($ast:ident, $expr:expr) => {
+            stmt_eq!($ast, [$expr])
+        };
+    }
 
     macro_rules! span {
         ($expr:expr) => {{
@@ -109,7 +107,7 @@ mod tests {
 
     macro_rules! spur {
         ($str:literal) => {{
-            let v = INTERNER.write().unwrap();
+            let v = unsafe { INTERNER.as_ref().unwrap() };
             let mut i = v.borrow_mut();
             i.get_or_intern($str)
         }};
@@ -124,9 +122,72 @@ mod tests {
         }};
     }
 
+    // will error if we add / remove expressions / statements
+    // if this errors please add / remove the respective tests
+    #[rustfmt::skip]
+    const _: () = {
+        match Ex::Empty {
+            Ex::Int(_) => (),
+            Ex::Float(_) => (),
+            Ex::String(_) => (),
+            Ex::Bool(_) => (),
+            Ex::Id(_, _) => (),
+            Ex::Op(_, _, _) => (),
+            Ex::Unary(_, _) => (),
+            Ex::Var(_) => (),
+            Ex::Type(_) => (),
+            Ex::Array(_) => (),
+            Ex::Dict(_) => (),
+            Ex::Maybe(_) => (),
+            Ex::Is(_, _) => (),
+            Ex::Index { .. } => (),
+            Ex::Member { .. } => (),
+            Ex::TypeMember { .. } => (),
+            Ex::Associated { .. } => (),
+            Ex::Call { .. } => (),
+            Ex::Macro { .. } => (),
+            Ex::TriggerFunc { .. } => (),
+            Ex::TriggerFuncCall(_) => (),
+            Ex::Ternary { .. } => (),
+            Ex::Typeof(_) => (),
+            Ex::Builtins => (),
+            Ex::Empty => (),
+            Ex::Epsilon => (),
+            Ex::Import(_) => (),
+            Ex::Instance { .. } => (),
+            Ex::Obj(_, _) => (),
+        }
+        match St::Break {
+            St::Expr(_) => (),
+            St::Let(_, _) => (),
+            St::AssignOp(_, _, _) => (),
+            St::If { .. } => (),
+            St::While { .. } => (),
+            St::For { .. } => (),
+            St::TryCatch { .. } => (),
+            St::Arrow(_) => (),
+            St::Return(_) => (),
+            St::Break => (),
+            St::Continue => (),
+            St::TypeDef { .. } => (),
+            St::ExtractImport(_) => (),
+            St::Impl { .. } => (),
+            St::Overload { .. } => (),
+            St::Dbg(_) => (),
+            St::Throw(_) => (),
+        }
+    };
+
     fn parse(code: &'static str) -> ParseResult<Ast> {
-        let i = INTERNER.write().unwrap();
-        let mut parser = Parser::new(code, SpwnSource::File("<test>".into()), Rc::clone(&*i));
+        unsafe {
+            INTERNER = Some(Rc::new(RefCell::new(
+                Rodeo::with_hasher(RandomState::new()),
+            )))
+        };
+
+        let mut parser = Parser::new(code, SpwnSource::File("<test>".into()), unsafe {
+            Rc::clone(INTERNER.as_ref().unwrap())
+        });
 
         parser.parse()
     }
@@ -267,6 +328,7 @@ mod tests {
     #[test]
     fn test_ops() -> ParseResult<()> {
         // useless match so this errors if we ever add/remove ops
+        // if this errors please add / remove the respective tests
         match BinOp::And {
             BinOp::Range => (),
             BinOp::In => (),
@@ -410,6 +472,8 @@ mod tests {
 
     #[test]
     fn test_unary_op() -> ParseResult<()> {
+        // useless match so this errors if we ever add/remove ops
+        // if this errors please add / remove the respective tests
         match UnaryOp::Minus {
             UnaryOp::ExclMark => (),
             UnaryOp::Minus => (),
@@ -423,12 +487,6 @@ mod tests {
 
         Ok(())
     }
-
-    // #[test]
-    // fn test_assign_op() -> ParseResult<()> {
-    //     todo!();
-    //     Ok(())
-    // }
 
     #[test]
     fn test_var() -> ParseResult<()> {
@@ -521,6 +579,8 @@ mod tests {
 
     #[test]
     fn test_is_pattern() -> ParseResult<()> {
+        // useless match so this errors if we ever add/remove patterns
+        // if this errors please add / remove the respective tests
         match Pt::Any {
             Pattern::Any => (),
             Pattern::Type(_) => (),
@@ -673,12 +733,106 @@ mod tests {
         Ok(())
     }
 
-    // #[test]
-    // fn test_macro() -> ParseResult<()> {
-    //     todo!();
+    #[test]
+    fn test_macro() -> ParseResult<()> {
+        let t = parse("(a, b: @int, c = 20, d: @bool = true) {}")?;
+        expr_eq!(
+            t,
+            Ex::Macro {
+                args: vec![
+                    MacroArg::Single {
+                        name: span!(spur!("a")),
+                        pattern: None,
+                        default: None,
+                        is_ref: false,
+                    },
+                    MacroArg::Single {
+                        name: span!(spur!("b")),
+                        pattern: Some(PatternNode {
+                            pat: Box::new(Pt::Type(spur!("int"))),
+                            span: CodeSpan::internal(),
+                        }),
+                        default: None,
+                        is_ref: false,
+                    },
+                    MacroArg::Single {
+                        name: span!(spur!("c")),
+                        pattern: None,
+                        default: Some(ExprNode {
+                            expr: Box::new(Ex::Int(20)),
+                            attributes: vec![],
+                            span: CodeSpan::internal(),
+                        }),
+                        is_ref: false,
+                    },
+                    MacroArg::Single {
+                        name: span!(spur!("d")),
+                        pattern: Some(PatternNode {
+                            pat: Box::new(Pt::Type(spur!("bool"))),
+                            span: CodeSpan::internal(),
+                        }),
+                        default: Some(ExprNode {
+                            expr: Box::new(Ex::Bool(true)),
+                            attributes: vec![],
+                            span: CodeSpan::internal(),
+                        }),
+                        is_ref: false,
+                    }
+                ],
+                ret_type: None,
+                code: MacroCode::Normal(vec![])
+            }
+        );
 
-    //     Ok(())
-    // }
+        let t = parse("(&a) {}")?;
+        expr_eq!(
+            t,
+            Ex::Macro {
+                args: vec![MacroArg::Single {
+                    name: span!(spur!("a")),
+                    pattern: None,
+                    default: None,
+                    is_ref: true,
+                },],
+                ret_type: None,
+                code: MacroCode::Normal(vec![])
+            }
+        );
+
+        let t = parse("(...a, ...b: @int) {}")?;
+        expr_eq!(
+            t,
+            Ex::Macro {
+                args: vec![
+                    MacroArg::Spread {
+                        name: span!(spur!("a")),
+                        pattern: None,
+                    },
+                    MacroArg::Spread {
+                        name: span!(spur!("b")),
+                        pattern: Some(PatternNode {
+                            pat: Box::new(Pt::Type(spur!("int"))),
+                            span: CodeSpan::internal(),
+                        }),
+                    }
+                ],
+                ret_type: None,
+                code: MacroCode::Normal(vec![])
+            }
+        );
+
+        let t = parse("() -> @string {}")?;
+        expr_eq!(
+            t,
+            Ex::Macro {
+                args: vec![],
+                ret_type: Some(Ex::Type(spur!("string")).into()),
+                code: MacroCode::Normal(vec![])
+            }
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn test_trigger_func() -> ParseResult<()> {
@@ -819,6 +973,343 @@ mod tests {
 
         let t = parse("ε")?;
         expr_eq!(t, Ex::Epsilon);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_let() -> ParseResult<()> {
+        let t = parse("let a = 10")?;
+        stmt_eq!(t, St::Let(Ex::Var(spur!("a")).into(), Ex::Int(10).into()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_op() -> ParseResult<()> {
+        // useless match so this errors if we ever add/remove ops
+        // if this errors please add / remove the respective tests
+        match AssignOp::Assign {
+            AssignOp::Assign => (),
+            AssignOp::PlusEq => (),
+            AssignOp::MinusEq => (),
+            AssignOp::MultEq => (),
+            AssignOp::DivEq => (),
+            AssignOp::PowEq => (),
+            AssignOp::ModEq => (),
+            AssignOp::BinAndEq => (),
+            AssignOp::BinOrEq => (),
+            AssignOp::ShiftLeftEq => (),
+            AssignOp::ShiftRightEq => (),
+        }
+
+        let t = parse("a = 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::Assign,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a += 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::PlusEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a -= 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::MinusEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a *= 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::MultEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a /= 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::DivEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a ^= 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::PowEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a %= 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::ModEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a &= 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::BinAndEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a |= 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::BinOrEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a <<= 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::ShiftLeftEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        let t = parse("a >>= 1")?;
+        stmt_eq!(
+            t,
+            St::AssignOp(
+                Ex::Var(spur!("a")).into(),
+                AssignOp::ShiftRightEq,
+                Ex::Int(1).into()
+            )
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_if() -> ParseResult<()> {
+        let t = parse("if false {} else if true {} else {}")?;
+        stmt_eq!(
+            t,
+            St::If {
+                branches: vec![
+                    (Ex::Bool(false).into(), vec![]),
+                    (Ex::Bool(true).into(), vec![])
+                ],
+                else_branch: Some(vec![])
+            }
+        );
+
+        let t = parse("if false {}")?;
+        stmt_eq!(
+            t,
+            St::If {
+                branches: vec![(Ex::Bool(false).into(), vec![]),],
+                else_branch: None
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_while() -> ParseResult<()> {
+        let t = parse("while true {}")?;
+        stmt_eq!(
+            t,
+            St::While {
+                cond: Ex::Bool(true).into(),
+                code: vec![]
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_for() -> ParseResult<()> {
+        let t = parse("for a in [1, 2] {}")?;
+        stmt_eq!(
+            t,
+            St::For {
+                iter_var: Ex::Var(spur!("a")).into(),
+                iterator: Ex::Array(vec![Ex::Int(1).into(), Ex::Int(2).into()]).into(),
+                code: vec![]
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_try_catch() -> ParseResult<()> {
+        let t = parse("try {} catch e {} catch {}")?;
+        stmt_eq!(
+            t,
+            St::TryCatch {
+                try_code: vec![],
+                branches: vec![(Ex::Var(spur!("e")).into(), vec![])],
+                catch_all: Some(vec![]),
+            }
+        );
+
+        let t = parse("try {} catch e {}")?;
+        stmt_eq!(
+            t,
+            St::TryCatch {
+                try_code: vec![],
+                branches: vec![(Ex::Var(spur!("e")).into(), vec![])],
+                catch_all: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_arrow() -> ParseResult<()> {
+        let t = parse("-> let a = 10")?;
+        stmt_eq!(
+            t,
+            St::Arrow(Box::new(
+                St::Let(Ex::Var(spur!("a")).into(), Ex::Int(10).into()).into()
+            ))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_control_flow() -> ParseResult<()> {
+        let t = parse("return 20")?;
+        stmt_eq!(t, St::Return(Some(Ex::Int(20).into())));
+
+        let t = parse("return")?;
+        stmt_eq!(t, St::Return(None));
+
+        let t = parse("break")?;
+        stmt_eq!(t, St::Break);
+
+        let t = parse("continue")?;
+        stmt_eq!(t, St::Continue);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_typedef() -> ParseResult<()> {
+        let t = parse("type @A")?;
+        stmt_eq!(
+            t,
+            St::TypeDef {
+                name: spur!("A"),
+                private: false
+            }
+        );
+
+        let t = parse("private type @A")?;
+        stmt_eq!(
+            t,
+            St::TypeDef {
+                name: spur!("A"),
+                private: true
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extract_import() -> ParseResult<()> {
+        let t = parse("extract import a")?;
+        stmt_eq!(
+            t,
+            St::ExtractImport(ImportType::Library(PathBuf::from("a"),))
+        );
+
+        let t = parse(r#"extract import "test.spwn""#)?;
+        stmt_eq!(
+            t,
+            St::ExtractImport(ImportType::Module(
+                PathBuf::from("test.spwn"),
+                ModuleImport::Regular
+            ))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_impl() -> ParseResult<()> {
+        let t = parse(
+            r#"impl @A {
+                a: 10,
+                private b: false
+            }"#,
+        )?;
+        stmt_eq!(
+            t,
+            St::Impl {
+                base: Ex::Type(spur!("A")).into(),
+                items: vec![
+                    (span!(spur!("a")), Some(Ex::Int(10).into()), false),
+                    (span!(spur!("b")), Some(Ex::Bool(false).into()), true),
+                ],
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_overload() -> ParseResult<()> {
+        // let t = parse(
+        //     r#"overload + {
+
+        // }"#,
+        // )?;
+        // stmt_eq!(
+        //     t,
+
+        // );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_throw() -> ParseResult<()> {
+        let t = parse(r#"throw "a""#)?;
+        stmt_eq!(t, St::Throw(spur!("a")));
 
         Ok(())
     }
