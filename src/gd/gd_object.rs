@@ -20,6 +20,12 @@ impl TriggerOrder {
     }
 }
 
+impl Default for TriggerOrder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum ObjParam {
     Group(Id),

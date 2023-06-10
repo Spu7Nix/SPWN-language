@@ -10,10 +10,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 
-use super::compiler::{CompileResult, CustomTypeKey, TypeDef};
+use super::compiler::{CompileResult, CustomTypeKey};
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
-use crate::gd::object_keys::ObjectKey;
 use crate::parsing::ast::{ImportType, MacroArg, ObjKeyType, ObjectType, Spannable, Spanned};
 use crate::parsing::utils::operators::Operator;
 use crate::sources::{CodeSpan, SpwnSource};
@@ -1560,7 +1559,7 @@ impl Bytecode<Register> {
                                 .bold()
                         )
                     },
-                    Opcode::Import { dest, src } => {
+                    Opcode::Import { dest, src: _ } => {
                         format!(
                             "import  -> R{dest}",
                             // format!("{:?}", &self.import_paths[*src as usize].value)
@@ -1585,7 +1584,7 @@ impl Bytecode<Register> {
                     Some(span) if span.start != usize::MAX => {
                         let mut s = format!("{:?}", &code[span.start..span.end]);
                         s = s[1..s.len() - 1].into();
-                        if s.len() == 0 {
+                        if s.is_empty() {
                             s = " ".into();
                         }
                         let last_char = "";

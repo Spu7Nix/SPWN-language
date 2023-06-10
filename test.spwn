@@ -3,15 +3,15 @@
 
 
 
-// func = () {
-//     let a = [];
-//     for i in 0..100 {
-//         a.push(i);
-//     }
-// }
+func = () {
+    let a = [];
+    for i in 0..100 {
+        a.push(i);
+    }
+}
 
-// while true {
-//     func()
-// }
+while true {
+    func()
+    func()
+}
 
-$.print(1)

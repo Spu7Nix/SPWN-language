@@ -298,7 +298,7 @@ opcodes! {
     #[delve(display = |s: &R, d: &R| format!("R{s}.next() -> R{d}"))]
     IterNext { => src, => dest },
 
-    #[delve(display = |s: &R, m: &bool| format!("{} R{s}", if *module_ret { "export" } else { "return" }))]
+    #[delve(display = |s: &R, _m: &bool| format!("{} R{s}", if *module_ret { "export" } else { "return" }))]
     Ret { => src, module_ret: bool },
 
     #[delve(display = |s: &R, d: &R| format!("R{s}? -> R{d}"))]

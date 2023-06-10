@@ -18,9 +18,7 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::fs;
 use std::io::Read;
-use std::ops::ControlFlow;
 use std::path::PathBuf;
-use std::process::exit;
 use std::rc::Rc;
 
 use clap::Parser as _;
@@ -28,21 +26,20 @@ use cli::Settings;
 use colored::Colorize;
 use gd::gd_object::{GdObject, TriggerObject};
 use lasso::Rodeo;
-use slotmap::SecondaryMap;
 use spinoff::spinners::SpinnerFrames;
 use spinoff::{Spinner as SSpinner, *};
 
 use crate::cli::{Arguments, Command};
 use crate::compiling::compiler::{Compiler, TypeDefMap};
+use crate::gd::ids::IDClass;
+use crate::gd::optimizer::{optimize, ReservedIds};
 use crate::gd::{gd_object, levelstring};
-use crate::parsing::ast::Spannable;
 use crate::parsing::parser::Parser;
 use crate::sources::{BytecodeMap, CodeSpan, SpwnSource};
 use crate::util::{BasicError, HexColorize, RandomState};
 use crate::vm::context::{CallInfo, Context};
 use crate::vm::interpreter::{ContextSplitMode, FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
-use crate::vm::value::ValueType;
 
 const CORE_PATH: &str = "./libraries/core/";
 
@@ -194,7 +191,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let SpwnOutput {
                 mut objects,
-                triggers,
+                mut triggers,
                 id_counters,
             } = match run_spwn(file, &settings, &mut spinner) {
                 Ok(o) => o,
@@ -204,6 +201,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                     std::process::exit(1);
                 },
             };
+
+            let reserved = ReservedIds::from_objects(&objects, &triggers);
+
+            if !triggers.is_empty() && !settings.no_optimize {
+                // TODO: print message
+                triggers =
+                    optimize::optimize(triggers, id_counters[IDClass::Group as usize], reserved);
+            }
 
             objects.extend(gd_object::apply_triggers(triggers));
 
@@ -264,7 +269,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 struct SpwnOutput {
     pub objects: Vec<GdObject>,
     pub triggers: Vec<TriggerObject>,
-    pub id_counters: [usize; 4],
+    pub id_counters: [u16; 4],
 }
 
 fn run_spwn(
@@ -345,10 +350,7 @@ fn run_spwn(
         Box::new(|_| Ok(())),
         ContextSplitMode::Allow,
     )
-    .map_err(|e| {
-        let r = e.to_report(&vm);
-        r
-    })?;
+    .map_err(|e| e.to_report(&vm))?;
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());
 

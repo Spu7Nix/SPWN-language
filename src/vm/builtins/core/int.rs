@@ -1,8 +1,5 @@
 use crate::vm::builtins::builtin_utils::impl_type;
-use crate::vm::error::RuntimeError;
-use crate::vm::value::{StoredValue, Value};
-use crate::vm::value_ops;
-
+use crate::vm::value::Value;
 impl_type! {
     impl Int {
         Constants:

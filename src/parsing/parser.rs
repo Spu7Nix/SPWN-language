@@ -1,6 +1,4 @@
 use std::cell::RefCell;
-use std::os::windows::raw;
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::Chars;
 
@@ -79,9 +77,9 @@ impl Parser<'_> {
         }
     }
 
-    pub fn next_or_newline(&mut self) -> Token {
-        self.lexer.next_or_eof()
-    }
+    // pub fn next_or_newline(&mut self) -> Token {
+    //     self.lexer.next_or_eof()
+    // }
 
     pub fn span(&self) -> CodeSpan {
         self.lexer.span().into()

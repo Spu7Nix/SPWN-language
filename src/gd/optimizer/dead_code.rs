@@ -26,7 +26,7 @@ pub fn dead_code_optimization(
                     &mut visited,
                 ) == DeadCodeResult::Keep
                 {
-                    (*network.map.get_mut(&group).unwrap()).triggers[i].deleted = false;
+                    network.map.get_mut(&group).unwrap().triggers[i].deleted = false;
                 }
             }
         }
@@ -40,8 +40,8 @@ enum DeadCodeResult {
 }
 
 #[must_use]
-fn check_for_dead_code<'a>(
-    network: &'a mut TriggerNetwork,
+fn check_for_dead_code(
+    network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
     start: (Id, usize),
     //closed_group: &mut u16,
@@ -63,7 +63,7 @@ fn check_for_dead_code<'a>(
                 return Delete;
             }
         }
-        (*network.map.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
+        network.map.get_mut(&start.0).unwrap().triggers[start.1].deleted = false;
         return Keep;
     }
 
@@ -119,7 +119,7 @@ fn check_for_dead_code<'a>(
             visited_stack,
         ) == Keep
         {
-            (*network.map.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
+            network.map.get_mut(&trigger_ptr.0).unwrap().triggers[trigger_ptr.1].deleted = false;
             out = Keep;
         }
     }

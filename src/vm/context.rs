@@ -3,7 +3,6 @@ use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
 
 use ahash::AHashMap;
-use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use super::interpreter::{FuncCoord, ValueKey};
 use super::opcodes::Register;
@@ -18,7 +17,7 @@ pub struct CallInfo {
     pub call_area: Option<CodeArea>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Context {
     pub ip: usize,
 
@@ -28,11 +27,7 @@ pub struct Context {
 
 impl Context {
     pub fn new() -> Self {
-        Self {
-            registers: vec![],
-            ip: 0,
-            group_stack: vec![Id::Specific(0)],
-        }
+        Self::default()
     }
 
     pub fn hash(&self) -> u64 {
@@ -124,11 +119,11 @@ impl<'a> super::interpreter::Vm<'a> {
 
         // lord forgive me for what i am about to do
 
-        let mut clone_map = SecondaryMap::default();
+        let mut clone_map = AHashMap::new();
 
         for regs in &mut new.registers {
             for reg in regs {
-                let k = match clone_map.get(*reg) {
+                let k = match clone_map.get(reg) {
                     Some(k) => *k,
                     None => {
                         let k = self.deep_clone_key_insert(*reg);

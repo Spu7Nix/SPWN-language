@@ -1,10 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use super::interpreter::{BytecodeKey, RuntimeResult, ValueKey, Vm};
+use super::interpreter::{BytecodeKey, RuntimeResult, Vm};
 use super::value::{StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Constant;
-use crate::gd::object_keys::ObjectKey;
 use crate::parsing::ast::{Pattern, Spanned};
 use crate::sources::CodeSpan;
 
@@ -166,7 +165,7 @@ impl std::fmt::Debug for ConstPattern {
             Pattern::Lte(c) => write!(f, "<={c:?}"),
             Pattern::Gt(c) => write!(f, ">{c:?}"),
             Pattern::Gte(c) => write!(f, ">={c:?}"),
-            Pattern::MacroPattern { args, ret_type } => todo!(),
+            Pattern::MacroPattern { .. } => todo!(),
         }
     }
 }

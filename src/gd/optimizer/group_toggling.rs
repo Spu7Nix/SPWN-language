@@ -232,7 +232,7 @@ fn group_triggers(
         {
             all_outputs.extend(network.map[target].triggers.iter().copied());
             for t in &mut network.map.get_mut(target).unwrap().triggers {
-                (*t).deleted = true;
+                t.deleted = true;
             }
 
             *target = output_group; // enable output
@@ -240,14 +240,14 @@ fn group_triggers(
             unreachable!()
         };
         for output in all_outputs.iter_mut() {
-            (*output).deleted = false;
+            output.deleted = false;
             let new_obj = objects[output.obj].clone();
 
             (*objects.list).push(new_obj);
 
             let obj_index = ObjPtr(objects.list.len() - 1);
 
-            (*output).obj = obj_index;
+            output.obj = obj_index;
         }
         for trigger in all_outputs.iter() {
             if let Some(param) = objects[trigger.obj]
@@ -380,7 +380,6 @@ fn group_triggers(
         toggle_trigger_groups.extend(additional_groups.iter().copied());
         // create toggle triggers
         create_toggle_trigger(
-            *trigger,
             swapping_group,
             toggle_trigger_groups.clone(),
             false,
@@ -389,7 +388,6 @@ fn group_triggers(
             TriggerOrder(order.0 - delta), // before the function trigger
         );
         create_toggle_trigger(
-            *trigger,
             output_group,
             toggle_trigger_groups.clone(),
             false,
@@ -398,7 +396,6 @@ fn group_triggers(
             TriggerOrder(order.0 - delta), // before the function trigger
         );
         create_toggle_trigger(
-            *trigger,
             swapping_group,
             toggle_trigger_groups.clone(),
             true,
@@ -410,7 +407,6 @@ fn group_triggers(
 }
 
 pub fn create_toggle_trigger(
-    obj: ObjPtr,
     target_group: Id,
     groups: Vec<Id>,
     enable: bool,
@@ -447,7 +443,7 @@ pub fn create_toggle_trigger(
 
     if let Some(ObjParam::Group(group)) = new_obj.params.get(&obj_props::GROUPS) {
         match network.map.get_mut(group) {
-            Some(gang) => (*gang).triggers.push(new_trigger),
+            Some(gang) => gang.triggers.push(new_trigger),
             None => {
                 network
                     .map
@@ -456,7 +452,7 @@ pub fn create_toggle_trigger(
         }
     } else {
         match network.map.get_mut(&NO_GROUP) {
-            Some(gang) => (*gang).triggers.push(new_trigger),
+            Some(gang) => gang.triggers.push(new_trigger),
             None => {
                 network
                     .map

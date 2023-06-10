@@ -6,7 +6,7 @@ use crate::gd::gd_object::{ObjParam, TriggerOrder};
 use crate::gd::ids::Id;
 
 pub(crate) fn param_identifier(param: &ObjParam) -> String {
-    let str = match param {
+    match param {
         ObjParam::Group(id) | ObjParam::Channel(id) | ObjParam::Block(id) | ObjParam::Item(id) => {
             match id {
                 Id::Specific(id) => format!("{}", id),
@@ -35,8 +35,7 @@ pub(crate) fn param_identifier(param: &ObjParam) -> String {
             out
         },
         ObjParam::Epsilon => "0.050".to_string(),
-    };
-    str
+    }
     // use std::collections::hash_map::DefaultHasher;
     // use std::hash::{Hash, Hasher};
 
@@ -170,7 +169,7 @@ pub(crate) fn dedup_triggers(
             for (b, repr, order) in representative_groups.iter() {
                 if b == &behavior {
                     for trigger in &mut gang.triggers {
-                        (*trigger).deleted = true;
+                        trigger.deleted = true;
                     }
                     //dbg!(behavior, repr, group, &representative_groups);
                     assert!(swaps.insert(*group, (*repr, *order)).is_none());

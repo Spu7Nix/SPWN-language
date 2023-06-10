@@ -3,9 +3,10 @@ use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-use ahash::{AHashMap, AHashSet};
+use ahash::AHashMap;
 use colored::Colorize;
 use lasso::Spur;
+use slab::Slab;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use super::context::{CallInfo, Context, ContextStack, FullContext};
@@ -16,9 +17,9 @@ use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
 use crate::compiling::compiler::{CustomTypeKey, TypeDef};
 use crate::gd::gd_object::{make_spawn_trigger, GdObject, TriggerObject, TriggerOrder};
-use crate::gd::ids::{IDClass, Id, SpecificId};
+use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
-use crate::parsing::ast::{MacroArg, ModuleImport, ObjectType, Spannable, Spanned};
+use crate::parsing::ast::{MacroArg, ObjectType, Spannable, Spanned};
 use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
@@ -28,7 +29,6 @@ use crate::vm::value_ops as vo;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 new_key_type! {
-    pub struct ValueKey;
     pub struct BytecodeKey;
 }
 
@@ -64,11 +64,74 @@ impl StoredValue {
     }
 }
 
-const DELTA_COLLECT: usize = 15000;
+const DELTA_COLLECT: usize = 10000000;
+
+#[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct ValueKey(pub usize);
+
+// impl From<ValueKey> for usize {
+//     fn from(value: ValueKey) -> Self {
+//         value.0
+//     }
+// }
+// impl From<usize> for ValueKey {
+//     fn from(value: usize) -> Self {
+//         ValueKey(value)
+//     }
+// }
+
+pub struct Memory(Slab<ValueCollect>);
+
+impl Memory {
+    pub fn insert(&mut self, v: ValueCollect) -> ValueKey {
+        ValueKey(self.0.insert(v))
+    }
+
+    pub fn retain<F>(&mut self, mut f: F)
+    where
+        F: FnMut(ValueKey, &mut ValueCollect) -> bool,
+    {
+        self.0.retain(|k, v| f(ValueKey(k), v));
+    }
+
+    pub fn get(&self, v: ValueKey) -> Option<&ValueCollect> {
+        self.0.get(v.0)
+    }
+
+    pub fn get_mut(&mut self, v: ValueKey) -> Option<&mut ValueCollect> {
+        self.0.get_mut(v.0)
+    }
+}
+
+impl std::ops::Index<ValueKey> for Memory {
+    type Output = ValueCollect;
+
+    fn index(&self, index: ValueKey) -> &Self::Output {
+        &self.0[index.0]
+    }
+}
+impl std::ops::IndexMut<ValueKey> for Memory {
+    fn index_mut(&mut self, index: ValueKey) -> &mut Self::Output {
+        &mut self.0[index.0]
+    }
+}
+
+// impl std::ops::Deref for Memory {
+//     type Target = Slab<ValueCollect>;
+
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }
+// impl std::ops::DerefMut for Memory {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.0
+//     }
+// }
 
 pub struct Vm<'a> {
     // 256 registers per function
-    pub memory: SlotMap<ValueKey, ValueCollect>,
+    pub memory: Memory,
     pub last_memory_size: usize,
 
     pub programs: SlotMap<
@@ -83,7 +146,7 @@ pub struct Vm<'a> {
 
     pub interner: Rc<RefCell<Interner>>,
 
-    pub id_counters: [usize; 4],
+    pub id_counters: [u16; 4],
 
     pub contexts: ContextStack,
     pub objects: Vec<GdObject>,
@@ -142,7 +205,7 @@ impl<'a> Vm<'a> {
         }
 
         Self {
-            memory: SlotMap::default(),
+            memory: Memory(Slab::new()),
             last_memory_size: 0,
             interner,
             programs,
@@ -172,8 +235,8 @@ impl<'a> Vm<'a> {
     }
 
     pub fn garbage_collect(&mut self) {
-        fn mark_value(vm: &mut Vm, v: ValueKey) {
-            // let vm = unsafe { vm.as_mut().unwrap() };
+        fn mark_value(vm: *mut Vm, v: ValueKey) {
+            let vm = unsafe { vm.as_mut().unwrap() };
 
             // println!("bibi: {:?}", v);
             if vm.memory[v].will_collect {
@@ -200,11 +263,11 @@ impl<'a> Vm<'a> {
                             }
                         }
                         for arg in &data.args {
-                            match arg {
-                                MacroArg::Single {
-                                    default: Some(d), ..
-                                } => keys.push(*d),
-                                _ => (),
+                            if let MacroArg::Single {
+                                default: Some(d), ..
+                            } = arg
+                            {
+                                keys.push(*d)
                             }
                         }
                         if let Some(k) = data.self_arg {
@@ -239,23 +302,29 @@ impl<'a> Vm<'a> {
             }
         }
 
-        // let ptr = self as *mut Self;
+        let ptr = self as *mut Self;
 
-        let v = self
+        println!("kajajaaj {}", self.contexts.0.len());
+
+        for i in self
             .contexts
             .0
             .iter()
-            .flat_map(|c| {
-                c.contexts
-                    .iter()
-                    .flat_map(|c| c.registers.iter().flat_map(|v| v))
-            })
-            .copied()
-            .collect::<Vec<_>>();
-
-        for i in v {
-            mark_value(self, i)
+            .flat_map(|c| c.contexts.iter().flat_map(|c| c.registers.iter().flatten()))
+        {
+            mark_value(ptr, *i)
         }
+        for (_, map) in &self.impls {
+            for (_, (k, _)) in map {
+                mark_value(ptr, *k)
+            }
+        }
+        for (_, v) in &self.overloads {
+            for k in v {
+                mark_value(ptr, *k)
+            }
+        }
+
         self.memory.retain(|_, v| {
             if !v.will_collect {
                 v.will_collect = true;
@@ -514,10 +583,11 @@ impl<'a> Vm<'a> {
             let opcode = &opcodes[ip];
 
             // println!("COCK: {:?}", opcode);
-            // if self.memory.len() > self.last_memory_size + DELTA_COLLECT {
-            self.garbage_collect();
-            //     self.last_memory_size = self.memory.len();
-            // }
+            if self.memory.0.len() > self.last_memory_size + DELTA_COLLECT {
+                self.garbage_collect();
+                self.last_memory_size = self.memory.0.len();
+                println!("v: {}", self.last_memory_size);
+            }
 
             match opcode {
                 Opcode::LoadConst { dest, id } => {
@@ -915,7 +985,7 @@ impl<'a> Vm<'a> {
                     }
                 },
                 Opcode::JumpIfEmpty { src, to } => {
-                    let span = self.get_span(func, ip);
+                    //let span = self.get_span(func, ip);
                     if self.get_reg(*src).value == Value::Empty {
                         self.contexts.jump_current(*to as usize);
                         continue;
@@ -1407,7 +1477,7 @@ impl<'a> Vm<'a> {
                         .or_insert(items);
                 },
                 Opcode::Overload { array, op } => {
-                    let span = self.get_span(func, ip);
+                    //let span = self.get_span(func, ip);
 
                     let items = match &self.get_reg(*array).value {
                         Value::Array(items) => items.clone(),
@@ -1754,7 +1824,7 @@ impl<'a> Vm<'a> {
                         },
                     )
                 },
-                Opcode::StartTryCatch { id, reg } => {},
+                Opcode::StartTryCatch { .. } => {},
             }
 
             {
@@ -2153,18 +2223,16 @@ impl<'a> Vm<'a> {
 
     pub fn next_id(&mut self, c: IDClass) -> u16 {
         self.id_counters[c as usize] += 1;
-        self.id_counters[c as usize] as u16
+        self.id_counters[c as usize]
     }
 
     pub fn hash_value(&self, val: ValueKey, state: &mut std::collections::hash_map::DefaultHasher) {
         // hash numbers
-        match &self.memory[val].val.value {
-            Value::Int(a) => {
-                std::mem::discriminant(&Value::Float(0.0)).hash(state);
-                (*a as f64).to_bits().hash(state);
-                return;
-            }, // convert all ints to floats so float-int equality works
-            _ => (),
+        if let Value::Int(a) = &self.memory[val].val.value {
+            std::mem::discriminant(&Value::Float(0.0)).hash(state);
+            (*a as f64).to_bits().hash(state);
+            return;
+            // convert all ints to floats so float-int equality works
         };
 
         // hash enum discriminator
@@ -2200,7 +2268,7 @@ impl<'a> Vm<'a> {
                 }
             },
             Value::Empty => (),
-            Value::Macro(a) => (),
+            Value::Macro(..) => (),
             // {
             //     if let Some(slf_val) = a.self_arg {
             //         self.hash_value(slf_val, state);
@@ -2219,7 +2287,7 @@ impl<'a> Vm<'a> {
             //     }
             // },
             Value::Type(a) => a.hash(state),
-            Value::Module { exports, types } => (),
+            Value::Module { .. } => (),
             // {
             //     let exports: BTreeMap<_, _> = exports.iter().collect();
             //     for (k, v) in exports {
@@ -2358,8 +2426,8 @@ impl<'a> Vm<'a> {
             (Value::Bool(b), ValueType::Int) => Value::Int(*b as i64),
             (Value::Bool(b), ValueType::Float) => Value::Float(*b as i64 as f64),
 
-            (Value::Array(i), ValueType::Dict) => todo!(),
-            (Value::Range(a, b, c), ValueType::Array) => Value::Array(todo!()),
+            (Value::Array(..), ValueType::Dict) => todo!(),
+            (Value::Range(..), ValueType::Array) => Value::Array(todo!()),
 
             (Value::TriggerFunction { group, .. }, ValueType::Group) => Value::Group(*group),
 

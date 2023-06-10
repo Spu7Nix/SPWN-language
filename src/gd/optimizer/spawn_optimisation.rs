@@ -106,7 +106,7 @@ pub(crate) fn spawn_optimisation(
                 };
 
                 // delete trigger that will be rebuilt
-                (*trigger).deleted = true;
+                trigger.deleted = true;
 
                 if let Some(l) = spawn_connections.get_mut(group) {
                     l.push(SpawnTrigger {

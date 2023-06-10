@@ -33,15 +33,15 @@ pub fn optimize(
             deleted: false,
         };
         if let Some(ObjParam::Group(group)) = obj.params().get(&obj_props::GROUPS) {
-            match network.map.get_mut(&group) {
-                Some(l) => (*l).triggers.push(trigger),
+            match network.map.get_mut(group) {
+                Some(l) => l.triggers.push(trigger),
                 None => {
                     network.map.insert(*group, TriggerGang::new(vec![trigger]));
                 },
             }
         } else {
             match network.map.get_mut(&NO_GROUP) {
-                Some(l) => (*l).triggers.push(trigger),
+                Some(l) => l.triggers.push(trigger),
                 None => {
                     network
                         .map
@@ -231,8 +231,8 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
         for trigger in new_triggers {
             let obj = &objects[trigger.obj];
             if let Some(ObjParam::Group(group)) = obj.params().get(&obj_props::GROUPS) {
-                match new_network.map.get_mut(&group) {
-                    Some(l) => (*l).triggers.push(trigger),
+                match new_network.map.get_mut(group) {
+                    Some(l) => l.triggers.push(trigger),
                     None => {
                         new_network
                             .map
@@ -241,7 +241,7 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
                 }
             } else {
                 match new_network.map.get_mut(&NO_GROUP) {
-                    Some(l) => (*l).triggers.push(trigger),
+                    Some(l) => l.triggers.push(trigger),
                     None => {
                         new_network
                             .map
@@ -268,11 +268,11 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
             if let (TriggerRole::Func | TriggerRole::Spawn, Some(ObjParam::Group(id))) =
                 (trigger.role, obj.params().get(&obj_props::TARGET))
             {
-                if let Some(gang) = new_network.map.get_mut(&id) {
-                    (*gang).connections_in += 1;
+                if let Some(gang) = new_network.map.get_mut(id) {
+                    gang.connections_in += 1;
 
                     if trigger.role != TriggerRole::Spawn {
-                        (*gang).non_spawn_triggers_in = true;
+                        gang.non_spawn_triggers_in = true;
                     }
                 }
 
@@ -309,7 +309,7 @@ pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
         for (prop, param) in &mut object.params_mut().iter_mut() {
             match param {
                 ObjParam::Group(g) => {
-                    if let Some(to) = map.get_mut(&g) {
+                    if let Some(to) = map.get_mut(g) {
                         *g = to.1;
                         if *prop == obj_props::GROUPS {
                             to.0.push(ObjPtr(i));
@@ -318,7 +318,7 @@ pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
                 },
                 ObjParam::GroupList(list) => {
                     for g in list {
-                        if let Some(to) = map.get_mut(&g) {
+                        if let Some(to) = map.get_mut(g) {
                             *g = to.1;
                             if *prop == obj_props::GROUPS {
                                 to.0.push(ObjPtr(i));
@@ -416,8 +416,8 @@ pub fn create_spawn_trigger(
     };
 
     if let Some(ObjParam::Group(group)) = new_obj.params.get(&obj_props::GROUPS) {
-        match network.map.get_mut(&group) {
-            Some(gang) => (*gang).triggers.push(new_trigger),
+        match network.map.get_mut(group) {
+            Some(gang) => gang.triggers.push(new_trigger),
             None => {
                 network
                     .map
@@ -426,7 +426,7 @@ pub fn create_spawn_trigger(
         }
     } else {
         match network.map.get_mut(&NO_GROUP) {
-            Some(gang) => (*gang).triggers.push(new_trigger),
+            Some(gang) => gang.triggers.push(new_trigger),
             None => {
                 network
                     .map

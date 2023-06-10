@@ -1,22 +1,19 @@
 use std::cell::RefCell;
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
 
 use ahash::AHashMap;
 use delve::VariantNames;
 use lasso::Spur;
-use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, Constant, FuncBuilder, Function};
 use super::error::CompilerError;
 use crate::cli::Settings;
 use crate::gd::ids::IDClass::Group;
-use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
-    DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, ObjKeyType,
-    Pattern, PatternNode, Spannable, Spanned, Statement, StmtNode, StringContent,
+    DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, Pattern,
+    PatternNode, Spannable, Spanned, Statement, StmtNode, StringContent,
 };
 use crate::parsing::attributes::FileAttribute;
 use crate::parsing::parser::Parser;
@@ -305,11 +302,11 @@ impl<'a> Compiler<'a> {
                         let import_type =
                             ImportType::Module(BUILTIN_DIR.join("std/lib.spwn"), ModuleImport::Std);
                         self.compile_import(&import_type, CodeSpan::internal(), self.src.clone())?;
-                        // f.import(
-                        //     builtin_import_reg,
-                        //     import_type.spanned(CodeSpan::internal()),
-                        //     CodeSpan::internal(),
-                        // )
+                        f.import(
+                            builtin_import_reg,
+                            import_type.spanned(CodeSpan::internal()),
+                            CodeSpan::internal(),
+                        )
                     }
                 }
 
@@ -414,6 +411,7 @@ impl<'a> Compiler<'a> {
 
         let is_module = matches!(typ, ImportType::Module { .. });
 
+        println!("jbi: {:?}", import_src);
         let code = match import_src.read() {
             Some(s) => s,
             None => {
@@ -426,43 +424,43 @@ impl<'a> Compiler<'a> {
         };
         let import_base = import_path.parent().unwrap();
 
-        let hash = md5::compute(&code);
+        //let hash = md5::compute(&code);
 
         let spwnc_path = import_base.join(format!(".spwnc/{name}.spwnc"));
 
-        'from_cache: {
-            // if spwnc_path.is_file() {
-            //     let source_bytes = std::fs::read(&spwnc_path).unwrap();
+        //'from_cache: {
+        // if spwnc_path.is_file() {
+        //     let source_bytes = std::fs::read(&spwnc_path).unwrap();
 
-            //     let bytecode: Bytecode<Register> = match bincode::deserialize(&source_bytes) {
-            //         Ok(b) => b,
-            //         Err(_) => {
-            //             break 'from_cache;
-            //         },
-            //     };
+        //     let bytecode: Bytecode<Register> = match bincode::deserialize(&source_bytes) {
+        //         Ok(b) => b,
+        //         Err(_) => {
+        //             break 'from_cache;
+        //         },
+        //     };
 
-            //     if bytecode.source_hash == hash.into()
-            //         && bytecode.spwn_ver == env!("CARGO_PKG_VERSION")
-            //     {
-            //         for import in &bytecode.import_paths {
-            //             self.compile_import(&import.value, import.span, import_src.clone())?;
-            //         }
-            //         for (k, (name, private)) in &bytecode.custom_types {
-            //             self.custom_type_defs.insert(
-            //                 TypeDef {
-            //                     def_src: import_src.clone(),
-            //                     name: self.intern(&name.value),
-            //                     private: *private,
-            //                 },
-            //                 k.spanned(name.span),
-            //             );
-            //         }
+        //     if bytecode.source_hash == hash.into()
+        //         && bytecode.spwn_ver == env!("CARGO_PKG_VERSION")
+        //     {
+        //         for import in &bytecode.import_paths {
+        //             self.compile_import(&import.value, import.span, import_src.clone())?;
+        //         }
+        //         for (k, (name, private)) in &bytecode.custom_types {
+        //             self.custom_type_defs.insert(
+        //                 TypeDef {
+        //                     def_src: import_src.clone(),
+        //                     name: self.intern(&name.value),
+        //                     private: *private,
+        //                 },
+        //                 k.spanned(name.span),
+        //             );
+        //         }
 
-            //         self.map.map.insert(import_src, bytecode);
-            //         return Ok(());
-            //     }
-            // }
-        }
+        //         self.map.map.insert(import_src, bytecode);
+        //         return Ok(());
+        //     }
+        // }
+        //}
 
         let mut parser = Parser::new(&code, import_src, Rc::clone(&self.interner));
 
@@ -490,7 +488,7 @@ impl<'a> Compiler<'a> {
                         // dont write bytecode if caching is disabled
                         if !self.settings.no_bytecode_cache {
                             let _ = std::fs::create_dir(import_base.join(".spwnc"));
-                            std::fs::write(&spwnc_path, bytes).unwrap();
+                            std::fs::write(spwnc_path, bytes).unwrap();
                         }
                     },
                     Err(err) => return Err(err),
@@ -1034,7 +1032,7 @@ impl<'a> Compiler<'a> {
                 let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
                 builder.gte(expr_reg, val, out_reg, pattern.span);
             },
-            Pattern::MacroPattern { args, ret_type } => {
+            Pattern::MacroPattern { .. } => {
                 // for pattern in args {
                 // let p = self.compile_pattern_check(expr_reg, pattern, scope, builder)?;
                 todo!()
@@ -1167,7 +1165,7 @@ impl<'a> Compiler<'a> {
                 Pattern::Lte(v) => Pattern::Lte(self.convert_const_expr(v)?.spanned(pat.span)),
                 Pattern::Gt(v) => Pattern::Gt(self.convert_const_expr(v)?.spanned(pat.span)),
                 Pattern::Gte(v) => Pattern::Gte(self.convert_const_expr(v)?.spanned(pat.span)),
-                Pattern::MacroPattern { args, ret_type } => todo!(),
+                Pattern::MacroPattern { .. } => todo!(),
             },
         })
     }
@@ -1370,7 +1368,7 @@ impl<'a> Compiler<'a> {
             },
             Expression::Macro {
                 args,
-                ret_type,
+                ret_type: _,
                 code,
             } => {
                 let func_id = builder.new_func(
@@ -1547,7 +1545,10 @@ impl<'a> Compiler<'a> {
                 builder.call(base_reg, out_reg, args_reg, expr.span);
             },
             // Expression::MacroPattern { args, ret_type } => todo!(),
-            Expression::TriggerFunc { attributes, code } => {
+            Expression::TriggerFunc {
+                attributes: _,
+                code,
+            } => {
                 let group_reg = builder.next_reg();
                 builder.load_id(None, Group, group_reg, expr.span);
                 builder.make_trigger_function(group_reg, out_reg, expr.span);

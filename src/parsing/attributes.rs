@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use ahash::AHashMap;
 use paste::paste;
 
@@ -294,17 +296,155 @@ attributes! {
     }
 }
 
-// #[doc(u"")]
-// type @a;
+/////////////////////////////
 
-// #[doc(u"")]
-// a: () {}
+pub trait ParseFromRaw<T> {
+    fn parse_from_raw(parser: &mut Parser<'_>, on: &T, attr: RawAttribute) -> ParseResult<Self>
+    where
+        Self: Sized;
+}
 
-// #[no_optimize] !{
+pub trait ValidOn<T> {
+    fn is_valid(&self, attr: &T) -> bool;
+}
 
-// }
+#[rustfmt::skip]
+macro_rules! attributes2 {
+    (
+        $vis:vis enum
+        $enum:ident {
+            $(
+                $(
+                    #[
+                        valid_on(
+                            $(
+                                $(Expression:: $v_expr:ident)?
+                                $(Statement:: $v_stmt:ident)?
+                            ),*
+                        )
+                    ]
+                )?
+                $variant:ident $(($typ1:ty $(, $typ:ty)*))? $({ $field1:ident : $f_typ1:ty, $($field:ident : $f_typ:ty,)* })?,
+            )*
+        }
+    ) => {
+        // impl ValidOn<$enum> for Expression {
+        //     fn is_valid(&self, attr: &$enum) -> bool {
+        //         match attr {
+        //             $(
+        //                 $enum::$variant {..} => {
+        //                     match self {
+        //                         $(
+        //                             $(
+        //                                 $(Self::$v_expr { .. } => true,)?
+        //                             )*
+        //                         )?
+        //                         _ => false
+        //                     }
+        //                 },
+        //             )*
+        //         }
+        //     }
+        // }
 
-// #[doc("")]
-// #[doc(type_alias = @foo), doc_type = @cunt]
+        // impl ValidOn<$enum> for Statement {
+        //     fn is_valid(&self, attr: &$enum) -> bool {
+                // match attr {
+                //     $(
+                //         $enum::$variant {..} => {
+                //             match self {
+                //                 $(
+                //                     $(
+                //                         $(Self::$v_stmt { .. } => true,)?
+                //                     )*
+                //                 )?
+                //                 _ => false
+                //             }
+                //         },
+                //     )*
+                // }
+        //     }
+        // }
 
-// #[doc = ""] ??
+        impl ParseFromRaw<Expression> for $enum {
+            fn parse_from_raw(parser: &mut Parser<'_>, on: &Expression, attr: RawAttribute) -> ParseResult<Self>
+            where
+                Self: Sized 
+            {
+                // match attr {
+                //     $(
+                //         $enum::$variant {..} => {
+                //             match self {
+                //                 $(
+                //                     $(
+                //                         $(Self::$v_stmt { .. } => true,)?
+                //                     )*
+                //                 )?
+                //                 _ => false
+                //             }
+                //         },
+                //     )*
+                // }
+
+                todo!()
+            }
+        }
+
+        impl ParseFromRaw<Statement> for $enum {
+            fn parse_from_raw(parser: &mut Parser<'_>, on: &Statement, attr: RawAttribute) -> ParseResult<Self>
+            where
+                Self: Sized 
+            {
+                todo!()
+            }
+        }
+
+        #[derive(Debug, Clone, PartialEq, Eq)]
+        $vis enum $enum {
+            $(
+                $variant $( ( $typ1 $(,$typ)*) )? $( { $field1: $f_typ1, $($field: $f_typ,)* } )?,
+            )*
+        }
+
+        impl ParseAttribute for $enum {
+            fn parse(parser: &mut Parser) -> ParseResult<$enum> {
+                todo!()
+            }
+        }
+    };
+}
+
+pub struct RawAttribute {
+    tokens: Vec<Token>,
+}
+
+attributes2! {
+    pub enum AAA {
+        #[valid_on(Expression::Int, Statement::Let)] Doc(String),
+    }
+}
+
+/*
+
+attribute:
+name,
+arguments -> 1 arg allow #[x(...)] and #[x = ...] syntax
+
+
+#[doc = "aaa"]
+#[doc("aaaa")]
+
+#[no_optimize]
+
+attributes! {
+    pub enum StmtAttribute {
+        #[valid_on(Expression::Arrow)] Doc(String),
+
+        #[valid_on(Let, TypeDef)]
+        Deprecated { since: String, note: String, },
+    }
+}
+
+#[doc("aaa")] a: 10
+a: #[doc("aaa")] 10
+ */

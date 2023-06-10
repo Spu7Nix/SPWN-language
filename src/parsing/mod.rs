@@ -1293,17 +1293,7 @@ mod tests {
 
     #[test]
     fn test_overload() -> ParseResult<()> {
-        // let t = parse(
-        //     r#"overload + {
-
-        // }"#,
-        // )?;
-        // stmt_eq!(
-        //     t,
-
-        // );
-
-        Ok(())
+        todo!("overloading tests");
     }
 
     #[test]

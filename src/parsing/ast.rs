@@ -1,4 +1,3 @@
-use std::fmt::{write, Display};
 use std::path::{Path, PathBuf};
 
 use delve::{EnumDisplay, EnumToStr};
