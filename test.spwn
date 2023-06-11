@@ -1,23 +1,38 @@
-wait = (time: @int | @float | @epsilon = $.epsilon()) {
-	if time == $.epsilon() || time > 0 {
-		$.add( trigger{
-			OBJ_ID: 1268,
-			SPAWN_DURATION: time,
-			TARGET: !{
-				-> return
-			},
-		})
-	}
-}
+// wait = (time: @int | @float | @epsilon = $.epsilon()) {
+// 	if time == $.epsilon() || time > 0 {
+// 		$.add( trigger{
+// 			OBJ_ID: 1268,
+// 			SPAWN_DURATION: time,
+// 			TARGET: !{
+// 				-> return
+// 			},
+// 		})
+// 	}
+// }
 
 
+// loop = (code) {
+//     f = !{
+//         code()
+//         f!
+//     }
+//     wait(1)
+//     f!
+// }
 
 
-wait(1)
-wait(1)
-wait(1)
+// loop(() {
+//     10g.move(10, 10, 0.5)
+//     10g.move(-10, 10, 0.5)
+//     10g.move(-10, -10, 0.5)
+//     10g.move(10, -10, 0.5)
+// })
 
-10g.move(10, 10, 0.5)
-10g.move(-10, 10, 0.5)
-10g.move(10, -10, 0.5)
-10g.move(-10, -10, 0.5)
+// cock = !{
+//     cock!
+// }
+
+extract import "test2.spwn"
+
+$.print(penis)
+$.print(fuck)

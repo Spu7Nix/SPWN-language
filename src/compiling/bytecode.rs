@@ -1433,8 +1433,11 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::YeetContext))
     }
 
-    pub fn call_trigger_func(&mut self, reg: usize) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::CallTriggerFunc { func: reg }))
+    pub fn call_trigger_func(&mut self, reg: usize, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::CallTriggerFunc { func: reg }),
+            span,
+        )
     }
 
     pub fn call(

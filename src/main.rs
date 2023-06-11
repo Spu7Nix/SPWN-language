@@ -97,6 +97,7 @@ const READING_COLOR: u32 = 0x7F94FF;
 const PARSING_COLOR: u32 = 0x59C7FF;
 const COMPILING_COLOR: u32 = 0xFFC759;
 const RUNNING_COLOR: u32 = 0xFF59C7;
+const OPTIMISING_COLOR: u32 = 0xA74AFF;
 
 fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
@@ -205,9 +206,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             let reserved = ReservedIds::from_objects(&objects, &triggers);
 
             if !triggers.is_empty() && !settings.no_optimize {
-                // TODO: print message
+                spinner.start(format!(
+                    "{:20}",
+                    "Optimizing Triggers...".color_hex(OPTIMISING_COLOR).bold()
+                ));
+
                 triggers =
                     optimize::optimize(triggers, id_counters[IDClass::Group as usize], reserved);
+
+                spinner.complete(None);
             }
 
             objects.extend(gd_object::apply_triggers(triggers));

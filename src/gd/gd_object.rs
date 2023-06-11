@@ -139,7 +139,7 @@ pub fn make_spawn_trigger(
         mode: ObjectType::Trigger,
     };
 
-    obj.params.insert(1, ObjParam::Number(1006.0));
+    obj.params.insert(1, ObjParam::Number(1268.0));
     //obj.params.insert(63, ObjParam::Number(0.0));
     obj.params.insert(51, ObjParam::Group(target));
 

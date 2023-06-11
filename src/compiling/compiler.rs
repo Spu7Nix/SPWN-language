@@ -285,28 +285,17 @@ impl<'a> Compiler<'a> {
                     typ: Some(ScopeType::Global),
                 });
 
-                let builtin_import_reg = f.next_reg();
-
                 if entry.is_some() {
                     let import_type =
                         ImportType::Module(BUILTIN_DIR.join("core/lib.spwn"), ModuleImport::Core);
-                    self.compile_import(&import_type, CodeSpan::internal(), self.src.clone())?;
-                    f.import(
-                        builtin_import_reg,
-                        import_type.spanned(CodeSpan::internal()),
-                        CodeSpan::internal(),
-                    )
+
+                    self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
                 }
                 if let Some(attrs) = entry {
                     if !attrs.iter().any(|a| *a == FileAttribute::NoStd) {
                         let import_type =
                             ImportType::Module(BUILTIN_DIR.join("std/lib.spwn"), ModuleImport::Std);
-                        self.compile_import(&import_type, CodeSpan::internal(), self.src.clone())?;
-                        f.import(
-                            builtin_import_reg,
-                            import_type.spanned(CodeSpan::internal()),
-                            CodeSpan::internal(),
-                        )
+                        self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
                     }
                 }
 
@@ -401,7 +390,7 @@ impl<'a> Compiler<'a> {
         typ: &ImportType,
         span: CodeSpan,
         importer_src: SpwnSource,
-    ) -> CompileResult<()> {
+    ) -> CompileResult<Vec<String>> {
         let base_dir = importer_src.path().parent().unwrap();
 
         let (name, import_path) = (typ.name(), typ.full_path(base_dir));
@@ -490,6 +479,8 @@ impl<'a> Compiler<'a> {
                             let _ = std::fs::create_dir(import_base.join(".spwnc"));
                             std::fs::write(spwnc_path, bytes).unwrap();
                         }
+
+                        return Ok(bytecode.export_names.clone());
                     },
                     Err(err) => return Err(err),
                 }
@@ -502,8 +493,6 @@ impl<'a> Compiler<'a> {
                 })
             },
         };
-
-        Ok(())
     }
 
     pub fn compile_stmts(
@@ -526,7 +515,7 @@ impl<'a> Compiler<'a> {
     ) -> CompileResult<()> {
         match &*stmt.stmt {
             Statement::Expr(e) => {
-                self.compile_expr(e, scope, builder, ExprType::Normal)?;
+                self.compile_expr(e, scope, builder, ExprType::normal())?;
             },
             Statement::Let(var, expr) => match *var.expr {
                 Expression::Var(s) => {
@@ -540,7 +529,7 @@ impl<'a> Compiler<'a> {
                         },
                         scope,
                     );
-                    let expr_reg = self.compile_expr(expr, scope, builder, ExprType::Normal)?;
+                    let expr_reg = self.compile_expr(expr, scope, builder, ExprType::normal())?;
 
                     builder.copy(expr_reg, var_reg, stmt.span);
                 },
@@ -561,8 +550,14 @@ impl<'a> Compiler<'a> {
                                 },
                                 scope,
                             );
-                            let expr_reg =
-                                self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                            let expr_reg = self.compile_expr(
+                                right,
+                                scope,
+                                builder,
+                                ExprType::Normal {
+                                    pre_assign: Some(var_reg),
+                                },
+                            )?;
 
                             builder.copy(expr_reg, var_reg, stmt.span);
 
@@ -573,58 +568,65 @@ impl<'a> Compiler<'a> {
                     let into_reg =
                         self.compile_expr(left, scope, builder, ExprType::Assign(stmt.span))?;
 
-                    let expr_reg = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let expr_reg = self.compile_expr(
+                        right,
+                        scope,
+                        builder,
+                        ExprType::Normal {
+                            pre_assign: Some(into_reg),
+                        },
+                    )?;
 
                     builder.copy(expr_reg, into_reg, stmt.span);
                 },
                 AssignOp::PlusEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.add_eq(a, b, stmt.span)
                 },
                 AssignOp::MinusEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.sub_eq(a, b, stmt.span)
                 },
                 AssignOp::MultEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.mult_eq(a, b, stmt.span)
                 },
                 AssignOp::DivEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.div_eq(a, b, stmt.span)
                 },
                 AssignOp::ModEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.modulo_eq(a, b, stmt.span)
                 },
                 AssignOp::PowEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.pow_eq(a, b, stmt.span)
                 },
                 AssignOp::ShiftLeftEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.shl_eq(a, b, stmt.span)
                 },
                 AssignOp::ShiftRightEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.shr_eq(a, b, stmt.span)
                 },
                 AssignOp::BinAndEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.bin_and_eq(a, b, stmt.span)
                 },
                 AssignOp::BinOrEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::normal())?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::normal())?;
                     builder.bin_or_eq(a, b, stmt.span)
                 },
             },
@@ -634,7 +636,7 @@ impl<'a> Compiler<'a> {
                     let inner_scope =
                         self.derive_scope(scope, Some(ScopeType::Loop(b.block_path.clone())));
 
-                    let cond_reg = self.compile_expr(cond, scope, b, ExprType::Normal)?;
+                    let cond_reg = self.compile_expr(cond, scope, b, ExprType::normal())?;
                     b.exit_if_false(cond_reg, cond.span);
 
                     self.compile_stmts(code, inner_scope, b)?;
@@ -649,7 +651,7 @@ impl<'a> Compiler<'a> {
                 iterator,
                 code,
             } => {
-                let iter_exec = self.compile_expr(iterator, scope, builder, ExprType::Normal)?;
+                let iter_exec = self.compile_expr(iterator, scope, builder, ExprType::normal())?;
                 let iter_reg = builder.next_reg();
                 builder.wrap_iterator(iter_exec, iter_reg, iterator.span);
 
@@ -696,7 +698,7 @@ impl<'a> Compiler<'a> {
                         let inner_scope = self.derive_scope(scope, None);
                         // let fuck = outer_b.test();
                         outer_b.block(|b| {
-                            let cond_reg = self.compile_expr(cond, scope, b, ExprType::Normal)?;
+                            let cond_reg = self.compile_expr(cond, scope, b, ExprType::normal())?;
                             b.exit_if_false(cond_reg, cond.span);
                             self.compile_stmts(code, inner_scope, b)?;
 
@@ -760,7 +762,7 @@ impl<'a> Compiler<'a> {
 
                         outer_b.block(|b| {
                             let err_catch_reg =
-                                self.compile_expr(err_catch, scope, b, ExprType::Normal)?;
+                                self.compile_expr(err_catch, scope, b, ExprType::normal())?;
 
                             let cond_reg = b.next_reg();
                             b.eq(err_catch_reg, error_reg, cond_reg, stmt.span);
@@ -805,7 +807,7 @@ impl<'a> Compiler<'a> {
                                 }
 
                                 let ret_reg =
-                                    self.compile_expr(node, scope, builder, ExprType::Normal)?;
+                                    self.compile_expr(node, scope, builder, ExprType::normal())?;
                                 self.global_return =
                                     Some((items.iter().map(|i| i.0).collect(), stmt.span));
                                 builder.ret(ret_reg, true, stmt.span);
@@ -832,7 +834,7 @@ impl<'a> Compiler<'a> {
                         },
                         Some(expr) => {
                             let ret_reg =
-                                self.compile_expr(expr, scope, builder, ExprType::Normal)?;
+                                self.compile_expr(expr, scope, builder, ExprType::normal())?;
                             builder.ret(ret_reg, false, stmt.span)
                         },
                     }
@@ -880,7 +882,7 @@ impl<'a> Compiler<'a> {
                 let dict_reg = builder.next_reg();
                 self.build_dict(builder, items, dict_reg, scope, stmt.span)?;
 
-                let base_reg = self.compile_expr(base, scope, builder, ExprType::Normal)?;
+                let base_reg = self.compile_expr(base, scope, builder, ExprType::normal())?;
 
                 builder.do_impl(base_reg, dict_reg, stmt.span);
             },
@@ -942,7 +944,7 @@ impl<'a> Compiler<'a> {
                             }
 
                             elems.push((
-                                self.compile_expr(e, scope, builder, ExprType::Normal)?,
+                                self.compile_expr(e, scope, builder, ExprType::normal())?,
                                 false,
                             ));
                         }
@@ -954,9 +956,11 @@ impl<'a> Compiler<'a> {
 
                 builder.do_overload(array_reg, *op, stmt.span);
             },
-            Statement::ExtractImport(_) => todo!(),
+            Statement::ExtractImport(t) => {
+                self.extract_import(t, stmt.span, builder, scope)?;
+            },
             Statement::Dbg(v) => {
-                let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
+                let v = self.compile_expr(v, scope, builder, ExprType::normal())?;
                 builder.dbg(v);
             },
             Statement::Throw(err) => {
@@ -967,6 +971,34 @@ impl<'a> Compiler<'a> {
             },
         }
         Ok(())
+    }
+
+    fn extract_import(
+        &mut self,
+        t: &ImportType,
+        span: CodeSpan,
+        builder: &mut FuncBuilder,
+        scope: ScopeKey,
+    ) -> Result<(), CompilerError> {
+        let names = self.compile_import(t, span, self.src.clone())?;
+        let import_reg = builder.next_reg();
+        builder.import(import_reg, t.clone().spanned(span), span);
+        Ok(for name in names {
+            let var_reg = builder.next_reg();
+            let spur = self.intern(&name);
+
+            self.new_var(
+                spur,
+                Variable {
+                    mutable: false,
+                    def_span: span,
+                    reg: var_reg,
+                },
+                scope,
+            );
+
+            builder.member(import_reg, var_reg, self.resolve(&spur).spanned(span), span)
+        })
     }
 
     pub fn compile_pattern_check(
@@ -989,7 +1021,7 @@ impl<'a> Compiler<'a> {
                     },
                     scope,
                     builder,
-                    ExprType::Normal,
+                    ExprType::normal(),
                 )?;
                 let typeof_reg = builder.next_reg();
                 builder.type_of(expr_reg, typeof_reg, pattern.span);
@@ -1009,27 +1041,27 @@ impl<'a> Compiler<'a> {
                 builder.and(left, right, out_reg, pattern.span);
             },
             Pattern::Eq(val) => {
-                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                let val = self.compile_expr(val, scope, builder, ExprType::normal())?;
                 builder.eq(expr_reg, val, out_reg, pattern.span);
             },
             Pattern::Neq(val) => {
-                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                let val = self.compile_expr(val, scope, builder, ExprType::normal())?;
                 builder.neq(expr_reg, val, out_reg, pattern.span);
             },
             Pattern::Lt(val) => {
-                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                let val = self.compile_expr(val, scope, builder, ExprType::normal())?;
                 builder.lt(expr_reg, val, out_reg, pattern.span);
             },
             Pattern::Lte(val) => {
-                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                let val = self.compile_expr(val, scope, builder, ExprType::normal())?;
                 builder.lte(expr_reg, val, out_reg, pattern.span);
             },
             Pattern::Gt(val) => {
-                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                let val = self.compile_expr(val, scope, builder, ExprType::normal())?;
                 builder.gt(expr_reg, val, out_reg, pattern.span);
             },
             Pattern::Gte(val) => {
-                let val = self.compile_expr(val, scope, builder, ExprType::Normal)?;
+                let val = self.compile_expr(val, scope, builder, ExprType::normal())?;
                 builder.gte(expr_reg, val, out_reg, pattern.span);
             },
             Pattern::MacroPattern { .. } => {
@@ -1181,9 +1213,14 @@ impl<'a> Compiler<'a> {
 
         macro_rules! bin_op {
             ($left:ident $fn:ident $right:ident) => {{
-                let a = self.compile_expr(&$left, scope, builder, ExprType::Normal)?;
-                let b = self.compile_expr(&$right, scope, builder, ExprType::Normal)?;
-                builder.$fn(a, b, out_reg, expr.span)
+                let a = self.compile_expr(&$left, scope, builder, ExprType::normal())?;
+
+                let a1 = builder.next_reg();
+                builder.copy(a, a1, $left.span);
+
+                let b = self.compile_expr(&$right, scope, builder, ExprType::normal())?;
+
+                builder.$fn(a1, b, out_reg, expr.span)
             }};
         }
 
@@ -1252,7 +1289,7 @@ impl<'a> Compiler<'a> {
                 BinOp::And => bin_op!(left and right),
             },
             Expression::Unary(op, value) => {
-                let v = self.compile_expr(value, scope, builder, ExprType::Normal)?;
+                let v = self.compile_expr(value, scope, builder, ExprType::normal())?;
                 match op {
                     UnaryOp::ExclMark => builder.unary_not(v, out_reg, expr.span),
                     UnaryOp::Minus => builder.unary_negate(v, out_reg, expr.span),
@@ -1302,7 +1339,7 @@ impl<'a> Compiler<'a> {
                     |builder, elems| {
                         for item in items {
                             elems.push((
-                                self.compile_expr(item, scope, builder, ExprType::Normal)?,
+                                self.compile_expr(item, scope, builder, ExprType::normal())?,
                                 false,
                             ));
                         }
@@ -1324,14 +1361,14 @@ impl<'a> Compiler<'a> {
             },
             Expression::Maybe(e) => match e {
                 Some(e) => {
-                    let value = self.compile_expr(e, scope, builder, ExprType::Normal)?;
+                    let value = self.compile_expr(e, scope, builder, ExprType::normal())?;
                     builder.wrap_maybe(value, out_reg, expr.span)
                 },
                 None => builder.load_none(out_reg, expr.span),
             },
             Expression::Index { base, index } => {
                 let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
-                let index_reg = self.compile_expr(index, scope, builder, ExprType::Normal)?;
+                let index_reg = self.compile_expr(index, scope, builder, ExprType::normal())?;
                 builder.index(base_reg, out_reg, index_reg, expr.span)
             },
             Expression::Member { base, name } => {
@@ -1418,7 +1455,7 @@ impl<'a> Compiler<'a> {
                             MacroCode::Normal(stmts) => self.compile_stmts(stmts, base_scope, f)?,
                             MacroCode::Lambda(expr) => {
                                 let ret_reg =
-                                    self.compile_expr(expr, base_scope, f, ExprType::Normal)?;
+                                    self.compile_expr(expr, base_scope, f, ExprType::normal())?;
                                 f.ret(ret_reg, false, expr.span);
                             },
                         }
@@ -1453,7 +1490,7 @@ impl<'a> Compiler<'a> {
                                             d,
                                             scope,
                                             builder,
-                                            ExprType::Normal,
+                                            ExprType::normal(),
                                         )?)
                                     } else {
                                         None
@@ -1492,7 +1529,7 @@ impl<'a> Compiler<'a> {
                 params,
                 named_params,
             } => {
-                let base_reg = self.compile_expr(base, scope, builder, ExprType::Normal)?;
+                let base_reg = self.compile_expr(base, scope, builder, ExprType::normal())?;
                 let args_reg = builder.next_reg();
                 builder.new_array(
                     2,
@@ -1505,7 +1542,7 @@ impl<'a> Compiler<'a> {
                             |builder, elems| {
                                 for i in params {
                                     elems.push((
-                                        self.compile_expr(i, scope, builder, ExprType::Normal)?,
+                                        self.compile_expr(i, scope, builder, ExprType::normal())?,
                                         true,
                                     ));
                                 }
@@ -1520,8 +1557,12 @@ impl<'a> Compiler<'a> {
                             named_params_reg,
                             |builder, elems| {
                                 for (name, param) in named_params {
-                                    let value_reg =
-                                        self.compile_expr(param, scope, builder, ExprType::Normal)?;
+                                    let value_reg = self.compile_expr(
+                                        param,
+                                        scope,
+                                        builder,
+                                        ExprType::normal(),
+                                    )?;
 
                                     elems.push((
                                         self.resolve(&name.value).spanned(name.span),
@@ -1555,6 +1596,12 @@ impl<'a> Compiler<'a> {
 
                 builder.push_context_group(group_reg, expr.span);
                 builder.block(|b| {
+                    if let ExprType::Normal {
+                        pre_assign: Some(reg),
+                    } = expr_type
+                    {
+                        b.copy(group_reg, reg, expr.span);
+                    }
                     let inner_scope = self.derive_scope(
                         scope,
                         Some(ScopeType::TriggerFunc(self.make_area(expr.span))),
@@ -1564,35 +1611,35 @@ impl<'a> Compiler<'a> {
                 builder.pop_context_group(out_reg, expr.span);
             },
             Expression::TriggerFuncCall(e) => {
-                let reg = self.compile_expr(e, scope, builder, ExprType::Normal)?;
-                builder.call_trigger_func(reg);
+                let reg = self.compile_expr(e, scope, builder, ExprType::normal())?;
+                builder.call_trigger_func(reg, expr.span);
             },
             Expression::Ternary {
                 cond,
                 if_true,
                 if_false,
             } => {
-                let cond_reg = self.compile_expr(cond, scope, builder, ExprType::Normal)?;
+                let cond_reg = self.compile_expr(cond, scope, builder, ExprType::normal())?;
                 builder.block(|outer_b| {
                     let outer_path = outer_b.block_path.clone();
 
                     outer_b.block(|b| {
                         b.exit_if_false(cond_reg, cond.span);
-                        let reg = self.compile_expr(if_true, scope, b, ExprType::Normal)?;
+                        let reg = self.compile_expr(if_true, scope, b, ExprType::normal())?;
                         b.copy(reg, out_reg, expr.span);
 
                         b.exit_other_block(outer_path);
                         Ok(())
                     })?;
 
-                    let reg = self.compile_expr(if_false, scope, outer_b, ExprType::Normal)?;
+                    let reg = self.compile_expr(if_false, scope, outer_b, ExprType::normal())?;
                     outer_b.copy(reg, out_reg, expr.span);
 
                     Ok(())
                 })?;
             },
             Expression::Typeof(e) => {
-                let reg = self.compile_expr(e, scope, builder, ExprType::Normal)?;
+                let reg = self.compile_expr(e, scope, builder, ExprType::normal())?;
                 builder.type_of(reg, out_reg, expr.span);
             },
             Expression::Builtins => {
@@ -1619,7 +1666,7 @@ impl<'a> Compiler<'a> {
                     |builder, elems| {
                         for (key, expr) in items {
                             let value_reg =
-                                self.compile_expr(expr, scope, builder, ExprType::Normal)?;
+                                self.compile_expr(expr, scope, builder, ExprType::normal())?;
 
                             elems.push((*key, value_reg));
                         }
@@ -1649,7 +1696,7 @@ impl<'a> Compiler<'a> {
             |builder, elems| {
                 for (key, item, private) in items {
                     let value_reg = match item {
-                        Some(e) => self.compile_expr(e, scope, builder, ExprType::Normal)?,
+                        Some(e) => self.compile_expr(e, scope, builder, ExprType::normal())?,
                         None => match self.get_var(key.value, scope) {
                             Some(data) => data.reg,
                             None => {
@@ -1674,11 +1721,26 @@ impl<'a> Compiler<'a> {
         )?;
         Ok(())
     }
+
+    // fn compile_extract_import(
+    //     &self,
+    //     import_type: &ImportType,
+    //     internal: CodeSpan,
+    //     clone: SpwnSource,
+    // ) -> _ {
+    //     todo!()
+    // }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExprType {
-    Normal,
+    Normal { pre_assign: Option<UnoptRegister> },
     Assign(CodeSpan),
     // Match,
+}
+
+impl ExprType {
+    pub fn normal() -> Self {
+        Self::Normal { pre_assign: None }
+    }
 }

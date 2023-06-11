@@ -298,16 +298,6 @@ attributes! {
 
 /////////////////////////////
 
-pub trait ParseFromRaw<T> {
-    fn parse_from_raw(parser: &mut Parser<'_>, on: &T, attr: RawAttribute) -> ParseResult<Self>
-    where
-        Self: Sized;
-}
-
-pub trait ValidOn<T> {
-    fn is_valid(&self, attr: &T) -> bool;
-}
-
 #[rustfmt::skip]
 macro_rules! attributes2 {
     (
@@ -328,74 +318,45 @@ macro_rules! attributes2 {
             )*
         }
     ) => {
-        // impl ValidOn<$enum> for Expression {
-        //     fn is_valid(&self, attr: &$enum) -> bool {
-        //         match attr {
-        //             $(
-        //                 $enum::$variant {..} => {
-        //                     match self {
-        //                         $(
-        //                             $(
-        //                                 $(Self::$v_expr { .. } => true,)?
-        //                             )*
-        //                         )?
-        //                         _ => false
-        //                     }
-        //                 },
-        //             )*
-        //         }
-        //     }
-        // }
-
-        // impl ValidOn<$enum> for Statement {
-        //     fn is_valid(&self, attr: &$enum) -> bool {
-                // match attr {
-                //     $(
-                //         $enum::$variant {..} => {
-                //             match self {
-                //                 $(
-                //                     $(
-                //                         $(Self::$v_stmt { .. } => true,)?
-                //                     )*
-                //                 )?
-                //                 _ => false
-                //             }
-                //         },
-                //     )*
-                // }
-        //     }
-        // }
-
-        impl ParseFromRaw<Expression> for $enum {
-            fn parse_from_raw(parser: &mut Parser<'_>, on: &Expression, attr: RawAttribute) -> ParseResult<Self>
+        impl ParseAttribute for $enum {
+            fn parse(parser: &mut Parser<'_>) -> ParseResult<Self>
             where
                 Self: Sized 
             {
-                // match attr {
-                //     $(
-                //         $enum::$variant {..} => {
-                //             match self {
-                //                 $(
-                //                     $(
-                //                         $(Self::$v_stmt { .. } => true,)?
-                //                     )*
-                //                 )?
-                //                 _ => false
-                //             }
-                //         },
-                //     )*
-                // }
+                // the #[ and ] are already consumed by the parser
+                parser.expect_tok(Token::Ident)?;
 
-                todo!()
-            }
-        }
+                paste! {
+                    match parser.slice() {
+                        $(
+                            stringify!([< $variant:snake >]) => {
+                                $(
+                                    stringify!($typ1);
+                                    if parser.next_is(Token::LParen) {
+                                        parser.next();
+                                    } else if {
+                                        #[allow(unreachable_code, unused_labels)]
+                                        'v: {
+                                            $(break 'v false; stringify!($typ);)*
+                                            parser.next_is(Token::Assign)
+                                        }
+                                    } {
+                                        parser.next();
+                                    }
+                                )?
 
-        impl ParseFromRaw<Statement> for $enum {
-            fn parse_from_raw(parser: &mut Parser<'_>, on: &Statement, attr: RawAttribute) -> ParseResult<Self>
-            where
-                Self: Sized 
-            {
-                todo!()
+                                
+                                // $variant $(
+                                //     ({
+                                //         parser.slice()
+                                //     })
+                                // )?
+                                todo!()
+                            },
+                        )*
+                        _ => todo!(),
+                    }
+                }
             }
         }
 
@@ -405,17 +366,7 @@ macro_rules! attributes2 {
                 $variant $( ( $typ1 $(,$typ)*) )? $( { $field1: $f_typ1, $($field: $f_typ,)* } )?,
             )*
         }
-
-        impl ParseAttribute for $enum {
-            fn parse(parser: &mut Parser) -> ParseResult<$enum> {
-                todo!()
-            }
-        }
     };
-}
-
-pub struct RawAttribute {
-    tokens: Vec<Token>,
 }
 
 attributes2! {
