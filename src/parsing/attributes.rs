@@ -323,7 +323,7 @@ macro_rules! attributes2 {
             where
                 Self: Sized 
             {
-                // the #[ and ] are already consumed by the parser
+                // the #[ are already consumed by the parser
                 parser.expect_tok(Token::Ident)?;
 
                 paste! {
@@ -344,13 +344,29 @@ macro_rules! attributes2 {
                                         parser.next();
                                     }
                                 )?
-
                                 
-                                // $variant $(
-                                //     ({
-                                //         parser.slice()
-                                //     })
-                                // )?
+                                let mut found = 0;
+                                
+                                $enum::$variant $(
+                                    (
+                                        {
+                                            parser.next();
+                                            <$typ1 as std::str::FromStr>::from_str(parser.slice()).map_err(|_| SyntaxError::InvalidAttributeArgType {
+                                                area: parser.make_area(parser.span()),
+                                                expected: stringify!($typ1),
+                                            })?
+                                        }
+                                        $(
+                                            {
+                                                parser.skip_tok(Token::Comma);
+                                                <$typ as std::str::FromStr>::from_str(parser.slice()).map_err(|_| SyntaxError::InvalidAttributeArgType {
+                                                    area: parser.make_area(parser.span()),
+                                                    expected: stringify!($typ),
+                                                })?
+                                            }
+                                        )*
+                                    );
+                                )?
                                 todo!()
                             },
                         )*

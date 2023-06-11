@@ -186,6 +186,18 @@ error_maker! {
 
         /////////
         #[
+            Message: "Invalid type for attribute", Note: None;
+            Labels: [
+                area => "Attribute expected `{}`": expected;
+            ]
+        ]
+        InvalidAttributeArgType {
+            expected: &'static str,
+            area: CodeArea,
+        },
+
+        /////////
+        #[
             Message: "Invalid string type", Note: None;
             Labels: [
                 area => "Expected {} string": typ;
