@@ -94,6 +94,7 @@ macro_rules! attributes {
 
                                         if !field_names.contains(&&field[..]) {
                                             return Err(SyntaxError::InvalidAttributeField {
+                                                field,
                                                 area: parser.make_area(field_span),
                                                 attribute: attr_name,
                                                 fields: field_names.iter().map(|s| s.to_string()).collect()
@@ -343,11 +344,11 @@ macro_rules! attributes2 {
                 // the #[ are already consumed by the parser
                 parser.expect_tok(Token::Ident)?;
 
-                let attr_name = parser.slice();
+                let attr_name = parser.slice().to_string();
                 let attr_name_span = parser.span();
 
                 paste! {
-                    match attr_name {
+                    match &attr_name[..] {
                         $(
                             stringify!([< $variant:snake >]) => {
                                 $(
@@ -370,10 +371,57 @@ macro_rules! attributes2 {
                                         })
                                     }
                                 )?
+                                $(
+                                    const FIELD_NAMES: &[&str] = &[stringify!($field1) $(,stringify!($field))*];
+                                    let mut field_map: AHashMap<String, $crate::CodeSpan> = AHashMap::new();
+
+                                    parser.expect_tok(Token::LParen)?;
+
+                                    for _ in 0..FIELD_NAMES.len() {
+                                        parser.expect_tok(Token::Ident)?;
+                                        let name = parser.slice().to_string();
+
+                                        if !FIELD_NAMES.contains(&&name[..]) {
+                                            return Err(SyntaxError::InvalidAttributeField {
+                                                field: name.to_string(),
+                                                area: parser.make_area(parser.span()),
+                                                attribute: attr_name,
+                                                fields: FIELD_NAMES.iter().map(|s| s.to_string()).collect()
+                                            })
+                                        }
+
+                                        if let Some(prev_span) = field_map.get(&name) {
+                                            return Err(SyntaxError::DuplicateAttributeField {
+                                                field: name.to_string(),
+                                                used_again: parser.make_area(parser.span()),
+                                                first_used: parser.make_area(*prev_span),
+                                            })
+                                        }
+
+                                        field_map.insert(name, parser.span());
+
+                                        parser.expect_tok(Token::Assign)?;
+
+                                        //* parse
+
+
+                                    }
+
+                                    if field_map.len() != FIELD_NAMES.len() {
+                                        return Err(SyntaxError::InvalidAttributeArgCount2 {
+                                            attribute: stringify!([< $variant:snake >]).into(),
+                                            expected: FIELD_NAMES.len(),
+                                            found: field_map.len(),
+                                            area: parser.make_area(attr_name_span)
+                                        })
+                                    }
+
+                                    parser.expect_tok(Token::RParen)?;
+                                )?
 
                                 let mut found = 0;
 
-                                fn parse_t<T: ParseType>(parser: &mut Parser<'_>, found: &mut usize, span: $crate::CodeSpan, t_name: &'static str) -> ParseResult<T> {
+                                fn parse_t<T: ParseType>(parser: &mut Parser<'_>, found: &mut usize, span: $crate::CodeSpan) -> ParseResult<T> {
                                     const TUPLE_ARG_COUNT: usize = { 0 $(; [stringify!($typ1), $(stringify!($typ)),*].len() )? };
 
                                     if parser.next_is(Token::RSqBracket) {
@@ -391,19 +439,21 @@ macro_rules! attributes2 {
                                     }
                                 }
 
-                                let v = $enum::$variant $(
-                                    (
-                                        parse_t::<$typ1>(parser, &mut found, attr_name_span, stringify!($typ1))?,
-                                        $(
-                                            {
-                                                parser.expect_tok(Token::Comma)?;
-                                                parse_t::<$typ>(parser, &mut found, attr_name_span, stringify!($typ))?
-                                            },
-                                        )*
-                                    );
-                                )?
+                                // let v = $enum::$variant $(
+                                //     (
+                                //         parse_t::<$typ1>(parser, &mut found, attr_name_span)?,
+                                //         $(
+                                //             {
+                                //                 parser.expect_tok(Token::Comma)?;
+                                //                 parse_t::<$typ>(parser, &mut found, attr_name_span)?
+                                //             },
+                                //         )*
+                                //     );
+                                // )?
 
-                                Ok(v)
+
+                                // Ok(v)
+                                todo!()
                             },
                         )*
                         _ => todo!(),
@@ -423,7 +473,7 @@ macro_rules! attributes2 {
 
 attributes2! {
     pub enum AAA {
-        #[valid_on(Expression::Int, Statement::Let)] Doc(String),
+        #[valid_on(Expression::Int, Statement::Let)] Deprecated { since: String, note: String, },
     }
 }
 

@@ -147,10 +147,11 @@ error_maker! {
         #[
             Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are {}", attribute, fields.join(", ")));
             Labels: [
-                area => "Unexpected attribute";
+                area => "Unexpected field `{}`": field;
             ]
         ]
         InvalidAttributeField {
+            field: String,
             area: CodeArea,
             attribute: String,
             fields: Vec<String>,
