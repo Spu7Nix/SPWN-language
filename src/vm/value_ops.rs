@@ -162,6 +162,34 @@ pub fn in_op(
     })
 }
 
+pub fn has_op(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
+    Ok(match (&a.value, &b.value) {
+        (Value::Array(a), b) => {
+            todo!("I want to give an useful error instead of just spamming random text") // it's true
+        },
+
+        (Value::Dict(d), Value::String(s)) => {
+            Value::Bool(d.contains_key(&vm.intern(&s.iter().collect::<String>())))
+        },
+
+        _ => {
+            return Err(RuntimeError::InvalidOperands {
+                op: BinOp::Has,
+                a: (a.value.get_type(), a.area.clone()),
+                b: (b.value.get_type(), b.area.clone()),
+                area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
+            })
+        },
+    })
+}
+
 pub fn add(
     a: &StoredValue,
     b: &StoredValue,

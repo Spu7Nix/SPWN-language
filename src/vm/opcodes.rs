@@ -263,6 +263,8 @@ opcodes! {
     Range { => left, => right, => dest },
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} in R{b} -> R{x}"))]
     In { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} has R{b} -> R{x}"))]
+    Has { => left, => right, => dest },
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} as R{b} -> R{x}"))]
     As { => left, => right, => dest },
     // #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} is R{b} -> R{x}"))]

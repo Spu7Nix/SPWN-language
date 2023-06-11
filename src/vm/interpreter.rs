@@ -940,6 +940,9 @@ impl<'a> Vm<'a> {
                 Opcode::In { left, right, dest } => {
                     self.bin_op(vo::in_op, func, ip, left, right, dest, BinOp::In)?
                 },
+                Opcode::Has { left, right, dest } => {
+                    self.bin_op(vo::has_op, func, ip, left, right, dest, BinOp::Has)?
+                }
                 Opcode::As { left, right, dest } => {
                     let span = self.get_span(func, ip);
 
