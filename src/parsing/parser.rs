@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::os::windows::raw;
 use std::rc::Rc;
 use std::str::Chars;
 
@@ -11,7 +12,9 @@ use super::ast::{
     ObjectType, Pattern, PatternNode, Spannable, Spanned, Statement, Statements, StmtNode,
     StringContent, StringType,
 };
-use super::attributes::{ExprAttribute, FileAttribute, IsValidOn, ParseAttribute, StmtAttribute};
+use super::attributes::{
+    ExprAttribute, FileAttribute, IsValidOn, ParseAttribute, StmtAttribute, AAA,
+};
 use super::error::SyntaxError;
 use super::utils::operators::{self, unary_prec};
 use crate::gd::ids::IDClass;
@@ -203,6 +206,7 @@ impl Parser<'_> {
     pub fn parse_string(&self, s: &str, span: CodeSpan) -> ParseResult<StringType> {
         let mut chars = s.chars();
 
+        // TODO: a single character is a valid string in attributes cause this deletes it so it will never error
         // Remove trailing "
         chars.next_back();
 
@@ -1467,6 +1471,10 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> ParseResult<Ast> {
+        // self.next();
+        // self.next();
+        // dbg!(self.parse_attributes::<AAA>()?);
+
         let file_attributes = if self.next_are(&[Token::Hashtag, Token::ExclMark]) {
             self.next();
             self.next();

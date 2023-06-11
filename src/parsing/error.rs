@@ -184,17 +184,36 @@ error_maker! {
             area: CodeArea,
         },
 
+
+
         /////////
         #[
-            Message: "Invalid type for attribute", Note: None;
+            Message: "Invalid number of arguments", Note: None;
             Labels: [
-                area => "Attribute expected `{}`": expected;
+                area => "Attribute `{}` expected {} arguments, found `{}`": attribute, expected, found;
             ]
         ]
-        InvalidAttributeArgType {
-            expected: &'static str,
+        InvalidAttributeArgCount2 {
+            attribute: String,
+            expected: usize,
+            found: usize,
+
             area: CodeArea,
         },
+
+        // /////////
+        // #[
+        //     Message: "Invalid type for attribute", Note: None;
+        //     Labels: [
+        //         area => "Attribute expected `{}`": expected;
+        //     ]
+        // ]
+        // InvalidAttributeArgType {
+        //     expected: &'static str,
+        //     area: CodeArea,
+        // },
+
+
 
         /////////
         #[

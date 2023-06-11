@@ -1,3 +1,5 @@
+#![doc = j]
+
 // wait = (time: @int | @float | @epsilon = $.epsilon()) {
 // 	if time == $.epsilon() || time > 0 {
 // 		$.add( trigger{
@@ -32,7 +34,7 @@
 //     cock!
 // }
 
-extract import "test2.spwn"
+// extract import "test2.spwn"
 
-$.print(penis)
-$.print(fuck)
+// $.print(penis)
+// $.print(fuck)

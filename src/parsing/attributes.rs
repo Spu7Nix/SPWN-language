@@ -298,6 +298,23 @@ attributes! {
 
 /////////////////////////////
 
+pub trait ParseType {
+    fn parse(parser: &mut Parser) -> ParseResult<Self>
+    where
+        Self: Sized;
+}
+
+// TODO: mayb move individual parser functions into here for less code duplication
+impl ParseType for String {
+    fn parse(parser: &mut Parser) -> ParseResult<Self>
+    where
+        Self: Sized,
+    {
+        // do string parsing logic here rather than calling the string parsing function?
+        Ok(parser.resolve(&parser.parse_plain_string(parser.slice(), parser.span())?))
+    }
+}
+
 #[rustfmt::skip]
 macro_rules! attributes2 {
     (
@@ -321,13 +338,16 @@ macro_rules! attributes2 {
         impl ParseAttribute for $enum {
             fn parse(parser: &mut Parser<'_>) -> ParseResult<Self>
             where
-                Self: Sized 
+                Self: Sized
             {
                 // the #[ are already consumed by the parser
                 parser.expect_tok(Token::Ident)?;
 
+                let attr_name = parser.slice();
+                let attr_name_span = parser.span();
+
                 paste! {
-                    match parser.slice() {
+                    match attr_name {
                         $(
                             stringify!([< $variant:snake >]) => {
                                 $(
@@ -342,32 +362,48 @@ macro_rules! attributes2 {
                                         }
                                     } {
                                         parser.next();
+                                    } else {
+                                        return Err(SyntaxError::UnexpectedToken {
+                                            expected: format!("({}", { " or =" $(; stringify!($typ); "")* }),
+                                            found: parser.next(),
+                                            area: parser.make_area(parser.span()),
+                                        })
                                     }
                                 )?
-                                
+
                                 let mut found = 0;
-                                
-                                $enum::$variant $(
+
+                                fn parse_t<T: ParseType>(parser: &mut Parser<'_>, found: &mut usize, span: $crate::CodeSpan, t_name: &'static str) -> ParseResult<T> {
+                                    const TUPLE_ARG_COUNT: usize = { 0 $(; [stringify!($typ1), $(stringify!($typ)),*].len() )? };
+
+                                    if parser.next_is(Token::RSqBracket) {
+                                        return Err(SyntaxError::InvalidAttributeArgCount2 {
+                                            attribute: stringify!([< $variant:snake >]).into(),
+                                            expected: TUPLE_ARG_COUNT,
+                                            found: *found,
+                                            area: parser.make_area(span)
+                                        })
+                                    } else {
+                                        parser.next();
+                                        let v = <T as ParseType>::parse(parser);
+                                        *found += 1;
+                                        v
+                                    }
+                                }
+
+                                let v = $enum::$variant $(
                                     (
-                                        {
-                                            parser.next();
-                                            <$typ1 as std::str::FromStr>::from_str(parser.slice()).map_err(|_| SyntaxError::InvalidAttributeArgType {
-                                                area: parser.make_area(parser.span()),
-                                                expected: stringify!($typ1),
-                                            })?
-                                        }
+                                        parse_t::<$typ1>(parser, &mut found, attr_name_span, stringify!($typ1))?,
                                         $(
                                             {
-                                                parser.skip_tok(Token::Comma);
-                                                <$typ as std::str::FromStr>::from_str(parser.slice()).map_err(|_| SyntaxError::InvalidAttributeArgType {
-                                                    area: parser.make_area(parser.span()),
-                                                    expected: stringify!($typ),
-                                                })?
-                                            }
+                                                parser.expect_tok(Token::Comma)?;
+                                                parse_t::<$typ>(parser, &mut found, attr_name_span, stringify!($typ))?
+                                            },
                                         )*
                                     );
                                 )?
-                                todo!()
+
+                                Ok(v)
                             },
                         )*
                         _ => todo!(),
@@ -392,6 +428,7 @@ attributes2! {
 }
 
 /*
+
 
 attribute:
 name,

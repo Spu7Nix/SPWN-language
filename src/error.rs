@@ -1,6 +1,6 @@
 use std::io::{BufWriter, Write};
 
-use ariadne::{sources, Label, Report, ReportKind, Config, CharSet};
+use ariadne::{sources, CharSet, Config, Label, Report, ReportKind};
 
 use crate::sources::CodeArea;
 use crate::util::hsv_to_rgb;
@@ -20,10 +20,12 @@ impl std::fmt::Display for ErrorReport {
 
         let charset = match std::env::var("USE_ASCII").ok() {
             Some(_) => CharSet::Ascii,
-            None => CharSet::Unicode
+            None => CharSet::Unicode,
         };
 
-        let mut report = Report::build(ReportKind::Error, "", 0).with_config(Config::default().with_char_set(charset)).with_message(&self.message);
+        let mut report = Report::build(ReportKind::Error, "", 0)
+            .with_config(Config::default().with_char_set(charset))
+            .with_message(&self.message);
 
         let mut source_vec = vec![];
 
