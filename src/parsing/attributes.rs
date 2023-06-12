@@ -305,15 +305,27 @@ pub trait ParseType {
         Self: Sized;
 }
 
-// TODO: mayb move individual parser functions into here for less code duplication
-impl ParseType for String {
-    fn parse(parser: &mut Parser) -> ParseResult<Self>
-    where
-        Self: Sized,
-    {
-        // do string parsing logic here rather than calling the string parsing function?
-        Ok(parser.resolve(&parser.parse_plain_string(parser.slice(), parser.span())?))
-    }
+// // TODO: mayb move individual parser functions into here for less code duplication
+// impl ParseType for String {
+//     fn parse(parser: &mut Parser) -> ParseResult<Self>
+//     where
+//         Self: Sized,
+//     {
+//         parser.expect_tok(Token::String);
+//         // do string parsing logic here rather than calling the string parsing function?
+//         Ok(parser.resolve(&parser.parse_plain_string(parser.slice(), parser.span())?))
+//     }
+// }
+fn into_t<T: std::str::FromStr>(
+    parser: &mut Parser,
+    s: &str,
+    span: crate::CodeSpan,
+    t_name: &'static str,
+) -> ParseResult<T> {
+    T::from_str(s).map_err(|_| SyntaxError::InvalidAttributeArgType {
+        expected: t_name,
+        area: parser.make_area(span),
+    })
 }
 
 #[rustfmt::skip]
@@ -336,6 +348,7 @@ macro_rules! attributes2 {
             )*
         }
     ) => {
+        #[allow(unused_variables, unused_mut, dead_code)]
         impl ParseAttribute for $enum {
             fn parse(parser: &mut Parser<'_>) -> ParseResult<Self>
             where
@@ -351,6 +364,28 @@ macro_rules! attributes2 {
                     match &attr_name[..] {
                         $(
                             stringify!([< $variant:snake >]) => {
+                                let mut found = 0;
+                                fn parse_t<T: std::str::FromStr>(parser: &mut Parser<'_>, found: &mut usize, span: $crate::CodeSpan, t_name: &'static str) -> ParseResult<T> {
+                                    const COUNT: usize = {
+                                        0
+                                        $(; [stringify!($typ1), $(stringify!($typ)),*].len() )?
+                                        $(; [stringify!($field1), $(stringify!($field)),*].len() )?
+                                    };
+
+                                    if parser.next_is(Token::RSqBracket) {
+                                        return Err(SyntaxError::InvalidAttributeArgCount2 {
+                                            attribute: stringify!([< $variant:snake >]).into(),
+                                            expected: COUNT,
+                                            found: *found,
+                                            area: parser.make_area(span)
+                                        })
+                                    } else {
+                                        let v = into_t::<T>(parser, &parse_string!(parser), parser.span(), t_name);
+                                        *found += 1;
+                                        v
+                                    }
+                                }
+
                                 $(
                                     stringify!($typ1);
                                     if parser.next_is(Token::LParen) {
@@ -373,11 +408,11 @@ macro_rules! attributes2 {
                                 )?
                                 $(
                                     const FIELD_NAMES: &[&str] = &[stringify!($field1) $(,stringify!($field))*];
-                                    let mut field_map: AHashMap<String, $crate::CodeSpan> = AHashMap::new();
+                                    let mut field_map: AHashMap<String, ($crate::CodeSpan, String)> = AHashMap::new();
 
                                     parser.expect_tok(Token::LParen)?;
 
-                                    for _ in 0..FIELD_NAMES.len() {
+                                    for i in 0..FIELD_NAMES.len() {
                                         parser.expect_tok(Token::Ident)?;
                                         let name = parser.slice().to_string();
 
@@ -390,7 +425,7 @@ macro_rules! attributes2 {
                                             })
                                         }
 
-                                        if let Some(prev_span) = field_map.get(&name) {
+                                        if let Some((prev_span, _)) = field_map.get(&name) {
                                             return Err(SyntaxError::DuplicateAttributeField {
                                                 field: name.to_string(),
                                                 used_again: parser.make_area(parser.span()),
@@ -398,14 +433,17 @@ macro_rules! attributes2 {
                                             })
                                         }
 
-                                        field_map.insert(name, parser.span());
-
                                         parser.expect_tok(Token::Assign)?;
+                                        parser.expect_tok(Token::String)?;
 
-                                        //* parse
+                                        field_map.insert(name, (parser.span(), parse_string!(parser)));
 
-
+                                        if i < FIELD_NAMES.len() - 1 {
+                                            parser.expect_tok(Token::Comma)?;
+                                        }
                                     }
+
+                                    parser.skip_tok(Token::Comma);
 
                                     if field_map.len() != FIELD_NAMES.len() {
                                         return Err(SyntaxError::InvalidAttributeArgCount2 {
@@ -419,44 +457,42 @@ macro_rules! attributes2 {
                                     parser.expect_tok(Token::RParen)?;
                                 )?
 
-                                let mut found = 0;
-
-                                fn parse_t<T: ParseType>(parser: &mut Parser<'_>, found: &mut usize, span: $crate::CodeSpan) -> ParseResult<T> {
-                                    const TUPLE_ARG_COUNT: usize = { 0 $(; [stringify!($typ1), $(stringify!($typ)),*].len() )? };
-
-                                    if parser.next_is(Token::RSqBracket) {
-                                        return Err(SyntaxError::InvalidAttributeArgCount2 {
-                                            attribute: stringify!([< $variant:snake >]).into(),
-                                            expected: TUPLE_ARG_COUNT,
-                                            found: *found,
-                                            area: parser.make_area(span)
-                                        })
-                                    } else {
-                                        parser.next();
-                                        let v = <T as ParseType>::parse(parser);
-                                        *found += 1;
-                                        v
+                                Ok($enum::$variant $(
+                                    (
+                                        parse_t::<$typ1>(parser, &mut found, attr_name_span, stringify!($typ1))?,
+                                        $(
+                                            {
+                                                parser.expect_tok(Token::Comma)?;
+                                                parser.expect_tok(Token::String)?;
+                                                parse_t::<$typ>(parser, &mut found, attr_name_span, stringify!($typ))?
+                                            },
+                                        )*
+                                    )
+                                )?
+                                $(
+                                    {
+                                        $field1: {
+                                            let (span, s) = &field_map[stringify!($field1)];
+                                            into_t::<$f_typ1>(parser, s, *span, stringify!($f_typ1))?
+                                        },
+                                        $(
+                                            $field: {
+                                                let (span, s) = &field_map[stringify!($field)];
+                                                into_t::<$f_typ>(parser, s, *span, stringify!($f_typ))?
+                                            },
+                                        )*
                                     }
-                                }
-
-                                // let v = $enum::$variant $(
-                                //     (
-                                //         parse_t::<$typ1>(parser, &mut found, attr_name_span)?,
-                                //         $(
-                                //             {
-                                //                 parser.expect_tok(Token::Comma)?;
-                                //                 parse_t::<$typ>(parser, &mut found, attr_name_span)?
-                                //             },
-                                //         )*
-                                //     );
-                                // )?
-
-
-                                // Ok(v)
-                                todo!()
+                                )?)
                             },
                         )*
-                        _ => todo!(),
+                        _ => Err(SyntaxError::UnknownAttribute {
+                            area: parser.make_area(attr_name_span),
+                            attribute: attr_name,
+                            valid: paste!(vec![$(hyperlink(
+                                "https://spu7nix.net/spwn/#/attributes?id=attributes",
+                                Some(stringify!([<$variant:snake>]))
+                            )),*])
+                        }),
                     }
                 }
             }
@@ -473,32 +509,7 @@ macro_rules! attributes2 {
 
 attributes2! {
     pub enum AAA {
+        #[valid_on(Expression::Int, Statement::Let)] A,
         #[valid_on(Expression::Int, Statement::Let)] Deprecated { since: String, note: String, },
     }
 }
-
-/*
-
-
-attribute:
-name,
-arguments -> 1 arg allow #[x(...)] and #[x = ...] syntax
-
-
-#[doc = "aaa"]
-#[doc("aaaa")]
-
-#[no_optimize]
-
-attributes! {
-    pub enum StmtAttribute {
-        #[valid_on(Expression::Arrow)] Doc(String),
-
-        #[valid_on(Let, TypeDef)]
-        Deprecated { since: String, note: String, },
-    }
-}
-
-#[doc("aaa")] a: 10
-a: #[doc("aaa")] 10
- */

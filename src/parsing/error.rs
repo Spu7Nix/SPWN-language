@@ -130,7 +130,7 @@ error_maker! {
                 area => "Attribute `{}` cannot be added to this expression": attr;
 
                 expr_area => "{}": =>(match valid {
-                    Some(v) => format!("The valid attributes for this expression are: {}", v.join(", ")),
+                    Some(v) => format!("The valid attributes for this expression are: `{}`", v.join(", ")),
                     None => "This expression doesn't support any attributes".into(),
                 });
             ]
@@ -145,7 +145,7 @@ error_maker! {
 
         /////////
         #[
-            Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are {}", attribute, fields.join(", ")));
+            Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are `{}`", attribute, fields.join(", ")));
             Labels: [
                 area => "Unexpected field `{}`": field;
             ]
@@ -202,17 +202,17 @@ error_maker! {
             area: CodeArea,
         },
 
-        // /////////
-        // #[
-        //     Message: "Invalid type for attribute", Note: None;
-        //     Labels: [
-        //         area => "Attribute expected `{}`": expected;
-        //     ]
-        // ]
-        // InvalidAttributeArgType {
-        //     expected: &'static str,
-        //     area: CodeArea,
-        // },
+        /////////
+        #[
+            Message: "Invalid type for attribute", Note: None;
+            Labels: [
+                area => "Attribute expected string literal `{}`": expected;
+            ]
+        ]
+        InvalidAttributeArgType {
+            expected: &'static str,
+            area: CodeArea,
+        },
 
 
 
