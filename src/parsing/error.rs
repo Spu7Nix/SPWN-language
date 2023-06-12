@@ -127,11 +127,11 @@ error_maker! {
         #[
             Message: "Mismatched attribute", Note: None;
             Labels: [
-                area => "Attribute `{}` cannot be added to this expression": attr;
+                area => "Attribute `{}` cannot be added to this element": attr;
 
                 expr_area => "{}": =>(match valid {
-                    Some(v) => format!("The valid attributes for this expression are: `{}`", v.join(", ")),
-                    None => "This expression doesn't support any attributes".into(),
+                    Some(v) => format!("The valid attributes for this element are: `{}`", v.join(", ")),
+                    None => "This element doesn't support any attributes".into(),
                 });
             ]
         ]

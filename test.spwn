@@ -1,4 +1,7 @@
-#![fgfdg]
+
+
+#[doc]
+-> aaa
 
 // wait = (time: @int | @float | @epsilon = $.epsilon()) {
 // 	if time == $.epsilon() || time > 0 {

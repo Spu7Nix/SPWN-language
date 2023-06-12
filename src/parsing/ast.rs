@@ -4,7 +4,7 @@ use delve::{EnumDisplay, EnumToStr};
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
-use super::attributes::{ExprAttribute, FileAttribute, StmtAttribute};
+use super::attributes::{Attributes, FileAttribute};
 use super::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
@@ -95,7 +95,7 @@ pub enum MacroCode {
 #[derive(Debug, Clone)]
 pub struct ExprNode {
     pub expr: Box<Expression>,
-    pub attributes: Vec<ExprAttribute>,
+    pub attributes: Vec<Attributes>,
     pub span: CodeSpan,
 }
 
@@ -103,7 +103,7 @@ pub struct ExprNode {
 #[derive(Debug, Clone)]
 pub struct StmtNode {
     pub stmt: Box<Statement>,
-    pub attributes: Vec<Spanned<StmtAttribute>>,
+    pub attributes: Vec<Spanned<Attributes>>,
     pub span: CodeSpan,
 }
 
@@ -223,7 +223,7 @@ pub enum Expression {
     },
 
     TriggerFunc {
-        attributes: Vec<ExprAttribute>,
+        attributes: Vec<Attributes>,
         code: Statements,
     },
 
@@ -341,7 +341,7 @@ pub enum Pattern<T, P, E> {
 }
 
 impl Expression {
-    pub fn into_node(self, attributes: Vec<ExprAttribute>, span: CodeSpan) -> ExprNode {
+    pub fn into_node(self, attributes: Vec<Attributes>, span: CodeSpan) -> ExprNode {
         ExprNode {
             expr: Box::new(self),
             attributes,
@@ -350,7 +350,7 @@ impl Expression {
     }
 }
 impl Statement {
-    pub fn into_node(self, attributes: Vec<Spanned<StmtAttribute>>, span: CodeSpan) -> StmtNode {
+    pub fn into_node(self, attributes: Vec<Spanned<Attributes>>, span: CodeSpan) -> StmtNode {
         StmtNode {
             stmt: Box::new(self),
             attributes,

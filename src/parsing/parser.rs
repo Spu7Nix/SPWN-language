@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::os::windows::raw;
 use std::rc::Rc;
 use std::str::Chars;
 
@@ -12,9 +11,7 @@ use super::ast::{
     ObjectType, Pattern, PatternNode, Spannable, Spanned, Statement, Statements, StmtNode,
     StringContent, StringType,
 };
-use super::attributes::{
-    ExprAttribute, FileAttribute, IsValidOn, ParseAttribute, StmtAttribute, AAA,
-};
+use super::attributes::{Attributes, FileAttribute, IsValidOn, ParseAttribute};
 use super::error::SyntaxError;
 use super::utils::operators::{self, unary_prec};
 use crate::gd::ids::IDClass;
@@ -527,7 +524,7 @@ impl Parser<'_> {
         let attrs = if self.next_is(Token::Hashtag) {
             self.next();
 
-            self.parse_attributes::<ExprAttribute>()?
+            self.parse_attributes::<Attributes>()?
         } else {
             vec![]
         };
@@ -858,7 +855,6 @@ impl Parser<'_> {
 
                     Expression::Array(elems).spanned(start.extend(self.span()))
                 },
-
                 typ @ (Token::Obj | Token::Trigger) => {
                     self.next();
 
@@ -998,7 +994,6 @@ impl Parser<'_> {
                         if_false,
                     }
                 }
-
                 Token::Is => {
                     self.next();
                     let typ = self.parse_pattern()?;
@@ -1184,9 +1179,10 @@ impl Parser<'_> {
                     | Token::Overload
                     | Token::Extract
                     | Token::Dbg
+                    | Token::Arrow
             ) {
                 self.next();
-                self.parse_attributes::<StmtAttribute>()?
+                self.parse_attributes::<Attributes>()?
             } else {
                 vec![]
             }
@@ -1471,10 +1467,6 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> ParseResult<Ast> {
-        // self.next();
-        // self.next();
-        // dbg!(self.parse_attributes::<AAA>()?);
-
         let file_attributes = if self.next_are(&[Token::Hashtag, Token::ExclMark]) {
             self.next();
             self.next();
