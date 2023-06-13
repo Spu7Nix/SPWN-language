@@ -56,25 +56,6 @@ macro_rules! attributes {
                 let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
 
                 paste! {
-                    $(
-                        $(
-                            $(
-                                $(
-                                    map.entry(
-                                        stringify!($v_expr)
-                                    )
-                                    .and_modify( |v| v.push(
-                                        stringify!([<$variant:snake>])
-                                            .to_string()
-                                    ))
-                                    .or_insert(vec![
-                                        stringify!([<$variant:snake>]).to_string()
-                                    ]);
-                                )?
-                            )*
-                        )?
-                    )*
-
                     for attr in self {
                         match &attr.value {
                             $(
@@ -88,7 +69,25 @@ macro_rules! attributes {
                                         area: src.area(attr.span),
                                         expr_area: src.area(node.span),
                                         attr: stringify!([< $variant:snake >]).into(),
-                                        valid: map.remove(Into::<&'static str>::into(other)),
+                                        valid: {
+                                            $(
+                                                $(
+                                                    $(
+                                                        map.entry(
+                                                            stringify!($v_expr)
+                                                        )
+                                                        .and_modify( |v| v.push(
+                                                            stringify!([<$variant:snake>])
+                                                                .to_string()
+                                                        ))
+                                                        .or_insert(vec![
+                                                            stringify!([<$variant:snake>]).to_string()
+                                                        ]);
+                                                    )?
+                                                )*
+                                            )?
+                                            map.remove(Into::<&'static str>::into(other))
+                                        },
                                     }),
                                 }
                             )*
@@ -105,25 +104,6 @@ macro_rules! attributes {
                 let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
 
                 paste! {
-                    $(
-                        $(
-                            $(
-                                $(
-                                    map.entry(
-                                        stringify!($v_stmt)
-                                    )
-                                    .and_modify( |v| v.push(
-                                        stringify!([<$variant:snake>])
-                                            .to_string()
-                                    ))
-                                    .or_insert(vec![
-                                        stringify!([<$variant:snake>]).to_string()
-                                    ]);
-                                )?
-                            )*
-                        )?
-                    )*
-
                     for attr in self {
                         match &attr.value {
                             $(
@@ -137,7 +117,25 @@ macro_rules! attributes {
                                         area: src.area(attr.span),
                                         expr_area: src.area(node.span),
                                         attr: stringify!([< $variant:snake >]).into(),
-                                        valid: map.remove(Into::<&'static str>::into(other)),
+                                        valid: {
+                                            $(
+                                                $(
+                                                    $(
+                                                        map.entry(
+                                                            stringify!($v_stmt)
+                                                        )
+                                                        .and_modify( |v| v.push(
+                                                            stringify!([<$variant:snake>])
+                                                                .to_string()
+                                                        ))
+                                                        .or_insert(vec![
+                                                            stringify!([<$variant:snake>]).to_string()
+                                                        ]);
+                                                    )?
+                                                )*
+                                            )?
+                                            map.remove(Into::<&'static str>::into(other))
+                                        },
                                     }),
                                 }
                             )*
@@ -251,7 +249,7 @@ macro_rules! attributes {
                                     parser.skip_tok(Token::Comma);
 
                                     if field_map.len() != FIELD_NAMES.len() {
-                                        return Err(SyntaxError::InvalidAttributeArgCount2 {
+                                        return Err(SyntaxError::InvalidAttributeArgCount {
                                             attribute: stringify!([< $variant:snake >]).into(),
                                             expected: FIELD_NAMES.len(),
                                             found: field_map.len(),
@@ -259,7 +257,7 @@ macro_rules! attributes {
                                         })
                                     }
 
-                                    parser.expect_tok(Token::RParen);
+                                    parser.expect_tok(Token::RParen)?;
                                 )?
 
                                 let mut i = 0;
@@ -328,21 +326,33 @@ attributes! {
     pub enum FileAttribute {
         CacheOutput,
         NoStd,
+
+        Doc(String),
     }
 }
+
+pub type SemVer = semver::Version;
 
 attributes! {
     pub enum Attributes {
         #[valid_on(Expression::TriggerFunc)]
         NoOptimize,
 
-        // #[valid_on(Expression::TriggerFunc, Expression::Macro)]
-        // DebugBytecode,
+        #[valid_on(Expression::TriggerFunc, Expression::Macro)]
+        DebugBytecode,
 
-        // #[valid_on(Statement::Let, Statement::TypeDef)]
-        // Deprecated { since: String, note: String, },
+        #[valid_on(
+            Statement::TypeDef,
+            Statement::Let,
+            Statement::AssignOp,
+        )]
+        Deprecated { since: SemVer, note: String, },
 
-        #[valid_on(Statement::Arrow)]
+        #[valid_on(
+            Statement::TypeDef,
+            Statement::Let,
+            Statement::AssignOp,
+        )]
         Doc(String),
     }
 }

@@ -26,6 +26,7 @@ hex-serde = "0.1.0"
 home = "0.5.4"
 rand = "0.8.5"
 slab = "0.4.8"
+semver = "1.0.17"
 
 quick-xml = "0.27.1"
 libflate = "1.1.0"

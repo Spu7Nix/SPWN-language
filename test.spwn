@@ -1,7 +1,7 @@
 
 
-#[doc]
--> aaa
+#[deprecated(since = "100", note = "dfdxijfg")]
+let a = 10;
 
 // wait = (time: @int | @float | @epsilon = $.epsilon()) {
 // 	if time == $.epsilon() || time > 0 {

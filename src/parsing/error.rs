@@ -175,26 +175,10 @@ error_maker! {
         #[
             Message: "Invalid number of arguments", Note: None;
             Labels: [
-                area => "Attribute `{}` expected {} arguments": attribute, expected;
-            ]
-        ]
-        InvalidAttributeArgCount {
-            attribute: String,
-            expected: usize,
-
-            area: CodeArea,
-        },
-
-
-
-        /////////
-        #[
-            Message: "Invalid number of arguments", Note: None;
-            Labels: [
                 area => "Attribute `{}` expected {} arguments, found `{}`": attribute, expected, found;
             ]
         ]
-        InvalidAttributeArgCount2 {
+        InvalidAttributeArgCount {
             attribute: String,
             expected: usize,
             found: usize,
@@ -206,15 +190,13 @@ error_maker! {
         #[
             Message: "Invalid type for attribute", Note: None;
             Labels: [
-                area => "Attribute expected string literal `{}`": expected;
+                area => "Attribute expected type `{}` as string literal": expected;
             ]
         ]
         InvalidAttributeArgType {
             expected: &'static str,
             area: CodeArea,
         },
-
-
 
         /////////
         #[
