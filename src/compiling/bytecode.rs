@@ -13,15 +13,15 @@ use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 use super::compiler::{CompileResult, CustomTypeKey};
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
+use crate::interpreting::opcodes::{
+    FunctionID, ImportID, Opcode, Register, TryCatchID, UnoptOpcode, UnoptRegister,
+};
+use crate::interpreting::pattern::ConstPattern;
+use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{ImportType, MacroArg, ObjKeyType, ObjectType, Spannable, Spanned};
 use crate::parsing::utils::operators::Operator;
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
-use crate::vm::opcodes::{
-    FunctionID, ImportID, Opcode, Register, TryCatchID, UnoptOpcode, UnoptRegister,
-};
-use crate::vm::pattern::ConstPattern;
-use crate::vm::value::ValueType;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
@@ -32,8 +32,7 @@ where
     for<'de3> Vec<R>: Serialize + Deserialize<'de3>,
 {
     pub opcodes: Vec<Opcode<R>>,
-    // always 0 for unoptimised bytecode
-    // populated only after optimisation
+
     pub regs_used: usize,
 
     pub arg_amount: usize,

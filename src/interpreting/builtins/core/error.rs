@@ -1,4 +1,4 @@
-use crate::vm::builtins::builtin_utils::impl_type;
+use crate::interpreting::builtins::builtin_utils::impl_type;
 
 impl_type! {
     impl Error {

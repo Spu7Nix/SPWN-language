@@ -114,7 +114,20 @@ pub struct PatternNode {
     pub span: CodeSpan,
 }
 
-pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>, bool)>;
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub struct DictItem {
+    pub name: Spanned<Spur>,
+    pub attributes: Vec<Spanned<Attributes>>,
+    pub value: Option<ExprNode>,
+    pub private: bool,
+}
+
+impl From<DictItem> for &'static str {
+    fn from(value: DictItem) -> Self {
+        "Dict Item"
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MacroArg<N, D, P> {
@@ -187,7 +200,7 @@ pub enum Expression {
     Type(Spur),
 
     Array(Vec<ExprNode>),
-    Dict(DictItems),
+    Dict(Vec<DictItem>),
 
     Maybe(Option<ExprNode>),
 
@@ -245,7 +258,7 @@ pub enum Expression {
 
     Instance {
         base: ExprNode,
-        items: DictItems,
+        items: Vec<DictItem>,
     },
     Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
 }
@@ -307,7 +320,7 @@ pub enum Statement {
 
     Impl {
         base: ExprNode,
-        items: DictItems,
+        items: Vec<DictItem>,
     },
     Overload {
         op: Operator,

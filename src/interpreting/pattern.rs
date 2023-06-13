@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use super::interpreter::{BytecodeKey, RuntimeResult, Vm};
 use super::value::{StoredValue, Value, ValueType};
 use super::value_ops;
+use super::vm::{BytecodeKey, RuntimeResult, Vm};
 use crate::compiling::bytecode::Constant;
 use crate::parsing::ast::{Pattern, Spanned};
 use crate::sources::CodeSpan;

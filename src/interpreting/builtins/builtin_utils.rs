@@ -64,17 +64,17 @@ macro_rules! impl_type {
             )*
         }
     ) => {
-        impl $crate::vm::value::type_aliases::$impl_var {
-            pub fn get_override_fn(self, name: &str) -> Option<$crate::vm::value::BuiltinFn> {
+        impl $crate::interpreting::value::type_aliases::$impl_var {
+            pub fn get_override_fn(self, name: &str) -> Option<$crate::interpreting::value::BuiltinFn> {
                 $(
                     #[allow(unused_assignments, unused_variables, unused_imports)]
                     $(#[doc = $fn_doc])*
                     fn $fn_name(
-                        __args: Vec<$crate::vm::interpreter::ValueKey>,
-                        $vm: &mut $crate::vm::interpreter::Vm,
+                        __args: Vec<$crate::interpreting::vm::ValueKey>,
+                        $vm: &mut $crate::interpreting::vm::Vm,
                         $call_area: $crate::sources::CodeArea
-                    ) -> $crate::vm::interpreter::RuntimeResult<$crate::vm::value::Value> {
-                        use $crate::vm::value::value_structs::*;
+                    ) -> $crate::interpreting::vm::RuntimeResult<$crate::interpreting::value::Value> {
+                        use $crate::interpreting::value::value_structs::*;
 
                         let mut __arg_idx = 0usize;
 
@@ -85,7 +85,7 @@ macro_rules! impl_type {
                             )?
                             $(
                                 paste::paste! {
-                                    let $crate::vm::value::Value::$name
+                                    let $crate::interpreting::value::Value::$name
                                         $(
                                             ( $( $v_val ),* )
                                         )?
@@ -114,7 +114,7 @@ macro_rules! impl_type {
 
                 match name {
                     $(
-                        stringify!($fn_name) => Some($crate::vm::value::BuiltinFn(&$fn_name)),
+                        stringify!($fn_name) => Some($crate::interpreting::value::BuiltinFn(&$fn_name)),
                     )*
                     _ => None
                 }
@@ -148,7 +148,7 @@ macro_rules! impl_type {
                     ];
 
                     if stringify!($impl_var) == "Error" {
-                        for (i, name) in $crate::vm::error::ErrorDiscriminants::VARIANT_NAMES.iter().enumerate() {
+                        for (i, name) in $crate::interpreting::error::ErrorDiscriminants::VARIANT_NAMES.iter().enumerate() {
                             consts.push(
                                 indoc::formatdoc!("
                                     \n\t{name}: {i},",
@@ -331,10 +331,10 @@ macro_rules! impl_type {
             let $name = match &$vm.memory[$args[$arg_index]].val.value {
                 $(
                     $(
-                        v @ $crate::vm::value::Value::$dederef_ty {..} => [<$name:camel Value>]::$dederef_ty(v.clone().into()),
+                        v @ $crate::interpreting::value::Value::$dederef_ty {..} => [<$name:camel Value>]::$dederef_ty(v.clone().into()),
                     )?
                     $(
-                        $crate::vm::value::Value::$deref_ty {..} => [<$name:camel>]::$deref_ty([<$deref_ty Getter>] ($args[$arg_index])),
+                        $crate::interpreting::value::Value::$deref_ty {..} => [<$name:camel>]::$deref_ty([<$deref_ty Getter>] ($args[$arg_index])),
                     )?
                 )+
                 _ => unreachable!(),
@@ -361,7 +361,7 @@ macro_rules! impl_type {
 
     (@... ($name:ident, $vm:ident, $args:ident, $arg_index:ident) Value) => {
         let $name = match &$vm.memory[$args[$arg_index]].val.value {
-            $crate::vm::value::Value::Array(v) => {
+            $crate::interpreting::value::Value::Array(v) => {
                 v.iter().map(|k| $vm.memory[*k].val.value.clone()).collect::<Vec<_>>()
             }
             _ => unreachable!(),
@@ -369,7 +369,7 @@ macro_rules! impl_type {
     };
     (@... ($name:ident, $vm:ident, $args:ident, $arg_index:ident) ValueKey) => {
         let $name = match &$vm.memory[$args[$arg_index]].value {
-            $crate::vm::value::Value::Array(v) => {
+            $crate::interpreting::value::Value::Array(v) => {
                 v.clone()
             }
             _ => unreachable!(),
@@ -379,7 +379,7 @@ macro_rules! impl_type {
         impl_type! { @union [type] ($name, $vm, $args, $arg_index) $( $($dederef_ty)? $(&$deref_ty)? )|+ }
 
         let $name = match &$vm.memory[$args[$arg_index]].value {
-            $crate::vm::value::Value::Array(v) => {
+            $crate::interpreting::value::Value::Array(v) => {
                 v.iter().map(|k| {
                     impl_type! { @union [let] ($name, $vm, $args, $arg_index) $( $($dederef_ty)? $(&$deref_ty)? )|+ }
                     $name

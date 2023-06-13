@@ -1,6 +1,6 @@
-use crate::vm::builtins::builtin_utils::impl_type;
-use crate::vm::interpreter::Visibility;
-use crate::vm::value::Value;
+use crate::interpreting::builtins::builtin_utils::impl_type;
+use crate::interpreting::value::Value;
+use crate::interpreting::vm::Visibility;
 
 impl_type! {
     impl Dict {

@@ -1,6 +1,6 @@
-use crate::vm::builtins::builtin_utils::impl_type;
-use crate::vm::error::RuntimeError;
-use crate::vm::value::Value;
+use crate::interpreting::builtins::builtin_utils::impl_type;
+use crate::interpreting::error::RuntimeError;
+use crate::interpreting::value::Value;
 
 impl_type! {
     impl Array {
@@ -29,7 +29,7 @@ impl_type! {
                     _ => return Err(RuntimeError::TypeMismatch {
                         v: (vm.memory[*el].val.value.get_type(), vm.memory[*el].val.area.clone()),
                         area: call_area,
-                        expected: crate::vm::value::ValueType::String,
+                        expected: crate::interpreting::value::ValueType::String,
                         call_stack: vm.get_call_stack(),
                     })
                 }
@@ -58,7 +58,7 @@ impl_type! {
                     index,
                     len,
                     area: call_area,
-                    typ: crate::vm::value::ValueType::Array,
+                    typ: crate::interpreting::value::ValueType::Array,
                     call_stack: vm.get_call_stack(),
                 });
             }
@@ -74,7 +74,7 @@ impl_type! {
                     index,
                     len,
                     area: call_area,
-                    typ: crate::vm::value::ValueType::Array,
+                    typ: crate::interpreting::value::ValueType::Array,
                     call_stack: vm.get_call_stack(),
                 });
             }

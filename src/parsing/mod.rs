@@ -24,7 +24,7 @@ mod tests {
     use crate::gd::ids::IDClass;
     use crate::gd::object_keys::ObjectKey;
     use crate::parsing::ast::{
-        ImportType, MacroArg, MacroCode, ModuleImport, ObjKeyType, ObjectType, Pattern,
+        DictItem, ImportType, MacroArg, MacroCode, ModuleImport, ObjKeyType, ObjectType, Pattern,
         PatternNode, Spanned,
     };
     use crate::parsing::attributes::FileAttribute;
@@ -557,9 +557,24 @@ mod tests {
         expr_eq!(
             t,
             Ex::Dict(vec![
-                (span!(spur!("a")), None, false),
-                (span!(spur!("b")), Some(Ex::Int(10).into()), false),
-                (span!(spur!("c")), Some(string!("a").into()), false),
+                DictItem {
+                    name: span!(spur!("a")),
+                    attributes: vec![],
+                    value: None,
+                    private: false
+                },
+                DictItem {
+                    name: span!(spur!("b")),
+                    attributes: vec![],
+                    value: Some(Ex::Int(10).into()),
+                    private: false
+                },
+                DictItem {
+                    name: span!(spur!("c")),
+                    attributes: vec![],
+                    value: Some(string!("a").into()),
+                    private: false
+                }
             ])
         );
 
@@ -908,8 +923,18 @@ mod tests {
             Ex::Instance {
                 base: Ex::Type(spur!("foo")).into(),
                 items: vec![
-                    (span!(spur!("a")), Some(Ex::Int(10).into()), false,),
-                    (span!(spur!("b")), None, false),
+                    DictItem {
+                        name: span!(spur!("a")),
+                        value: Some(Ex::Int(10).into()),
+                        private: false,
+                        attributes: vec![],
+                    },
+                    DictItem {
+                        name: span!(spur!("b")),
+                        value: None,
+                        private: false,
+                        attributes: vec![],
+                    },
                 ]
             }
         );
@@ -1282,8 +1307,18 @@ mod tests {
             St::Impl {
                 base: Ex::Type(spur!("A")).into(),
                 items: vec![
-                    (span!(spur!("a")), Some(Ex::Int(10).into()), false),
-                    (span!(spur!("b")), Some(Ex::Bool(false).into()), true),
+                    DictItem {
+                        name: span!(spur!("a")),
+                        value: Some(Ex::Int(10).into()),
+                        private: false,
+                        attributes: vec![],
+                    },
+                    DictItem {
+                        name: span!(spur!("b")),
+                        value: Some(Ex::Bool(false).into()),
+                        private: true,
+                        attributes: vec![],
+                    },
                 ],
             }
         );

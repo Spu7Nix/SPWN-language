@@ -1,43 +1,34 @@
 
 
-#[deprecated(since = "100", note = "dfdxijfg")]
-let a = 10;
+// // c = 5
+// // f = (a, b) {
+// //     cock = a.dick;
+// //     1 + 2 * 3
+// // }
 
-// wait = (time: @int | @float | @epsilon = $.epsilon()) {
-// 	if time == $.epsilon() || time > 0 {
-// 		$.add( trigger{
-// 			OBJ_ID: 1268,
-// 			SPAWN_DURATION: time,
-// 			TARGET: !{
-// 				-> return
-// 			},
-// 		})
-// 	}
-// }
+// // a = 1;
+// // b = 2;
+// // c = 3;
+// // d = a + b;
+// // e = c + d;
+// // f = a + e;
+// // result = f + d;
 
+// a = 2
+// b = 40
+// c = a
+// d = 42
+// c += b
+v = 10
 
-// loop = (code) {
-//     f = !{
-//         code()
-//         f!
-//     }
-//     wait(1)
-//     f!
-// }
+|
+V <-- v live here
+a += v
 
-
-// loop(() {
-//     10g.move(10, 10, 0.5)
-//     10g.move(-10, 10, 0.5)
-//     10g.move(-10, -10, 0.5)
-//     10g.move(10, -10, 0.5)
-// })
-
-// cock = !{
-//     cock!
-// }
-
-// extract import "test2.spwn"
-
-// $.print(penis)
-// $.print(fuck)
+...
+|
+v <-- v live here?
+v = 10
+|
+V <-- v not live here?
+return a

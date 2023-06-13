@@ -4,6 +4,7 @@ use std::hash::Hash;
 use ahash::{AHashMap, AHashSet};
 
 use super::ids::*;
+use crate::interpreting::vm::Vm;
 use crate::parsing::ast::ObjectType;
 
 #[derive(Clone, Copy, Debug)]
@@ -129,11 +130,7 @@ impl TriggerObject {
     }
 }
 
-pub fn make_spawn_trigger(
-    context: Id,
-    target: Id,
-    vm: &mut crate::vm::interpreter::Vm,
-) -> TriggerObject {
+pub fn make_spawn_trigger(context: Id, target: Id, vm: &mut Vm) -> TriggerObject {
     let mut obj = GdObject {
         params: AHashMap::default(),
         mode: ObjectType::Trigger,

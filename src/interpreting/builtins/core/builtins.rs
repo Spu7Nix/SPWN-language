@@ -2,11 +2,11 @@ use std::hash::Hasher;
 
 use crate::gd::gd_object::{GdObject, TriggerObject};
 use crate::gd::ids::Id;
+use crate::interpreting::builtins::builtin_utils::impl_type;
+use crate::interpreting::error::RuntimeError;
+use crate::interpreting::value::Value;
+use crate::interpreting::value_ops;
 use crate::parsing::ast::ObjectType;
-use crate::vm::builtins::builtin_utils::impl_type;
-use crate::vm::error::RuntimeError;
-use crate::vm::value::Value;
-use crate::vm::value_ops;
 
 impl_type! {
     impl Builtins {

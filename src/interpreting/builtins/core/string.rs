@@ -1,6 +1,6 @@
-use crate::vm::builtins::builtin_utils::impl_type;
-use crate::vm::error::RuntimeError;
-use crate::vm::value::{StoredValue, Value};
+use crate::interpreting::builtins::builtin_utils::impl_type;
+use crate::interpreting::error::RuntimeError;
+use crate::interpreting::value::{StoredValue, Value};
 
 impl_type! {
     impl String {
@@ -120,7 +120,7 @@ impl_type! {
                     len: s.len(),
                     index: start,
                     area: call_area,
-                    typ: crate::vm::value::ValueType::String,
+                    typ: crate::interpreting::value::ValueType::String,
                     call_stack: vm.get_call_stack(),
                 });
             }
@@ -129,7 +129,7 @@ impl_type! {
                     len: s.len(),
                     index: end,
                     area: call_area,
-                    typ: crate::vm::value::ValueType::String,
+                    typ: crate::interpreting::value::ValueType::String,
                     call_stack: vm.get_call_stack(),
                 });
             }

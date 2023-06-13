@@ -1,5 +1,5 @@
-use crate::vm::builtins::builtin_utils::impl_type;
-use crate::vm::value::Value;
+use crate::interpreting::builtins::builtin_utils::impl_type;
+use crate::interpreting::value::Value;
 impl_type! {
     impl Int {
         Constants:

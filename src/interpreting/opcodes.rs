@@ -125,11 +125,40 @@ macro_rules! opcodes {
                 }
             }
         }
+
+
+        impl Opcode<UnoptRegister> {
+            pub fn get_used_regs(&self) -> [UnoptRegister; 3] {
+                let mut arr = [UnoptRegister::MAX; 3];
+                let mut i = 0;
+                #[allow(unused_assignments)]
+                match self {
+                    $(
+                        Self::$variant $({
+                            $(
+                                $($reg_field,)?
+                            )+
+                            ..
+                        })? => {
+                            $(
+                                $(
+                                    $(
+                                        arr[i] = *$reg_field;
+                                        i += 1;
+                                    )?
+                                )+
+                            )?
+                        }
+                    )+
+                }
+                arr
+            }
+        }
     };
 }
 
 opcodes! {
-    <R> where (R: Display + Copy );
+    <R> where (R: Display + Copy);
 
     LoadConst {
         => dest,

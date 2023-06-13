@@ -9,10 +9,14 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, Constant, FuncBuilder, Function};
 use super::error::CompilerError;
+use super::optimizer::register_optimization::construct_graph;
 use crate::cli::Settings;
 use crate::gd::ids::IDClass::Group;
+use crate::interpreting::opcodes::{Register, UnoptRegister};
+use crate::interpreting::pattern::ConstPattern;
+use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{
-    DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, Pattern,
+    DictItem, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, Pattern,
     PatternNode, Spannable, Spanned, Statement, StmtNode, StringContent,
 };
 use crate::parsing::attributes::FileAttribute;
@@ -20,9 +24,6 @@ use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::{Interner, BUILTIN_DIR};
-use crate::vm::opcodes::{Register, UnoptRegister};
-use crate::vm::pattern::ConstPattern;
-use crate::vm::value::ValueType;
 
 pub type CompileResult<T> = Result<T, CompilerError>;
 
@@ -289,13 +290,13 @@ impl<'a> Compiler<'a> {
                     let import_type =
                         ImportType::Module(BUILTIN_DIR.join("core/lib.spwn"), ModuleImport::Core);
 
-                    self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
+                    // self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
                 }
                 if let Some(attrs) = entry {
                     if !attrs.iter().any(|a| *a == FileAttribute::NoStd) {
                         let import_type =
                             ImportType::Module(BUILTIN_DIR.join("std/lib.spwn"), ModuleImport::Std);
-                        self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
+                        // self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
                     }
                 }
 
@@ -320,7 +321,7 @@ impl<'a> Compiler<'a> {
             span,
         )?;
 
-        let unopt_code = builder.build(
+        let mut unopt_code = builder.build(
             &self.src,
             match &self.global_return {
                 Some(v) => {
@@ -809,7 +810,7 @@ impl<'a> Compiler<'a> {
                                 let ret_reg =
                                     self.compile_expr(node, scope, builder, ExprType::normal())?;
                                 self.global_return =
-                                    Some((items.iter().map(|i| i.0).collect(), stmt.span));
+                                    Some((items.iter().map(|i| i.name).collect(), stmt.span));
                                 builder.ret(ret_reg, true, stmt.span);
                             },
                             _ => {
@@ -1116,12 +1117,12 @@ impl<'a> Compiler<'a> {
                 }
                 Constant::Array(v)
             },
-            Expression::Dict(map) if map.iter().all(|(_, v, _)| v.is_some()) => {
+            Expression::Dict(map) if map.iter().all(|DictItem { value, .. }| value.is_some()) => {
                 let mut m = AHashMap::new();
-                for (k, v, _) in map {
+                for DictItem { name, value, .. } in map {
                     m.insert(
-                        self.resolve(&k.value),
-                        self.convert_const_expr(&v.clone().unwrap())?,
+                        self.resolve(&name.value),
+                        self.convert_const_expr(&value.clone().unwrap())?,
                     );
                 }
                 Constant::Dict(m)
@@ -1145,10 +1146,10 @@ impl<'a> Compiler<'a> {
                 };
 
                 let mut m = AHashMap::new();
-                for (k, v, _) in items {
+                for DictItem { name, value, .. } in items {
                     m.insert(
-                        self.resolve(&k.value),
-                        Box::new(self.convert_const_expr(&v.clone().unwrap())?),
+                        self.resolve(&name.value),
+                        Box::new(self.convert_const_expr(&value.clone().unwrap())?),
                     );
                 }
                 Constant::Instance(k, m)
@@ -1685,7 +1686,7 @@ impl<'a> Compiler<'a> {
     fn build_dict(
         &mut self,
         builder: &mut FuncBuilder,
-        items: &DictItems,
+        items: &Vec<DictItem>,
         out_reg: usize,
         scope: ScopeKey,
         span: CodeSpan,
@@ -1694,22 +1695,28 @@ impl<'a> Compiler<'a> {
             items.len() as u16,
             out_reg,
             |builder, elems| {
-                for (key, item, private) in items {
-                    let value_reg = match item {
+                for DictItem {
+                    name,
+                    value,
+                    private,
+                    ..
+                } in items
+                {
+                    let value_reg = match value {
                         Some(e) => self.compile_expr(e, scope, builder, ExprType::normal())?,
-                        None => match self.get_var(key.value, scope) {
+                        None => match self.get_var(name.value, scope) {
                             Some(data) => data.reg,
                             None => {
                                 return Err(CompilerError::NonexistentVariable {
-                                    area: self.make_area(key.span),
-                                    var: self.resolve(&key.value),
+                                    area: self.make_area(name.span),
+                                    var: self.resolve(&name.value),
                                 })
                             },
                         },
                     };
 
                     elems.push((
-                        self.resolve(&key.value).spanned(key.span),
+                        self.resolve(&name.value).spanned(name.span),
                         value_reg,
                         false,
                         *private,

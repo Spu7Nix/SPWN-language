@@ -19,12 +19,12 @@ use crate::compiling::compiler::{CustomTypeKey, TypeDef};
 use crate::gd::gd_object::{make_spawn_trigger, GdObject, TriggerObject, TriggerOrder};
 use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
+use crate::interpreting::value::MacroData;
+use crate::interpreting::value_ops as vo;
 use crate::parsing::ast::{MacroArg, ObjectType, Spannable, Spanned};
 use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
-use crate::vm::value::MacroData;
-use crate::vm::value_ops as vo;
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 

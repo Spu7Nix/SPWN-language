@@ -4,8 +4,8 @@ use std::collections::BinaryHeap;
 
 use ahash::AHashMap;
 
-use super::interpreter::{FuncCoord, ValueKey};
 use super::opcodes::Register;
+use super::vm::{FuncCoord, ValueKey, Vm};
 use crate::gd::ids::Id;
 use crate::sources::CodeArea;
 
@@ -116,7 +116,7 @@ impl FullContext {
     }
 }
 
-impl<'a> super::interpreter::Vm<'a> {
+impl<'a> Vm<'a> {
     pub fn split_current_context(&mut self) {
         let current = self.contexts.current();
         let mut new = current.clone();

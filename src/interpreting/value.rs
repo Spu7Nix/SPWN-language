@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use strum::EnumDiscriminants;
 
 use super::error::RuntimeError;
-use super::interpreter::{FuncCoord, RuntimeResult, ValueKey, Visibility, Vm};
 use super::pattern::ConstPattern;
+use super::vm::{FuncCoord, RuntimeResult, ValueKey, Visibility, Vm};
 // use super::pattern::Pattern;
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::CustomTypeKey;

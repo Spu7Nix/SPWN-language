@@ -1,6 +1,6 @@
-use crate::vm::builtins::builtin_utils::impl_type;
-use crate::vm::error::RuntimeError;
-use crate::vm::value::Value;
+use crate::interpreting::builtins::builtin_utils::impl_type;
+use crate::interpreting::error::RuntimeError;
+use crate::interpreting::value::Value;
 
 impl_type! {
 

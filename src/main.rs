@@ -8,11 +8,11 @@ mod cli;
 mod compiling;
 mod error;
 mod gd;
+mod interpreting;
 mod lexing;
 mod parsing;
 mod sources;
 mod util;
-mod vm;
 
 use std::cell::RefCell;
 use std::error::Error;
@@ -30,16 +30,18 @@ use spinoff::spinners::SpinnerFrames;
 use spinoff::{Spinner as SSpinner, *};
 
 use crate::cli::{Arguments, Command};
+use crate::compiling::bytecode::Function;
 use crate::compiling::compiler::{Compiler, TypeDefMap};
+use crate::compiling::optimizer::register_optimization::construct_graph;
 use crate::gd::ids::IDClass;
 use crate::gd::optimizer::{optimize, ReservedIds};
 use crate::gd::{gd_object, levelstring};
+use crate::interpreting::context::{CallInfo, Context};
+use crate::interpreting::opcodes::{Opcode, Register};
+use crate::interpreting::vm::{ContextSplitMode, FuncCoord, Vm};
 use crate::parsing::parser::Parser;
 use crate::sources::{BytecodeMap, CodeSpan, SpwnSource};
 use crate::util::{BasicError, HexColorize, RandomState};
-use crate::vm::context::{CallInfo, Context};
-use crate::vm::interpreter::{ContextSplitMode, FuncCoord, Vm};
-use crate::vm::opcodes::{Opcode, Register};
 
 const CORE_PATH: &str = "./libraries/core/";
 
@@ -269,6 +271,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
         },
     };
+
+    construct_graph(&mut Function {
+        opcodes: vec![
+            Opcode::LoadConst { dest: 0, id: 2 },
+            Opcode::LoadConst { dest: 1, id: 40 },
+            Opcode::Copy { from: 0, to: 2 },
+            Opcode::LoadConst { dest: 3, id: 42 },
+            Opcode::AddEq { left: 2, right: 1 },
+            Opcode::Dbg { reg: 2 },
+        ],
+        regs_used: 4,
+        arg_amount: 0,
+        capture_regs: vec![],
+        ref_arg_regs: vec![],
+        span: CodeSpan::invalid(),
+    });
 
     Ok(())
 }

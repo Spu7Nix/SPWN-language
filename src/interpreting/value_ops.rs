@@ -1,6 +1,6 @@
 use super::error::RuntimeError;
-use super::interpreter::{BytecodeKey, RuntimeResult, Vm};
 use super::value::{StoredValue, Value, ValueType};
+use super::vm::{BytecodeKey, RuntimeResult, Vm};
 use crate::gd::gd_object::ObjParam;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeSpan;

@@ -6,9 +6,9 @@ use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::compiling::bytecode::Bytecode;
+use crate::interpreting::opcodes::Register;
 use crate::parsing::ast::ModuleImport;
 use crate::util::hyperlink;
-use crate::vm::opcodes::Register;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpwnSource {

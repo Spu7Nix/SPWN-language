@@ -1,9 +1,9 @@
 use std::string::ToString;
 
 use super::context::CallInfo;
-use super::interpreter::Vm;
 use super::pattern::ConstPattern;
 use super::value::ValueType;
+use super::vm::Vm;
 use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;

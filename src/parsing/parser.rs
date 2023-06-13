@@ -7,9 +7,9 @@ use lasso::Spur;
 use unindent::unindent;
 
 use super::ast::{
-    Ast, DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport,
-    ObjectType, Pattern, PatternNode, Spannable, Spanned, Statement, Statements, StmtNode,
-    StringContent, StringType,
+    Ast, DictItem, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, ObjectType,
+    Pattern, PatternNode, Spannable, Spanned, Statement, Statements, StmtNode, StringContent,
+    StringType,
 };
 use super::attributes::{Attributes, FileAttribute, IsValidOn, ParseAttribute};
 use super::error::SyntaxError;
@@ -366,10 +366,17 @@ impl Parser<'_> {
         .unwrap_or('\u{FFFD}'))
     }
 
-    pub fn parse_dictlike(&mut self, allow_vis: bool) -> ParseResult<DictItems> {
+    pub fn parse_dictlike(&mut self, allow_vis: bool) -> ParseResult<Vec<DictItem>> {
         let mut items = vec![];
 
         list_helper!(self, RBracket {
+            let attrs = if self.next_is(Token::Hashtag) {
+                self.next();
+
+                self.parse_attributes::<Attributes>()?
+            } else {
+                vec![]
+            };
 
             let private = if allow_vis && self.next_is(Token::Private) {
                 self.next();
@@ -400,7 +407,7 @@ impl Parser<'_> {
                 None
             };
 
-            items.push((key.spanned(key_span), elem, private));
+            items.push(DictItem { name: key.spanned(key_span), attributes: attrs, value: elem, private });
         });
 
         Ok(items)
