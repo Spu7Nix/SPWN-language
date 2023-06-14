@@ -124,7 +124,7 @@ pub struct DictItem {
 }
 
 impl From<DictItem> for &'static str {
-    fn from(value: DictItem) -> Self {
+    fn from(_: DictItem) -> Self {
         "Dict Item"
     }
 }

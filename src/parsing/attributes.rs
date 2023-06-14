@@ -17,8 +17,6 @@ pub trait ParseAttribute {
 
 pub trait IsValidOn<T: Into<&'static str>> {
     fn is_valid_on(&self, node: &Spanned<T>, src: SpwnSource) -> ParseResult<()>;
-
-    // fn get_attrs_for_node(&self, node: &Spanned<T>) -> Option<Vec<String>>;
 }
 
 fn into_t<T: std::str::FromStr>(
@@ -54,29 +52,6 @@ macro_rules! attributes {
         }
     ) => {
         impl IsValidOn<Expression> for Vec<Spanned<$enum>> {
-            // fn get_attrs_for_node(&self, node: &Spanned<Expression>) -> Option<Vec<String>> {
-            //     let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
-            //     $(
-            //         $(
-            //             $(
-            //                 $(
-            //                     map.entry(
-            //                         stringify!($v_expr)
-            //                     )
-            //                     .and_modify( |v| v.push(
-            //                         stringify!([<$variant:snake>])
-            //                             .to_string()
-            //                     ))
-            //                     .or_insert(vec![
-            //                         stringify!([<$variant:snake>]).to_string()
-            //                     ]);
-            //                 )?
-            //             )*
-            //         )?
-            //     )*
-            //     map.remove(Into::<&'static str>::into(node.value))
-            // }
-
             fn is_valid_on(&self, node: &Spanned<Expression>, src: SpwnSource) -> ParseResult<()> {
                 let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
                 paste! {
@@ -170,32 +145,6 @@ macro_rules! attributes {
                 Ok(())
             }
         }
-
-        // impl IsValid2<Expression> for $enum {
-        //     fn is_valid(&self, node: &Expression) -> bool {
-        //         match &self {
-        //             $(
-        //                 $enum::$variant {..} => match &node {
-        //                     $(
-        //                         $(
-        //                             $(Expression::$v_expr {..} => true,)?
-        //                         )*
-        //                     )?
-        //                     other => false,
-        //                 }
-        //             )*
-        //         }
-        //     }
-        // }
-        
-        // impl IsValid3<Expression> for Vec<Spanned<$enum>> {
-        //     fn is_valid(&self, node: &Spanned<Expression>, src: SpwnSource) -> ParseResult<()> {
-        //         for attr in self {
-        //             if !attr.value.is_valid(&node.value) {}
-        //         }
-        //         Ok(())
-        //     }
-        // }
 
         #[allow(unused_variables, unused_mut, dead_code, unused_assignments)]
         impl ParseAttribute for $enum {
@@ -363,7 +312,8 @@ macro_rules! attributes {
             }
         }
 
-        #[derive(Debug, Clone, PartialEq, Eq)]
+        #[derive(Debug, Clone, PartialEq, Eq, delve::EnumToStr)]
+        #[delve(rename_variants = "snakecase")]
         $vis enum $enum {
             $(
                 $variant $( ( $typ1 $(,$typ)*) )? $( { $field1: $f_typ1, $($field: $f_typ,)* } )?,
@@ -407,43 +357,23 @@ attributes! {
     }
 }
 
-// trait IsValid2<T> {
-//     fn is_valid(&self, node: &T) -> bool;
-// }
+impl IsValidOn<DictItem> for Vec<Spanned<Attributes>> {
+    fn is_valid_on(&self, node: &Spanned<DictItem>, src: SpwnSource) -> ParseResult<()> {
+        for attr in self {
+            match &attr.value {
+                Attributes::Deprecated { .. } => (),
+                Attributes::Doc(..) => (),
+                other => {
+                    return Err(SyntaxError::MismatchedAttribute {
+                        area: src.area(attr.span),
+                        expr_area: src.area(node.span),
+                        attr: Into::<&'static str>::into(other).into(),
+                        valid: Some(vec!["doc".into(), "deprecated".into()]),
+                    });
+                },
+            }
+        }
 
-// trait IsValid3<T> {
-//     fn is_valid(&self, node: &Spanned<T>, src: SpwnSource) -> ParseResult<()>;
-// }
-
-// impl IsValidOn<DictItem> for Vec<Spanned<Attributes>> {
-//     fn is_valid_on(&self, node: &Spanned<DictItem>, src: SpwnSource) -> ParseResult<()> {
-//         for attr in self {
-//             if !attr.is_valid(node) {
-//                 return Err();
-//             }
-//         }
-//     }
-// }
-
-// impl IsValidOn<DictItem> for Vec<Spanned<Attributes>> {
-//     fn is_valid_on(&self, node: &Spanned<DictItem>, src: SpwnSource) -> ParseResult<()> {
-//         let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
-
-//         for attr in self {
-//             match &attr.value {
-//                 Attributes::Deprecated { .. } => (),
-//                 Attributes::Doc(..) => (),
-//                 other => {
-//                     return Err(SyntaxError::MismatchedAttribute {
-//                         area: src.area(attr.span),
-//                         expr_area: src.area(node.span),
-//                         attr: // other -> name,
-//                         valid: Some(),
-//                     });
-//                 },
-//             }
-//         }
-
-//         Ok(())
-//     }
-// }
+        Ok(())
+    }
+}

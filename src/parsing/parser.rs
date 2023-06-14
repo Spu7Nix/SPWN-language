@@ -378,6 +378,8 @@ impl Parser<'_> {
                 vec![]
             };
 
+            let start = self.peek_span();
+
             let private = if allow_vis && self.next_is(Token::Private) {
                 self.next();
                 true
@@ -407,7 +409,14 @@ impl Parser<'_> {
                 None
             };
 
-            items.push(DictItem { name: key.spanned(key_span), attributes: attrs, value: elem, private });
+            // this is so backwards if only u could use enum variants as types. . . .
+            let mut item = DictItem { name: key.spanned(key_span), attributes: vec![], value: elem, private }.spanned(start.extend(self.span()));
+
+            attrs.is_valid_on(&item, self.src.clone())?;
+
+            item.value.attributes = attrs;
+
+            items.push(item.value);
         });
 
         Ok(items)

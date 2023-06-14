@@ -19,16 +19,24 @@
 // c = a
 // d = 42
 // c += b
-v = 10
 
-|
-V <-- v live here
-a += v
+// v = 10
 
-...
-|
-v <-- v live here?
-v = 10
-|
-V <-- v not live here?
-return a
+// |
+// V <-- v live here
+// a += v
+
+// ...
+// |
+// v <-- v live here?
+// v = 10
+// |
+// V <-- v not live here?
+// return a
+
+type @a
+
+impl @a {
+    #[no_optimize]
+    a: 20
+}

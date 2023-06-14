@@ -4,6 +4,13 @@ use crate::error_maker;
 use crate::lexing::tokens::Token;
 use crate::sources::CodeArea;
 
+fn list_join<T: std::fmt::Display>(l: &[T]) -> String {
+    l.iter()
+        .map(|v| format!("`{v}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 error_maker! {
     Title: "Syntax Error"
     Extra: {}
@@ -85,7 +92,7 @@ error_maker! {
 
         /////////
         #[
-            Message: "Unknown attribute", Note: Some(format!("The valid attributes are: {}", valid.join(", ")));
+            Message: "Unknown attribute", Note: Some(format!("The valid attributes are: {}", list_join(valid)));
             Labels: [
                 area => "Attribute `{}` does not exist": attribute;
             ]
@@ -130,7 +137,7 @@ error_maker! {
                 area => "Attribute `{}` cannot be added to this element": attr;
 
                 expr_area => "{}": =>(match valid {
-                    Some(v) => format!("The valid attributes for this element are: `{}`", v.join(", ")),
+                    Some(v) => format!("The valid attributes for this element are: {}", list_join(v)),
                     None => "This element doesn't support any attributes".into(),
                 });
             ]
@@ -145,7 +152,7 @@ error_maker! {
 
         /////////
         #[
-            Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are `{}`", attribute, fields.join(", ")));
+            Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are {}", attribute, list_join(fields)));
             Labels: [
                 area => "Unexpected field `{}`": field;
             ]
