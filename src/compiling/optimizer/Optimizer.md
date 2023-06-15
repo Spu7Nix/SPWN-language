@@ -153,6 +153,29 @@ Going back to the original interference graph, if we apply a graph colouring alg
 
 Each colour represents a new register. We can see that it has been optimised from 4 registers down to 3, as `A` and `C` share a register as they do not interfere with each other. Although this is a small example, on a bigger scale this will optimise far more, especially with multiple passes.
 
+## Key Change Registers
+
+A `ValueKey` is a key into a slotmap which holds all the current values in the program. Most operations that change a value in memory will change the value at the location the `ValueKey` _points to_.
+
+For a few special cases however, instead of replacing the value at the `ValueKey`, we replace the _entire_ `ValueKey`. These are used in places such as accessing the members of a dictionary and variables caputured by value, in a function. (In the bytecode debug ouput in SPWN, these special key change operations are shown as a green squiggly arrow `~>`)
+The reason behind this is when we intialise the memory, each register is assigned its own `ValueKey`. Without the key change register, if you assigned to a dictionary key, the key would _not_ get updated as the register holding the value on the right of the assignement has a different `ValueKey` to the dictionary key.
+
+Unfortunately, this means we cannot link these key change registers to the non-key change register without some funky issues but if we did not optimise them we could potentially quickly run out of registers.
+Instead, in the final steps of optimisation, when we are building the graph, we track which registers are key change registers and create edges between every other key change register, but not to any non-key change registers.
+The optimisation continues as normal afterwards.
+
+## Function Arguments
+
+TODO
+
+# Dead Code Optimisation
+
+TODO
+
+# Constant Folding
+
+TODO
+
 ### Resources:
 
 -   https://www.cse.chalmers.se/edu/year/2014/course/TDA282_Compiler_Construction/lect07-2x2.pdf

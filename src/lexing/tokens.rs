@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::lexer;
 
 lexer! {
@@ -217,24 +219,104 @@ impl Token {
     }
 }
 
-#[derive(logos::Logos, Debug, PartialEq)]
-#[logos(skip r"[ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*")]
+fn parse_raw_string(lex: &mut logos::Lexer<'_, Token2>) -> logos::FilterResult<(), Error> {
+    let ht_count = lex.slice()[1..].len();
+
+    let mut chars = lex.remainder().chars().peekable();
+
+    match chars.next() {
+        Some('"') | Some('\'') => (),
+        _ => return logos::FilterResult::Error(Error::UnexpectedStringFlags),
+    }
+
+    let mut out = String::new();
+    let mut found_end = false;
+
+    while let Some(ch) = chars.next() {
+        match (ch, chars.peek()) {
+            (a, Some('"')) | (a, Some('\'')) => {
+                out.push(a);
+                chars.next();
+                lex.bump(1);
+
+                let mut c = 0;
+                while let Some('#') = chars.next() {
+                    c += 1
+                }
+
+                if c >= ht_count {
+                    found_end = true;
+                    lex.bump(ht_count);
+
+                    for _ in 0..ht_count {
+                        lex.next();
+                    }
+
+                    break;
+                }
+            },
+            (a, Some(b)) => {
+                out.push(a);
+                out.push(*b);
+                chars.next();
+                lex.bump(2);
+            },
+            (a, None) => {
+                out.push(a);
+                lex.bump(1);
+                break;
+            },
+        }
+    }
+
+    if !found_end {
+        return logos::FilterResult::Error(Error::UnterminatedRawString);
+    }
+
+    logos::FilterResult::Emit(())
+}
+
+#[test]
+fn test() {
+    use logos::{Lexer, Logos};
+
+    let mut a = Token2::lexer(r#####" "aaa" "#####);
+
+    while let Some(t) = a.next() {
+        dbg!(t, a.slice());
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+enum Error {
+    #[default]
+    Error,
+    UnterminatedRawString,
+    UnexpectedStringFlags,
+}
+
+#[derive(Debug, logos::Logos, PartialEq)]
+#[logos(
+    error = Error,
+    //extras = LexerExtras,
+    skip r"[ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*"
+)]
 enum Token2 {
     #[token("_", priority = 0)]
     Any,
 
-    #[regex(r#"0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[\d_]+"#, priority = 3)]
+    #[regex(r#"0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[0-9][0-9]*"#, priority = 3)]
     Int,
-    #[regex(r#"[\d_]+(\.[\d_]+)?"#, priority = 1)]
+    #[regex(r#"[0-9][0-9_]*(\.[0-9_]+)?"#, priority = 1)]
     Float,
 
-    #[regex(r###"([a-zA-Z]\w*)?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')|([a-zA-Z]\w*_)?"###)]
+    #[regex(r#"([a-zA-Z][a-zA-Z0-9_]*)?"(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
+    #[regex(r#"r[#]*"#, parse_raw_string)]
     String,
 
-    //(r".*?"|r#".*?"#|r##".*?"##|r'.*?'|r#'.*?'#|r##'.*?'##)
     #[regex(r"([0-9]+|\?)[gbci]")]
     Id,
-    #[regex(r"@[a-zA-Z_]\w*")]
+    #[regex(r"@[a-zA-Z][a-zA-Z0-9_]*")]
     TypeIndicator,
 
     #[token("let")]
@@ -414,10 +496,8 @@ enum Token2 {
     Hashtag,
     #[token("ε")]
     Epsilon,
-
-    #[regex(r"[a-zA-Z_][a-zA-Z_0-9]*")]
+    #[regex(r"[a-zA-Z][a-zA-Z_0-9]*", priority = 1)]
     Ident,
-
     #[regex(r"(\n|(\r\n))+")]
     Newline,
 

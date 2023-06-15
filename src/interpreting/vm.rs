@@ -1575,6 +1575,9 @@ impl<'a> Vm<'a> {
                                     .collect(),
                             },
                             args: vec![],
+                            arg_regs: self.programs[func.code].1.functions[*id as usize]
+                                .arg_regs
+                                .clone(),
                             self_arg: None,
                         }),
                         area: self.get_area(func, ip),
@@ -1982,14 +1985,20 @@ impl<'a> Vm<'a> {
             MacroTarget::Macro { func, captured } => {
                 let current_context = self.contexts.last_mut().yeet_current().unwrap();
 
-                let mut regs_keys = vec![];
+                let mut regs_keys: Vec<(Register, ValueKey)> = vec![];
 
                 per_arg! {
                     self,
                     (i, k) {
-                        regs_keys.push((i, k));
+                        regs_keys.push((i as Register, k));
                     }
                 }
+
+                for ((key_reg, _), arg_reg) in regs_keys.iter_mut().zip(data.arg_regs) {
+                    *key_reg = arg_reg;
+                }
+
+                println!("jablinksy {:?}", regs_keys);
 
                 self.run_function(
                     current_context,

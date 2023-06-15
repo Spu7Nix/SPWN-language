@@ -397,11 +397,12 @@ impl<'a> Compiler<'a> {
                     opcodes,
                     opcode_spans: f.opcode_spans,
                     regs_used: f.regs_used,
-                    arg_amount: f.arg_amount,
+                    arg_regs: f.arg_regs.into_iter().map(|r| r as Register).collect(),
+                    inner_funcs: f.inner_funcs,
                     capture_regs: f
                         .capture_regs
-                        .iter()
-                        .map(|(from, to)| (*from as Register, *to as Register))
+                        .into_iter()
+                        .map(|(from, to)| (from as Register, to as Register))
                         .collect(),
                     ref_arg_regs: f.ref_arg_regs.iter().map(|r| *r as Register).collect(),
                     span: f.span,

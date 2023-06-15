@@ -4,7 +4,7 @@ use ahash::AHashSet;
 use heuristic_graph_coloring::{color_rlf, ColorableGraph};
 use itertools::Itertools;
 
-use crate::compiling::bytecode::Function;
+use crate::compiling::bytecode::{Bytecode, Function};
 use crate::interpreting::opcodes::{Opcode, OpcodePos, UnoptOpcode, UnoptRegister};
 
 struct Node<'a> {
@@ -30,7 +30,7 @@ impl InterferenceGraph {
         }
     }
 
-    pub fn from_func(func: &Function<UnoptRegister>) -> Self {
+    pub fn from_func(func: &Function<UnoptRegister>, b: &Bytecode<UnoptRegister>) -> Self {
         let mut nodes: Vec<Node> = func
             .opcodes
             .iter()
@@ -73,9 +73,6 @@ impl InterferenceGraph {
                 let node = &mut nodes[node_idx as usize];
 
                 let mut new_live_in: AHashSet<_> = node.opcode.get_read().iter().copied().collect();
-                for i in &new_live_in {
-                    assert!(node.live_in.contains(i))
-                }
 
                 let write = node.opcode.get_write();
                 for i in out {
@@ -100,8 +97,15 @@ impl InterferenceGraph {
 
         let mut graph = Self::new(func.regs_used);
 
+        // key change registers
+        let mut key_regs = vec![false; func.regs_used];
+
         // building the graph
         for (i, node) in nodes.iter().enumerate() {
+            for key_reg in node.opcode.get_key_change_regs() {
+                key_regs[key_reg] = true;
+            }
+
             for g in node.live_in.iter().combinations(2) {
                 graph.add_edge(*g[0], *g[1])
             }
@@ -112,39 +116,56 @@ impl InterferenceGraph {
                     out.insert(*reg);
                 }
             }
-            println!(
-                "{}: IN{:?}, OUT{:?}, DEF{:?}, USE{:?}",
-                i,
-                node.live_in,
-                out,
-                node.opcode.get_write(),
-                node.opcode.get_read()
-            );
+            // println!(
+            //     "{}: IN{:?}, OUT{:?}, DEF{:?}, USE{:?}",
+            //     i,
+            //     node.live_in,
+            //     out,
+            //     node.opcode.get_write(),
+            //     node.opcode.get_read()
+            // );
 
             for a in node.opcode.get_write().iter() {
                 for b in &out {
                     graph.add_edge(*a, *b)
                 }
             }
-
-            // for reg in 0..func.regs_used {
-            //     for key_change in node.opcode.get_key_change_regs() {
-            //         graph.add_edge(reg, key_change)
-            //     }
-            // }
         }
 
+        // for (_, capture_reg) in &func.capture_regs {
+        //     key_regs[*capture_reg] = true;
+        // }
+
+        // println!("zuzu {:?}", key_regs);
+        for i in 0..func.regs_used {
+            // for &j in &func.ref_arg_regs {
+            //     graph.add_edge(i, j)
+            // }
+            for j in (i + 1)..func.regs_used {
+                if key_regs[i] != key_regs[j] {
+                    graph.add_edge(i, j)
+                }
+            }
+        }
+        // for &inner in &func.inner_funcs {
+        //     for &(reg, _) in &b.functions[inner as usize].capture_regs {
+        //         for j in 0..func.regs_used {
+        //             graph.add_edge(reg, j)
+        //         }
+        //     }
+        // }
         graph
     }
 }
 
-pub fn optimize(func: &mut Function<UnoptRegister>) -> bool {
-    let graph = InterferenceGraph::from_func(func);
+pub fn optimize(code: &mut Bytecode<UnoptRegister>, func: u16) -> bool {
+    let graph = InterferenceGraph::from_func(&code.functions[func as usize], &*code);
     let coloring = color_rlf(graph);
+    // println!("{:?}", coloring);
 
     let mut changed = false;
 
-    for opcode in &mut func.opcodes {
+    for opcode in &mut code.functions[func as usize].opcodes {
         for reg in opcode.get_used_regs() {
             if *reg != coloring[*reg] {
                 *reg = coloring[*reg];
@@ -152,8 +173,24 @@ pub fn optimize(func: &mut Function<UnoptRegister>) -> bool {
             }
         }
     }
+    for (_, reg) in &mut code.functions[func as usize].capture_regs {
+        *reg = coloring[*reg];
+    }
+    for reg in &mut code.functions[func as usize].ref_arg_regs {
+        *reg = coloring[*reg];
+    }
+    for reg in &mut code.functions[func as usize].arg_regs {
+        dbg!(&reg);
+        *reg = coloring[*reg];
+    }
 
-    func.regs_used = coloring.iter().unique().count();
+    for inner in code.functions[func as usize].inner_funcs.clone() {
+        let f = &mut code.functions[inner as usize];
+        for (reg, _) in &mut f.capture_regs {
+            *reg = coloring[*reg];
+        }
+    }
+    code.functions[func as usize].regs_used = coloring.iter().unique().count();
 
     changed
 }

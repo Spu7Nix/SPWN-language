@@ -15,18 +15,45 @@
 
 
 
-jaj = {be: "cock", h: 69}
-a = jaj.be;
-// b = jaj.be;
-// c = jaj.be;
-// d = jaj.be;
-// e = jaj.be;
-// f = jaj.be;
-// g = jaj.be;
-// h = jaj.be;
-// i = jaj.be;
-
-p = 5
-dbg jaj;
 
 
+
+
+// () {
+//     dbg "a";
+//     () {
+//         dbg "b";
+//     }
+// }
+// () {
+//     dbg "c";
+//     () {
+//         dbg "d";
+//     }
+//     () {
+//         dbg "e";
+//         () {
+//             dbg "f";
+//         }
+//     }
+// }
+
+
+grug = (x) {
+    dbg x
+}
+
+grug(5);
+grug(5);
+
+
+// h();
+// h();
+
+// f = (a, b, ...c) {
+//     dbg a;
+//     dbg b;
+//     dbg c;
+// }
+
+// f(8, 2, 7, 10)

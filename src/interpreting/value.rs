@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use strum::EnumDiscriminants;
 
 use super::error::RuntimeError;
+use super::opcodes::Register;
 use super::pattern::ConstPattern;
 use super::vm::{FuncCoord, RuntimeResult, ValueKey, Visibility, Vm};
 // use super::pattern::Pattern;
@@ -66,6 +67,7 @@ impl Debug for BuiltinFn {
 pub struct MacroData {
     pub target: MacroTarget,
     pub args: Vec<MacroArg<Spanned<Spur>, ValueKey, ConstPattern>>,
+    pub arg_regs: Vec<Register>,
     pub self_arg: Option<ValueKey>,
 }
 

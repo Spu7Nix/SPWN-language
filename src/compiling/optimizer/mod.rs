@@ -8,17 +8,29 @@ mod redundancy;
 mod registers;
 
 pub fn optimize_code(code: &mut Bytecode<UnoptRegister>) {
+    #[allow(clippy::never_loop)]
     loop {
         let mut changed = false;
 
-        for func in &mut code.functions {
-            changed |= registers::optimize(func);
-            // changed |= redundancy::optimize(func);
-            // changed |= dead_code::optimize(func);
+        fn visit(code: &mut Bytecode<UnoptRegister>, func: u16, changed: &mut bool) {
+            for child in code.functions[func as usize].inner_funcs.clone() {
+                let id = child;
+                visit(code, id, changed)
+            }
+
+            println!("jw {}", func);
+            *changed |= registers::optimize(code, func);
+            // *changed |= redundancy::optimize(&mut (*code).functions[func as usize]);
+            // *changed |= dead_code::optimize(&mut (*code).functions[func as usize]);
         }
 
-        if !changed {
-            break;
-        }
+        visit(code, 0, &mut changed);
+
+        // if !changed {
+        break;
+        // }
     }
+    // for func in &mut code.functions {
+    //     println!("{:#?}", func);
+    // }
 }

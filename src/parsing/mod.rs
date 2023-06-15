@@ -5,7 +5,7 @@ pub mod parser;
 pub mod utils;
 
 /// these tests must be ran with only a single thread (they are not thread safe)
-/// cargo test
+/// `cargo test --thread-count=1 parsing::*`
 
 #[cfg(test)]
 #[allow(clippy::from_over_into)]

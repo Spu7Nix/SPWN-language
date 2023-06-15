@@ -36,10 +36,12 @@ where
 
     pub regs_used: usize,
 
-    pub arg_amount: usize,
+    pub arg_regs: Vec<R>,
 
     pub capture_regs: Vec<(R, R)>,
     pub ref_arg_regs: Vec<R>,
+
+    pub inner_funcs: Vec<u16>,
 
     pub span: CodeSpan,
 }
@@ -239,9 +241,10 @@ impl BlockContent {
 struct ProtoFunc {
     code: Block,
     used_regs: usize,
-    arg_amount: usize,
+    arg_regs: Vec<usize>,
     capture_regs: Vec<(UnoptRegister, UnoptRegister)>,
     ref_arg_regs: Vec<UnoptRegister>,
+    inner_funcs: Vec<u16>,
     span: CodeSpan,
 }
 
@@ -299,9 +302,10 @@ impl BytecodeBuilder {
                 content: vec![BlockContent::Code(vec![])],
             },
             used_regs: 0,
-            arg_amount,
+            arg_regs: (0..arg_amount).collect(),
             capture_regs: vec![],
             ref_arg_regs: vec![],
+            inner_funcs: vec![],
             span,
         };
         let func_id = self.funcs.len();
@@ -348,7 +352,7 @@ impl BytecodeBuilder {
 
         let mut functions = vec![];
 
-        for (f_n, f) in self.funcs.iter().enumerate() {
+        for (f_n, f) in self.funcs.into_iter().enumerate() {
             type PositionMap<'a> = AHashMap<&'a Vec<usize>, (usize, usize)>;
 
             let mut block_positions = AHashMap::new();
@@ -463,9 +467,10 @@ impl BytecodeBuilder {
                 opcodes,
                 opcode_spans,
                 regs_used: f.used_regs,
-                arg_amount: f.arg_amount,
-                capture_regs: f.capture_regs.clone(),
-                ref_arg_regs: f.ref_arg_regs.clone(),
+                arg_regs: f.arg_regs,
+                capture_regs: f.capture_regs,
+                ref_arg_regs: f.ref_arg_regs,
+                inner_funcs: f.inner_funcs,
                 span: f.span,
             })
         }
@@ -566,7 +571,9 @@ impl<'a> FuncBuilder<'a> {
         )
             -> CompileResult<(Vec<(UnoptRegister, UnoptRegister)>, Vec<UnoptRegister>)>,
     {
-        self.code_builder.new_func(f, arg_amount, span)
+        let id = self.code_builder.new_func(f, arg_amount, span)?;
+        self.code_builder.funcs[self.func].inner_funcs.push(id);
+        Ok(id)
     }
 
     pub fn new_array<F>(
@@ -1679,14 +1686,25 @@ impl Bytecode<Register> {
             );
 
             println!(
-                "{}\n{}\n{}\n{}\n\n",
+                "{}\n{}\n{}\n{}\n{}\n\n",
                 format!("│ registers used: {}", func.regs_used).bright_yellow(),
                 format!(
                     "│ capture regs: {}",
                     func.capture_regs
                         .iter()
                         .map(|(from, to)| format!(
-                            "{} {} {}",
+                            "{}{} {} {}",
+                            format!(
+                                "F{}:",
+                                self.functions
+                                    .iter()
+                                    .enumerate()
+                                    .find(|(_, f)| f.inner_funcs.contains(&(func_i as u16)))
+                                    .unwrap()
+                                    .0
+                            )
+                            .bright_magenta()
+                            .bold(),
                             format!("R{from}").bright_red().bold(),
                             "~>".bright_green().bold(),
                             format!("R{to}").bright_red().bold(),
@@ -1696,7 +1714,20 @@ impl Bytecode<Register> {
                 )
                 .bright_yellow(),
                 format!(
-                    "│ args regs by ref: {}",
+                    "│ arg regs: {}",
+                    func.arg_regs
+                        .iter()
+                        .map(|r| format!(
+                            "{} {}",
+                            "->".bright_white().bold(),
+                            format!("R{r}").bright_red().bold(),
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+                .bright_yellow(),
+                format!(
+                    "│ arg regs by ref: {}",
                     func.ref_arg_regs
                         .iter()
                         .map(|r| format!(
