@@ -216,3 +216,210 @@ impl Token {
         }
     }
 }
+
+#[derive(logos::Logos, Debug, PartialEq)]
+#[logos(skip r"[ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*")]
+enum Token2 {
+    #[token("_", priority = 0)]
+    Any,
+
+    #[regex(r#"0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[\d_]+"#, priority = 3)]
+    Int,
+    #[regex(r#"[\d_]+(\.[\d_]+)?"#, priority = 1)]
+    Float,
+
+    #[regex(r###"([a-zA-Z]\w*)?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')|([a-zA-Z]\w*_)?"###)]
+    String,
+
+    //(r".*?"|r#".*?"#|r##".*?"##|r'.*?'|r#'.*?'#|r##'.*?'##)
+    #[regex(r"([0-9]+|\?)[gbci]")]
+    Id,
+    #[regex(r"@[a-zA-Z_]\w*")]
+    TypeIndicator,
+
+    #[token("let")]
+    Let,
+
+    #[token("true")]
+    True,
+    #[token("false")]
+    False,
+    #[token("obj")]
+    Obj,
+    #[token("trigger")]
+    Trigger,
+
+    #[token("if")]
+    If,
+    #[token("else")]
+    Else,
+    #[token("while")]
+    While,
+    #[token("for")]
+    For,
+    #[token("in")]
+    In,
+    #[token("try")]
+    Try,
+    #[token("catch")]
+    Catch,
+    #[token("throw")]
+    Throw,
+
+    #[token("return")]
+    Return,
+    #[token("break")]
+    Break,
+    #[token("continue")]
+    Continue,
+
+    #[token("type")]
+    Type,
+    #[token("impl")]
+    Impl,
+    #[token("overload")]
+    Overload,
+    #[token("unary")]
+    Unary,
+
+    #[token("dbg")]
+    Dbg,
+
+    #[token("private")]
+    Private,
+    #[token("extract")]
+    Extract,
+    #[token("import")]
+    Import,
+    #[token("$")]
+    Dollar,
+
+    #[token("self")]
+    Slf,
+
+    #[token("is")]
+    Is,
+    #[token("as")]
+    As,
+
+    #[token("+")]
+    Plus,
+    #[token("-")]
+    Minus,
+    #[token("*")]
+    Mult,
+    #[token("/")]
+    Div,
+    #[token("%")]
+    Mod,
+    #[token("^")]
+    Pow,
+    #[token("+=")]
+    PlusEq,
+    #[token("-=")]
+    MinusEq,
+    #[token("*=")]
+    MultEq,
+    #[token("/=")]
+    DivEq,
+    #[token("%=")]
+    ModEq,
+    #[token("^=")]
+    PowEq,
+
+    #[token("&=")]
+    BinAndEq,
+    #[token("|=")]
+    BinOrEq,
+
+    #[token("<<=")]
+    ShiftLeftEq,
+    #[token(">>=")]
+    ShiftRightEq,
+
+    #[token("&")]
+    BinAnd,
+    #[token("|")]
+    BinOr,
+
+    #[token("<<")]
+    ShiftLeft,
+    #[token(">>")]
+    ShiftRight,
+
+    #[token("&&")]
+    And,
+    #[token("||")]
+    Or,
+
+    #[token(";")]
+    Eol,
+
+    #[token("(")]
+    LParen,
+    #[token(")")]
+    RParen,
+    #[token("[")]
+    LSqBracket,
+    #[token("]")]
+    RSqBracket,
+    #[token("{")]
+    LBracket,
+    #[token("}")]
+    RBracket,
+    #[token("!{")]
+    TrigFnBracket,
+
+    #[token(",")]
+    Comma,
+
+    #[token("==")]
+    Eq,
+    #[token("!=")]
+    Neq,
+    #[token(">")]
+    Gt,
+    #[token(">=")]
+    Gte,
+    #[token("<")]
+    Lt,
+    #[token("<=")]
+    Lte,
+
+    #[token("=")]
+    Assign,
+
+    #[token(":")]
+    Colon,
+    #[token("::")]
+    DoubleColon,
+    #[token(".")]
+    Dot,
+    #[token("..")]
+    Range,
+    #[token("...")]
+    Spread,
+
+    #[token("=>")]
+    FatArrow,
+    #[token("->")]
+    Arrow,
+
+    #[token("?")]
+    QMark,
+    #[token("!")]
+    ExclMark,
+
+    #[token("#")]
+    Hashtag,
+    #[token("ε")]
+    Epsilon,
+
+    #[regex(r"[a-zA-Z_][a-zA-Z_0-9]*")]
+    Ident,
+
+    #[regex(r"(\n|(\r\n))+")]
+    Newline,
+
+    Eof,
+}

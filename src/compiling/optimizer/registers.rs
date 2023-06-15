@@ -70,9 +70,12 @@ impl InterferenceGraph {
                     }
                 }
 
-                let node = &nodes[node_idx as usize];
+                let node = &mut nodes[node_idx as usize];
 
                 let mut new_live_in: AHashSet<_> = node.opcode.get_read().iter().copied().collect();
+                for i in &new_live_in {
+                    assert!(node.live_in.contains(i))
+                }
 
                 let write = node.opcode.get_write();
                 for i in out {
@@ -82,8 +85,8 @@ impl InterferenceGraph {
                     }
                 }
 
-                if new_live_in != nodes[node_idx as usize].live_in {
-                    nodes[node_idx as usize].live_in = new_live_in;
+                if new_live_in != node.live_in {
+                    node.live_in = new_live_in;
                     *changed = true;
                 }
             }

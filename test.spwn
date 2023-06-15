@@ -1,22 +1,22 @@
 
 
-let a = 0
-let b = 1
+// let a = 0
+// let b = 1
 
 
-for i in 0..20 {
-    dbg a;
+// for i in 0..20 {
+//     dbg a;
 
-    c = a + b;
-    a = b;
-    b = c;
-}
-
-
+//     c = a + b;
+//     a = b;
+//     b = c;
+// }
 
 
-// jaj = {be: "cock", h: 69}
-// a = jaj.be;
+
+
+jaj = {be: "cock", h: 69}
+a = jaj.be;
 // b = jaj.be;
 // c = jaj.be;
 // d = jaj.be;
@@ -26,7 +26,7 @@ for i in 0..20 {
 // h = jaj.be;
 // i = jaj.be;
 
-// p = 5
-// dbg jaj;
+p = 5
+dbg jaj;
 
 

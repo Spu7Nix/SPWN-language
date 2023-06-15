@@ -27,6 +27,7 @@ home = "0.5.4"
 rand = "0.8.5"
 slab = "0.4.8"
 semver = "1.0.17"
+logos = "0.13.0"
 
 quick-xml = "0.27.1"
 libflate = "1.1.0"
@@ -41,4 +42,3 @@ defile = "0.1.2"
 
 itertools = "0.10.5"
 heuristic-graph-coloring = "0.1.0"
-traversal = "0.1.2"
