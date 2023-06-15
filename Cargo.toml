@@ -38,3 +38,7 @@ spinoff = "0.7.0"
 
 indoc = "2"
 defile = "0.1.2"
+
+itertools = "0.10.5"
+heuristic-graph-coloring = "0.1.0"
+traversal = "0.1.2"

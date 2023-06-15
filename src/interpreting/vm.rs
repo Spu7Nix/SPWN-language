@@ -410,7 +410,7 @@ impl<'a> Vm<'a> {
     }
 
     pub fn get_span(&self, func: FuncCoord, i: usize) -> CodeSpan {
-        self.programs[func.code].1.opcode_span_map[&(func.func, i)]
+        self.programs[func.code].1.functions[func.func].opcode_spans[i]
     }
 
     pub fn get_area(&self, func: FuncCoord, i: usize) -> CodeArea {

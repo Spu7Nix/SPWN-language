@@ -1,42 +1,32 @@
 
 
-// // c = 5
-// // f = (a, b) {
-// //     cock = a.dick;
-// //     1 + 2 * 3
-// // }
+let a = 0
+let b = 1
 
-// // a = 1;
-// // b = 2;
-// // c = 3;
-// // d = a + b;
-// // e = c + d;
-// // f = a + e;
-// // result = f + d;
 
-// a = 2
-// b = 40
-// c = a
-// d = 42
-// c += b
+for i in 0..20 {
+    dbg a;
 
-// v = 10
-
-// |
-// V <-- v live here
-// a += v
-
-// ...
-// |
-// v <-- v live here?
-// v = 10
-// |
-// V <-- v not live here?
-// return a
-
-type @a
-
-impl @a {
-    #[no_optimize]
-    a: 20
+    c = a + b;
+    a = b;
+    b = c;
 }
+
+
+
+
+// jaj = {be: "cock", h: 69}
+// a = jaj.be;
+// b = jaj.be;
+// c = jaj.be;
+// d = jaj.be;
+// e = jaj.be;
+// f = jaj.be;
+// g = jaj.be;
+// h = jaj.be;
+// i = jaj.be;
+
+// p = 5
+// dbg jaj;
+
+

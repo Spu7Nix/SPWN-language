@@ -9,7 +9,7 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, Constant, FuncBuilder, Function};
 use super::error::CompilerError;
-use super::optimizer::register_optimization::construct_graph;
+use super::optimizer::optimize_code;
 use crate::cli::Settings;
 use crate::gd::ids::IDClass::Group;
 use crate::interpreting::opcodes::{Register, UnoptRegister};
@@ -304,13 +304,7 @@ impl<'a> Compiler<'a> {
 
                 let final_ret = f.next_reg();
 
-                f.load_empty_dict(
-                    final_ret,
-                    CodeSpan {
-                        start: usize::MAX,
-                        end: usize::MAX,
-                    },
-                );
+                f.load_empty_dict(final_ret, CodeSpan::invalid());
                 f.ret(final_ret, true, span);
 
                 // f.load_empty(reg, span)
@@ -332,6 +326,52 @@ impl<'a> Compiler<'a> {
                 None => vec![],
             },
         );
+
+        // unopt_code.consts = vec![Constant::Int(0), Constant::Int(1), Constant::Int(20)];
+
+        // {
+        //     use Opcode::*;
+        //     unopt_code.functions = vec![Function {
+        //         opcodes: vec![
+        //             LoadConst { dest: 1, id: 0 },
+        //             LoadConst { dest: 0, id: 1 },
+        //             LoadConst { dest: 2, id: 0 },
+        //             LoadConst { dest: 3, id: 2 },
+        //             Range {
+        //                 left: 2,
+        //                 right: 3,
+        //                 dest: 2,
+        //             },
+        //             WrapIterator { src: 2, dest: 2 },
+        //             IterNext { src: 2, dest: 3 },
+        //             UnwrapOrJump { src: 3, to: 14 },
+        //             Dbg { reg: 1 },
+        //             Add {
+        //                 left: 1,
+        //                 right: 0,
+        //                 dest: 1,
+        //             },
+        //             Copy { from: 1, to: 3 },
+        //             Copy { from: 0, to: 1 },
+        //             Copy { from: 3, to: 0 },
+        //             Jump { to: 6 },
+        //             LoadEmptyDict { dest: 0 },
+        //             Ret {
+        //                 src: 0,
+        //                 module_ret: true,
+        //             },
+        //         ],
+        //         regs_used: 4,
+        //         arg_amount: 0,
+        //         capture_regs: vec![],
+        //         ref_arg_regs: vec![],
+        //         span: CodeSpan { start: 0, end: 91 },
+        //     }];
+        // }
+        optimize_code(&mut unopt_code);
+        // println!("fdgsdfgdf");
+
+        // println!("{:#?}", unopt_code);
 
         let functions = unopt_code
             .functions
@@ -355,6 +395,7 @@ impl<'a> Compiler<'a> {
 
                 Function {
                     opcodes,
+                    opcode_spans: f.opcode_spans,
                     regs_used: f.regs_used,
                     arg_amount: f.arg_amount,
                     capture_regs: f
@@ -378,7 +419,6 @@ impl<'a> Compiler<'a> {
                 consts: unopt_code.consts,
                 const_patterns: unopt_code.const_patterns,
                 functions,
-                opcode_span_map: unopt_code.opcode_span_map,
                 export_names: unopt_code.export_names,
             },
         );

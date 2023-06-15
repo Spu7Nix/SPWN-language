@@ -52,7 +52,7 @@ pub type UnoptRegister = usize;
 
 pub type ConstID = u16;
 pub type ConstPatternID = u16;
-pub type JumpPos = u16;
+pub type OpcodePos = u16;
 pub type AllocSize = u16;
 pub type FunctionID = u16;
 pub type ImportID = u16;
@@ -128,9 +128,7 @@ macro_rules! opcodes {
 
 
         impl Opcode<UnoptRegister> {
-            pub fn get_used_regs(&self) -> [UnoptRegister; 3] {
-                let mut arr = [UnoptRegister::MAX; 3];
-                let mut i = 0;
+            pub fn get_used_regs(&mut self) -> Vec<&mut UnoptRegister> {
                 #[allow(unused_assignments)]
                 match self {
                     $(
@@ -140,18 +138,16 @@ macro_rules! opcodes {
                             )+
                             ..
                         })? => {
-                            $(
+                            vec![$(
                                 $(
                                     $(
-                                        arr[i] = *$reg_field;
-                                        i += 1;
+                                        $reg_field,
                                     )?
                                 )+
-                            )?
+                            )?]
                         }
                     )+
                 }
-                arr
             }
         }
     };
@@ -302,24 +298,24 @@ opcodes! {
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} || R{b} -> R{x}"))]
     Or { => left, => right, => dest },
 
-    #[delve(display = |to: &JumpPos| format!("to {to}"))]
+    #[delve(display = |to: &OpcodePos| format!("to {to}"))]
     Jump {
-        to: JumpPos,
+        to: OpcodePos,
     },
-    #[delve(display = |s: &R, to: &JumpPos| format!("if not R{s}, to {to}"))]
+    #[delve(display = |s: &R, to: &OpcodePos| format!("if not R{s}, to {to}"))]
     JumpIfFalse {
         => src,
-        to: JumpPos,
+        to: OpcodePos,
     },
-    #[delve(display = |s: &R, to: &JumpPos| format!("if R{s} == (), to {to}"))]
+    #[delve(display = |s: &R, to: &OpcodePos| format!("if R{s} == (), to {to}"))]
     JumpIfEmpty {
         => src,
-        to: JumpPos,
+        to: OpcodePos,
     },
-    #[delve(display = |s: &R, to: &JumpPos| format!("if R{s} == ?, to {to}"))]
+    #[delve(display = |s: &R, to: &OpcodePos| format!("if R{s} == ?, to {to}"))]
     UnwrapOrJump {
         => src,
-        to: JumpPos,
+        to: OpcodePos,
     },
 
     #[delve(display = |s: &R, d: &R| format!("R{s}.iter() -> R{d}"))]
@@ -372,9 +368,9 @@ opcodes! {
 
     #[delve(display = || "yeet".to_string())]
     YeetContext,
-    #[delve(display = |to: &JumpPos| format!("skip to {to}"))]
+    #[delve(display = |to: &OpcodePos| format!("skip to {to}"))]
     EnterArrowStatement {
-        skip_to: JumpPos,
+        skip_to: OpcodePos,
     },
 
     #[delve(display = |d: &R| format!("$ -> R{d}"))]

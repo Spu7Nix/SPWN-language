@@ -32,6 +32,7 @@ where
     for<'de3> Vec<R>: Serialize + Deserialize<'de3>,
 {
     pub opcodes: Vec<Opcode<R>>,
+    pub opcode_spans: Vec<CodeSpan>,
 
     pub regs_used: usize,
 
@@ -58,7 +59,6 @@ where
     pub const_patterns: Vec<ConstPattern>,
 
     pub functions: Vec<Function<R>>,
-    pub opcode_span_map: AHashMap<(usize, usize), CodeSpan>,
 
     pub export_names: Vec<String>,
     pub import_paths: Vec<Spanned<ImportType>>,
@@ -347,7 +347,6 @@ impl BytecodeBuilder {
             .collect::<Vec<_>>();
 
         let mut functions = vec![];
-        let mut opcode_span_map = AHashMap::new();
 
         for (f_n, f) in self.funcs.iter().enumerate() {
             type PositionMap<'a> = AHashMap<&'a Vec<usize>, (usize, usize)>;
@@ -377,12 +376,13 @@ impl BytecodeBuilder {
             get_block_pos(&f.code, &mut length, &mut block_positions);
 
             let mut opcodes = vec![];
+            let mut opcode_spans = vec![];
 
             fn build_block(
                 b: &Block,
                 func: usize,
                 opcodes: &mut Vec<UnoptOpcode>,
-                opcode_span_map: &mut AHashMap<(usize, usize), CodeSpan>,
+                opcode_spans: &mut Vec<CodeSpan>,
                 positions: &PositionMap<'_>,
 
                 const_index_map: &SecondaryMap<ConstKey, usize>,
@@ -433,16 +433,14 @@ impl BytecodeBuilder {
                                     },
                                 });
 
-                                if opcode.span != CodeSpan::invalid() {
-                                    opcode_span_map.insert((func, opcodes.len() - 1), opcode.span);
-                                }
+                                opcode_spans.push(opcode.span);
                             }
                         },
                         BlockContent::Block(b) => build_block(
                             b,
                             func,
                             opcodes,
-                            opcode_span_map,
+                            opcode_spans,
                             positions,
                             const_index_map,
                             const_pattern_index_map,
@@ -455,7 +453,7 @@ impl BytecodeBuilder {
                 &f.code,
                 f_n,
                 &mut opcodes,
-                &mut opcode_span_map,
+                &mut opcode_spans,
                 &block_positions,
                 &const_index_map,
                 &const_pattern_index_map,
@@ -463,6 +461,7 @@ impl BytecodeBuilder {
 
             functions.push(Function {
                 opcodes,
+                opcode_spans,
                 regs_used: f.used_regs,
                 arg_amount: f.arg_amount,
                 capture_regs: f.capture_regs.clone(),
@@ -479,7 +478,6 @@ impl BytecodeBuilder {
             consts,
             const_patterns,
             functions,
-            opcode_span_map,
             export_names: global_returns,
             import_paths: self.import_paths,
             custom_types: self.custom_types,
@@ -1582,28 +1580,26 @@ impl Bytecode<Register> {
                     .to_string();
                 let f_len = clear_ansi(&formatted).len();
 
-                let opcode_str = match self.opcode_span_map.get(&(func_i, opcode_i)) {
-                    Some(span) if span.start != usize::MAX => {
-                        let mut s = format!("{:?}", &code[span.start..span.end]);
-                        s = s[1..s.len() - 1].into();
-                        if s.is_empty() {
-                            s = " ".into();
-                        }
-                        let last_char = "";
+                let opcode_str = {
+                    let span = self.functions[func_i].opcode_spans[opcode_i];
+                    let mut s = format!("{:?}", &code[span.start..span.end]);
+                    s = s[1..s.len() - 1].into();
+                    if s.is_empty() {
+                        s = " ".into();
+                    }
+                    let last_char = "";
 
-                        if s.len() > 15 {
-                            s = format!(
-                                "{} ... {}",
-                                &s[..15].bright_cyan().underline(),
-                                last_char.bright_cyan().underline()
-                            );
-                        } else {
-                            s = s.bright_cyan().underline().to_string();
-                        }
+                    if s.len() > 15 {
+                        s = format!(
+                            "{} ... {}",
+                            &s[..15].bright_cyan().underline(),
+                            last_char.bright_cyan().underline()
+                        );
+                    } else {
+                        s = s.bright_cyan().underline().to_string();
+                    }
 
-                        format!("({}..{}) {}", span.start, span.end, s)
-                    },
-                    _ => "".into(),
+                    format!("({}..{}) {}", span.start, span.end, s)
                 };
 
                 let o_len = clear_ansi(&opcode_str).len();

@@ -686,6 +686,18 @@ impl Parser<'_> {
                                 None
                             };
 
+                            args.push(MacroArg::Single { name: self.intern_string("self").spanned(span), pattern, default: None, is_ref: false })
+                        } else if is_first && self.next_are(&[Token::BinAnd, Token::Slf]) {
+                            self.next();
+                            let span = self.span();
+
+                            let pattern = if self.next_is(Token::Colon) {
+                                self.next();
+                                Some(self.parse_pattern()?)
+                            } else {
+                                None
+                            };
+
                             args.push(MacroArg::Single { name: self.intern_string("self").spanned(span), pattern, default: None, is_ref: true })
                         } else {
                             let is_spread = if self.next_is(Token::Spread) {
