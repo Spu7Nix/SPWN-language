@@ -3,6 +3,8 @@ use ahash::AHashSet;
 use crate::compiling::bytecode::Function;
 use crate::interpreting::opcodes::{Opcode, OpcodePos, UnoptRegister};
 
+// TODO: optimise captured registers
+
 pub fn optimize(func: &mut Function<UnoptRegister>) -> bool {
     let mut unreached =
         ((0 as OpcodePos)..(func.opcodes.len() as OpcodePos)).collect::<AHashSet<_>>();

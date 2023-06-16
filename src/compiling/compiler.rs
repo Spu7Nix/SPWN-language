@@ -1585,7 +1585,7 @@ impl<'a> Compiler<'a> {
                                 for i in params {
                                     elems.push((
                                         self.compile_expr(i, scope, builder, ExprType::normal())?,
-                                        true,
+                                        false,
                                     ));
                                 }
                                 Ok(())
@@ -1618,8 +1618,8 @@ impl<'a> Compiler<'a> {
                             expr.span,
                         )?;
 
-                        elems.push((params_reg, true));
-                        elems.push((named_params_reg, true));
+                        elems.push((params_reg, false));
+                        elems.push((named_params_reg, false));
 
                         Ok(())
                     },

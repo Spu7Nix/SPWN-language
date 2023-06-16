@@ -7,6 +7,10 @@ use itertools::Itertools;
 use crate::compiling::bytecode::{Bytecode, Function};
 use crate::interpreting::opcodes::{Opcode, OpcodePos, UnoptOpcode, UnoptRegister};
 
+// enum NodeType<'a> {
+//     Opcode(&'a Opcode<UnoptRegister>),
+// }
+
 struct Node<'a> {
     opcode: &'a Opcode<UnoptRegister>,
     live_in: AHashSet<usize>,
@@ -116,14 +120,14 @@ impl InterferenceGraph {
                     out.insert(*reg);
                 }
             }
-            // println!(
-            //     "{}: IN{:?}, OUT{:?}, DEF{:?}, USE{:?}",
-            //     i,
-            //     node.live_in,
-            //     out,
-            //     node.opcode.get_write(),
-            //     node.opcode.get_read()
-            // );
+            println!(
+                "{}: IN{:?}, OUT{:?}, DEF{:?}, USE{:?}",
+                i,
+                node.live_in,
+                out,
+                node.opcode.get_write(),
+                node.opcode.get_read()
+            );
 
             for a in node.opcode.get_write().iter() {
                 for b in &out {
@@ -132,9 +136,9 @@ impl InterferenceGraph {
             }
         }
 
-        // for (_, capture_reg) in &func.capture_regs {
-        //     key_regs[*capture_reg] = true;
-        // }
+        for (_, capture_reg) in &func.capture_regs {
+            key_regs[*capture_reg] = true;
+        }
 
         // println!("zuzu {:?}", key_regs);
         for i in 0..func.regs_used {
@@ -147,6 +151,20 @@ impl InterferenceGraph {
                 }
             }
         }
+
+        for g in func
+            .capture_regs
+            .iter()
+            .map(|(_, r)| r)
+            .chain(&func.arg_regs)
+            .combinations(2)
+        {
+            graph.add_edge(*g[0], *g[1])
+        }
+        // for g in func.arg_regs.iter().combinations(2) {
+        //     graph.add_edge(*g[0], *g[1])
+        // }
+
         // for &inner in &func.inner_funcs {
         //     for &(reg, _) in &b.functions[inner as usize].capture_regs {
         //         for j in 0..func.regs_used {
@@ -161,7 +179,7 @@ impl InterferenceGraph {
 pub fn optimize(code: &mut Bytecode<UnoptRegister>, func: u16) -> bool {
     let graph = InterferenceGraph::from_func(&code.functions[func as usize], &*code);
     let coloring = color_rlf(graph);
-    // println!("{:?}", coloring);
+    println!("F{func}: {:?}", coloring);
 
     let mut changed = false;
 
@@ -176,11 +194,11 @@ pub fn optimize(code: &mut Bytecode<UnoptRegister>, func: u16) -> bool {
     for (_, reg) in &mut code.functions[func as usize].capture_regs {
         *reg = coloring[*reg];
     }
-    for reg in &mut code.functions[func as usize].ref_arg_regs {
-        *reg = coloring[*reg];
-    }
+    // for reg in &mut code.functions[func as usize].ref_arg_regs {
+    //     *reg = coloring[*reg];
+    // }
     for reg in &mut code.functions[func as usize].arg_regs {
-        dbg!(&reg);
+        // dbg!(&reg);
         *reg = coloring[*reg];
     }
 

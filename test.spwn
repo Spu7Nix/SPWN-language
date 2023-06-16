@@ -39,21 +39,34 @@
 // }
 
 
-grug = (x) {
-    dbg x
+
+// a = [1, 2, 3]
+// b = 5
+
+let a = 20
+
+
+gugle = (&x) {
+    x = 10
 }
 
-grug(5);
-grug(5);
+gugle(a);
 
 
-// h();
-// h();
 
-// f = (a, b, ...c) {
-//     dbg a;
-//     dbg b;
-//     dbg c;
-// }
 
-// f(8, 2, 7, 10)
+// main
+R0 <- 20
+R1 <~ R0
+jump gugle
+
+
+
+// gugle
+R1 <- 10
+ret
+
+
+
+
+

@@ -19,7 +19,9 @@ pub fn optimize_code(code: &mut Bytecode<UnoptRegister>) {
             }
 
             println!("jw {}", func);
-            *changed |= registers::optimize(code, func);
+            if func == 1 {
+                // *changed |= registers::optimize(code, func);
+            }
             // *changed |= redundancy::optimize(&mut (*code).functions[func as usize]);
             // *changed |= dead_code::optimize(&mut (*code).functions[func as usize]);
         }
