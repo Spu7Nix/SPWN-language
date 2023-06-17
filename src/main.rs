@@ -7,8 +7,6 @@
 mod cli;
 mod compiling;
 mod error;
-mod gd;
-mod interpreting;
 mod lexing;
 mod parsing;
 mod sources;
@@ -24,22 +22,15 @@ use std::rc::Rc;
 use clap::Parser as _;
 use cli::Settings;
 use colored::Colorize;
-use gd::gd_object::{GdObject, TriggerObject};
+use compiling::builder::BytecodeBuilder;
+use compiling::bytecode::Register;
 use lasso::Rodeo;
 use spinoff::spinners::SpinnerFrames;
 use spinoff::{Spinner as SSpinner, *};
 
 use crate::cli::{Arguments, Command};
-use crate::compiling::bytecode::Function;
-use crate::compiling::compiler::{Compiler, TypeDefMap};
-use crate::gd::ids::IDClass;
-use crate::gd::optimizer::{optimize, ReservedIds};
-use crate::gd::{gd_object, levelstring};
-use crate::interpreting::context::{CallInfo, Context};
-use crate::interpreting::opcodes::{Opcode, Register};
-use crate::interpreting::vm::{ContextSplitMode, FuncCoord, Vm};
 use crate::parsing::parser::Parser;
-use crate::sources::{BytecodeMap, CodeSpan, SpwnSource};
+use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::{BasicError, HexColorize, RandomState};
 
 const CORE_PATH: &str = "./libraries/core/";
@@ -101,7 +92,29 @@ const RUNNING_COLOR: u32 = 0xFF59C7;
 const OPTIMISING_COLOR: u32 = 0xA74AFF;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
+    // assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
+    loop {
+        let mut b = BytecodeBuilder::new();
+
+        b.new_func(|f| {
+            f.load_int(69, Register(5), CodeSpan::invalid());
+            f.load_string(
+                "gaga".to_string().into_boxed_str(),
+                Register(6),
+                CodeSpan::invalid(),
+            );
+            let block = f.block_path;
+            f.new_block(|f| {
+                f.load_int(420, Register(9), CodeSpan::invalid());
+                // f.jump_to_end(None, CodeSpan::invalid());
+                // f.jump_to_end(Some(block), CodeSpan::invalid());
+            });
+            f.load_bool(true, Register(1), CodeSpan::invalid());
+        });
+    }
+
+    // println!("{:?}", b);
+    std::process::exit(1);
 
     let args = Arguments::parse();
 
@@ -138,64 +151,60 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None
             };
 
-            let (level_string, level_name) = if !settings.no_level {
-                if let Some(gd_path) = &gd_path {
-                    spinner.start(format!(
-                        "{:20}",
-                        "Reading savefile...".color_hex(READING_COLOR).bold()
-                    ));
+            // let (level_string, level_name) = if !settings.no_level {
+            //     if let Some(gd_path) = &gd_path {
+            //         spinner.start(format!(
+            //             "{:20}",
+            //             "Reading savefile...".color_hex(READING_COLOR).bold()
+            //         ));
 
-                    let mut file = fs::File::open(gd_path)?;
-                    let mut file_content = Vec::new();
+            //         let mut file = fs::File::open(gd_path)?;
+            //         let mut file_content = Vec::new();
 
-                    match file.read_to_end(&mut file_content) {
-                        Ok(..) => (),
-                        Err(e) => {
-                            spinner.fail(Some(format!(
-                                "❌  {} {}",
-                                "Error reading savefile:".bright_red().bold(),
-                                e
-                            )));
+            //         match file.read_to_end(&mut file_content) {
+            //             Ok(..) => (),
+            //             Err(e) => {
+            //                 spinner.fail(Some(format!(
+            //                     "❌  {} {}",
+            //                     "Error reading savefile:".bright_red().bold(),
+            //                     e
+            //                 )));
 
-                            std::process::exit(1);
-                        },
-                    }
+            //                 std::process::exit(1);
+            //             },
+            //         }
 
-                    let (mut level_string, level_name) = match levelstring::get_level_string(
-                        file_content,
-                        settings.level_name.as_ref(),
-                    ) {
-                        Ok(s) => s,
-                        Err(e) => {
-                            spinner.fail(Some(format!(
-                                "❌  {} {}",
-                                "Error reading level:".bright_red().bold(),
-                                e
-                            )));
+            //         let (mut level_string, level_name) = match levelstring::get_level_string(
+            //             file_content,
+            //             settings.level_name.as_ref(),
+            //         ) {
+            //             Ok(s) => s,
+            //             Err(e) => {
+            //                 spinner.fail(Some(format!(
+            //                     "❌  {} {}",
+            //                     "Error reading level:".bright_red().bold(),
+            //                     e
+            //                 )));
 
-                            std::process::exit(1);
-                        },
-                    };
+            //                 std::process::exit(1);
+            //             },
+            //         };
 
-                    spinner.complete(None);
+            //         spinner.complete(None);
 
-                    if level_string.is_empty() {}
+            //         if level_string.is_empty() {}
 
-                    gd_object::remove_spwn_objects(&mut level_string);
+            //         gd_object::remove_spwn_objects(&mut level_string);
 
-                    (level_string, level_name)
-                } else {
-                    (String::new(), String::new())
-                }
-            } else {
-                (String::new(), String::new())
-            };
+            //         (level_string, level_name)
+            //     } else {
+            //         (String::new(), String::new())
+            //     }
+            // } else {
+            //     (String::new(), String::new())
+            // };
 
-            let SpwnOutput {
-                mut objects,
-                mut triggers,
-                id_counters,
-            } = match run_spwn(file, &settings, &mut spinner) {
+            match run_spwn(file, &settings, &mut spinner) {
                 Ok(o) => o,
                 Err(e) => {
                     spinner.fail(Some(format!("❌  {e}")));
@@ -204,70 +213,70 @@ fn main() -> Result<(), Box<dyn Error>> {
                 },
             };
 
-            let reserved = ReservedIds::from_objects(&objects, &triggers);
+            // let reserved = ReservedIds::from_objects(&objects, &triggers);
 
-            if !triggers.is_empty() && !settings.no_optimize {
-                spinner.start(format!(
-                    "{:20}",
-                    "Optimizing Triggers...".color_hex(OPTIMISING_COLOR).bold()
-                ));
+            // if !triggers.is_empty() && !settings.no_optimize {
+            //     spinner.start(format!(
+            //         "{:20}",
+            //         "Optimizing Triggers...".color_hex(OPTIMISING_COLOR).bold()
+            //     ));
 
-                triggers =
-                    optimize::optimize(triggers, id_counters[IDClass::Group as usize], reserved);
+            //     triggers =
+            //         optimize::optimize(triggers, id_counters[IDClass::Group as usize], reserved);
 
-                spinner.complete(None);
-            }
+            //     spinner.complete(None);
+            // }
 
-            objects.extend(gd_object::apply_triggers(triggers));
+            // objects.extend(gd_object::apply_triggers(triggers));
 
-            println!(
-                "\n{} objects added",
-                (objects.len()).to_string().bright_white().bold()
-            );
+            // println!(
+            //     "\n{} objects added",
+            //     (objects.len()).to_string().bright_white().bold()
+            // );
 
-            let (new_ls, used_ids) = gd_object::append_objects(objects, &level_string)?;
+            // let (new_ls, used_ids) = gd_object::append_objects(objects, &level_string)?;
 
-            println!("\n{}", "Level uses:".bright_green().bold());
+            // println!("\n{}", "Level uses:".bright_green().bold());
 
-            for (i, len) in used_ids.iter().enumerate() {
-                println!(
-                    "{}",
-                    &format!(
-                        "{} {}",
-                        len.to_string().bright_white().bold(),
-                        ["groups", "channels", "block IDs", "item IDs"][i]
-                    ),
-                );
-            }
+            // for (i, len) in used_ids.iter().enumerate() {
+            //     println!(
+            //         "{}",
+            //         &format!(
+            //             "{} {}",
+            //             len.to_string().bright_white().bold(),
+            //             ["groups", "channels", "block IDs", "item IDs"][i]
+            //         ),
+            //     );
+            // }
 
-            println!();
+            // println!();
 
-            match gd_path {
-                Some(gd_path) => {
-                    spinner.start(format!(
-                        r#"{} "{}" {:20}"#,
-                        "Writing back to".bright_cyan().bold(),
-                        level_name.bright_white().bold(),
-                        "..."
-                    ));
+            // match gd_path {
+            //     Some(gd_path) => {
+            //         spinner.start(format!(
+            //             r#"{} "{}" {:20}"#,
+            //             "Writing back to".bright_cyan().bold(),
+            //             level_name.bright_white().bold(),
+            //             "..."
+            //         ));
 
-                    levelstring::encrypt_level_string(
-                        new_ls,
-                        level_string,
-                        gd_path,
-                        &settings.level_name,
-                    )?;
+            //         levelstring::encrypt_level_string(
+            //             new_ls,
+            //             level_string,
+            //             gd_path,
+            //             &settings.level_name,
+            //         )?;
 
-                    spinner.complete(Some(format!(
-                        "\n👍  {}  🙂",
-                        "Written to save. You can now open Geometry Dash again!"
-                            .bright_green()
-                            .bold(),
-                    )));
-                },
+            //         spinner.complete(Some(format!(
+            //             "\n👍  {}  🙂",
+            //             "Written to save. You can now open Geometry Dash again!"
+            //                 .bright_green()
+            //                 .bold(),
+            //         )));
+            //     },
 
-                None => println!("\nOutput: {new_ls}",),
-            };
+            //     None => println!("\nOutput: {new_ls}",),
+            // };
         },
     };
 
@@ -290,17 +299,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-struct SpwnOutput {
-    pub objects: Vec<GdObject>,
-    pub triggers: Vec<TriggerObject>,
-    pub id_counters: [u16; 4],
-}
-
 fn run_spwn(
     file: PathBuf,
     settings: &Settings,
     spinner: &mut Spinner,
-) -> Result<SpwnOutput, Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
     let interner = Rc::new(RefCell::new(Rodeo::with_hasher(RandomState::new())));
 
     spinner.start(format!(
@@ -323,64 +326,66 @@ fn run_spwn(
         "{:20}",
         "Compiling...".color_hex(COMPILING_COLOR).bold()
     ));
+    Ok(())
+    // todo!()
 
-    let mut map = BytecodeMap::default();
-    let mut typedefs = TypeDefMap::default();
+    // let mut map = BytecodeMap::default();
+    // let mut typedefs = TypeDefMap::default();
 
-    let mut compiler = Compiler::new(
-        Rc::clone(&interner),
-        parser.src.clone(),
-        settings,
-        &mut map,
-        &mut typedefs,
-    );
+    // let mut compiler = Compiler::new(
+    //     Rc::clone(&interner),
+    //     parser.src.clone(),
+    //     settings,
+    //     &mut map,
+    //     &mut typedefs,
+    // );
 
-    compiler
-        .compile(
-            ast.statements,
-            Some(ast.file_attributes),
-            CodeSpan {
-                start: 0,
-                end: code.len(),
-            },
-        )
-        .map_err(|e| e.to_report())?;
+    // compiler
+    //     .compile(
+    //         ast.statements,
+    //         Some(ast.file_attributes),
+    //         CodeSpan {
+    //             start: 0,
+    //             end: code.len(),
+    //         },
+    //     )
+    //     .map_err(|e| e.to_report())?;
 
-    spinner.complete(None);
-    println!();
+    // spinner.complete(None);
+    // println!();
 
-    if settings.debug_bytecode {
-        for (k, b) in &map.map {
-            b.debug_str(k)
-        }
-    }
+    // if settings.debug_bytecode {
+    //     for (k, b) in &map.map {
+    //         b.debug_str(k)
+    //     }
+    // }
 
-    let mut vm = Vm::new(&map, interner, typedefs);
+    // let mut vm = Vm::new(&map, interner, typedefs);
 
-    let key = vm.src_map[&parser.src];
-    let start = FuncCoord::new(0, key);
+    // let key = vm.src_map[&parser.src];
+    // let start = FuncCoord::new(0, key);
 
-    println!("{:20}", "Building...".color_hex(RUNNING_COLOR).bold());
+    // println!("{:20}", "Building...".color_hex(RUNNING_COLOR).bold());
 
-    println!("\n{}", "════ Output ══════════════════════".dimmed().bold());
+    // println!("\n{}", "════ Output ══════════════════════".dimmed().bold());
 
-    vm.run_function(
-        Context::new(),
-        CallInfo {
-            func: start,
-            return_dest: None,
-            call_area: None,
-        },
-        Box::new(|_| Ok(())),
-        ContextSplitMode::Allow,
-    )
-    .map_err(|e| e.to_report(&vm))?;
+    // vm.run_function(
+    //     Context::new(),
+    //     CallInfo {
+    //         func: start,
+    //         return_dest: None,
+    //         call_area: None,
+    //     },
+    //     Box::new(|_| Ok(())),
+    //     ContextSplitMode::Allow,
+    // )
+    // .map_err(|e| e.to_report(&vm))?;
 
-    println!("\n{}", "══════════════════════════════════".dimmed().bold());
+    // println!("\n{}", "══════════════════════════════════".dimmed().bold());
 
-    Ok(SpwnOutput {
-        objects: vm.objects,
-        triggers: vm.triggers,
-        id_counters: vm.id_counters,
-    })
+    // Ok(SpwnOutput {
+    //     objects: vm.objects,
+    //     triggers: vm.triggers,
+    //     id_counters: vm.id_counters,
+    // })
 }

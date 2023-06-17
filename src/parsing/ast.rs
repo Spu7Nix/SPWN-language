@@ -6,8 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use super::attributes::{Attributes, FileAttribute};
 use super::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
-use crate::gd::ids::IDClass;
-use crate::gd::object_keys::ObjectKey;
 use crate::sources::CodeSpan;
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -191,8 +189,7 @@ pub enum Expression {
     String(StringType),
     Bool(bool),
 
-    Id(IDClass, Option<u16>),
-
+    // Id(IDClass, Option<u16>),
     Op(ExprNode, BinOp, ExprNode),
     Unary(UnaryOp, ExprNode),
 
@@ -260,7 +257,7 @@ pub enum Expression {
         base: ExprNode,
         items: Vec<DictItem>,
     },
-    Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
+    // Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
 }
 
 #[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash)]
@@ -269,13 +266,13 @@ pub enum ObjectType {
     Trigger,
 }
 
-#[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash, EnumDisplay)]
-pub enum ObjKeyType {
-    #[delve(display = |o: &ObjectKey| <&ObjectKey as Into<&str>>::into(o).to_string())]
-    Name(ObjectKey),
-    #[delve(display = |n: &u8| format!("{n}"))]
-    Num(u8),
-}
+// #[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash, EnumDisplay)]
+// pub enum ObjKeyType {
+//     #[delve(display = |o: &ObjectKey| <&ObjectKey as Into<&str>>::into(o).to_string())]
+//     Name(ObjectKey),
+//     #[delve(display = |n: &u8| format!("{n}"))]
+//     Num(u8),
+// }
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone, EnumToStr)]

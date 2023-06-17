@@ -3,6 +3,7 @@ pub type Interner = lasso::Rodeo<lasso::Spur, RandomState>;
 
 use std::path::PathBuf;
 
+use ahash::AHashMap;
 use colored::{ColoredString, Colorize};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -131,6 +132,24 @@ impl std::error::Error for BasicError {}
 impl std::fmt::Display for BasicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UniqueRegister<T: std::hash::Hash + Eq> {
+    map: AHashMap<T, usize>,
+}
+
+impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
+    pub fn new() -> Self {
+        Self {
+            map: AHashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, value: T) -> usize {
+        let len = self.map.len();
+        *self.map.entry(value).or_insert(len)
     }
 }
 

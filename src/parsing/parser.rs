@@ -14,10 +14,7 @@ use super::ast::{
 use super::attributes::{Attributes, FileAttribute, IsValidOn, ParseAttribute};
 use super::error::SyntaxError;
 use super::utils::operators::{self, unary_prec};
-use crate::gd::ids::IDClass;
-use crate::gd::object_keys::OBJECT_KEYS;
 use crate::lexing::tokens::{Lexer, Token};
-use crate::parsing::ast::ObjKeyType;
 use crate::parsing::utils::operators::Operator;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
@@ -187,18 +184,18 @@ impl Parser<'_> {
         s.replace('_', "").parse::<i64>().unwrap()
     }
 
-    fn parse_id(&self, s: &str) -> (IDClass, Option<u16>) {
-        let class = match &s[(s.len() - 1)..(s.len())] {
-            "g" => IDClass::Group,
-            "c" => IDClass::Color,
-            "b" => IDClass::Block,
-            "i" => IDClass::Item,
-            _ => unreachable!(),
-        };
-        let value = s[0..(s.len() - 1)].parse::<u16>().ok();
+    // fn parse_id(&self, s: &str) -> (IDClass, Option<u16>) {
+    //     let class = match &s[(s.len() - 1)..(s.len())] {
+    //         "g" => IDClass::Group,
+    //         "c" => IDClass::Color,
+    //         "b" => IDClass::Block,
+    //         "i" => IDClass::Item,
+    //         _ => unreachable!(),
+    //     };
+    //     let value = s[0..(s.len() - 1)].parse::<u16>().ok();
 
-        (class, value)
-    }
+    //     (class, value)
+    // }
 
     pub fn parse_string(&self, s: &str, span: CodeSpan) -> ParseResult<StringType> {
         let mut chars = s.chars();
@@ -565,12 +562,12 @@ impl Parser<'_> {
                     self.next();
                     Expression::String(self.parse_string(self.slice(), self.span())?).spanned(start)
                 },
-                Token::Id => {
-                    self.next();
+                // Token::Id => {
+                //     self.next();
 
-                    let (id_class, value) = self.parse_id(self.slice());
-                    Expression::Id(id_class, value).spanned(start)
-                },
+                //     let (id_class, value) = self.parse_id(self.slice());
+                //     Expression::Id(id_class, value).spanned(start)
+                // },
                 Token::Dollar => {
                     self.next();
 
@@ -883,41 +880,41 @@ impl Parser<'_> {
 
                     Expression::Array(elems).spanned(start.extend(self.span()))
                 },
-                typ @ (Token::Obj | Token::Trigger) => {
-                    self.next();
+                // typ @ (Token::Obj | Token::Trigger) => {
+                //     self.next();
 
-                    self.expect_tok(Token::LBracket)?;
+                //     self.expect_tok(Token::LBracket)?;
 
-                    let mut items: Vec<(Spanned<ObjKeyType>, ExprNode)> = vec![];
+                //     let mut items: Vec<(Spanned<ObjKeyType>, ExprNode)> = vec![];
 
-                    list_helper!(self, RBracket {
-                        let key = match self.next() {
-                            Token::Int => ObjKeyType::Num(self.parse_int(self.slice()) as u8),
-                            Token::Ident => ObjKeyType::Name(OBJECT_KEYS[self.slice()]),
-                            other => {
-                                return Err(SyntaxError::UnexpectedToken {
-                                    expected: "key".into(),
-                                    found: other,
-                                    area: self.make_area(self.span()),
-                                })
-                            }
-                        };
+                //     list_helper!(self, RBracket {
+                //         let key = match self.next() {
+                //             Token::Int => ObjKeyType::Num(self.parse_int(self.slice()) as u8),
+                //             Token::Ident => ObjKeyType::Name(OBJECT_KEYS[self.slice()]),
+                //             other => {
+                //                 return Err(SyntaxError::UnexpectedToken {
+                //                     expected: "key".into(),
+                //                     found: other,
+                //                     area: self.make_area(self.span()),
+                //                 })
+                //             }
+                //         };
 
-                        let key_span = self.span();
-                        self.expect_tok(Token::Colon)?;
-                        items.push((key.spanned(key_span), self.parse_expr(true)?));
-                    });
+                //         let key_span = self.span();
+                //         self.expect_tok(Token::Colon)?;
+                //         items.push((key.spanned(key_span), self.parse_expr(true)?));
+                //     });
 
-                    Expression::Obj(
-                        match typ {
-                            Token::Obj => ObjectType::Object,
-                            Token::Trigger => ObjectType::Trigger,
-                            _ => unreachable!(),
-                        },
-                        items,
-                    )
-                    .spanned(start.extend(self.span()))
-                },
+                //     Expression::Obj(
+                //         match typ {
+                //             Token::Obj => ObjectType::Object,
+                //             Token::Trigger => ObjectType::Trigger,
+                //             _ => unreachable!(),
+                //         },
+                //         items,
+                //     )
+                //     .spanned(start.extend(self.span()))
+                // },
                 Token::LBracket => {
                     self.next();
 

@@ -5,8 +5,6 @@ use std::path::PathBuf;
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::compiling::bytecode::Bytecode;
-use crate::interpreting::opcodes::Register;
 use crate::parsing::ast::ModuleImport;
 use crate::util::hyperlink;
 
@@ -148,10 +146,3 @@ impl From<CodeSpan> for Range<usize> {
         s.start..s.end
     }
 }
-
-#[derive(Default)]
-pub struct BytecodeMap {
-    pub map: AHashMap<SpwnSource, Bytecode<Register>>,
-}
-
-// rmdir -r -fo ~\.spwn\versions\0.9.0\libraries; cp .\libraries\ ~\.spwn\versions\0.9.0 -r
