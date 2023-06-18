@@ -1,11 +1,16 @@
 use std::hash::Hash;
 
-#[derive(Clone, Debug)]
+use derive_more::{Deref, DerefMut};
+
+use super::opcodes::{Opcode, OptOpcode};
+use crate::util::{Digest, ImmutStr, ImmutVec};
+
+#[derive(Clone, Debug, derive_more::From)]
 pub enum Constant {
     Int(i64),
     Float(f64),
     Bool(bool),
-    String(Box<str>),
+    String(ImmutStr),
 }
 
 impl Hash for Constant {
@@ -31,7 +36,7 @@ impl PartialEq for Constant {
 }
 impl Eq for Constant {}
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, DerefMut)]
 pub struct Register<T: Copy>(pub T);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -42,52 +47,12 @@ pub struct OpcodePos(pub u16);
 pub struct FuncID(pub u16);
 
 pub type UnoptRegister = Register<usize>;
+pub type OptRegister = Register<u8>;
 
-impl<T: Copy> core::ops::Deref for Register<T> {
-    type Target = T;
+pub struct Bytecode<R: Copy> {
+    pub source_hash: Digest,
+    pub version: ImmutStr,
+    constants: ImmutVec<Constant>,
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl<T: Copy> core::ops::DerefMut for Register<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-impl core::ops::Deref for ConstID {
-    type Target = u16;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl core::ops::DerefMut for ConstID {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-impl core::ops::Deref for OpcodePos {
-    type Target = u16;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl core::ops::DerefMut for OpcodePos {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-impl core::ops::Deref for FuncID {
-    type Target = u16;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl core::ops::DerefMut for FuncID {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
+    opcodes: ImmutVec<Opcode<R>>,
 }

@@ -1,12 +1,13 @@
-pub type RandomState = ahash::RandomState;
-pub type Interner = lasso::Rodeo<lasso::Spur, RandomState>;
-
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use ahash::AHashMap;
 use colored::{ColoredString, Colorize};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+
+pub type RandomState = ahash::RandomState;
+pub type Interner = lasso::Rodeo<lasso::Spur, RandomState>;
 
 pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
     let mtext = match &text {
@@ -137,7 +138,7 @@ impl std::fmt::Display for BasicError {
 
 #[derive(Debug, Clone)]
 pub struct UniqueRegister<T: std::hash::Hash + Eq> {
-    map: AHashMap<T, usize>,
+    pub map: AHashMap<T, usize>,
 }
 
 impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
@@ -165,3 +166,13 @@ lazy_static! {
         env!("CARGO_PKG_VERSION")
     ));
 }
+
+pub type ImmutCloneStr = Rc<str>;
+pub type ImmutStr = Box<str>;
+pub type ImmutCloneVec<T> = Rc<[T]>;
+pub type ImmutVec<T> = Box<[T]>;
+
+// this is equivalent to if you were to do
+// something like String in the case of no mutability
+// specky are you reading this if you
+// a re reading this specky tag me on SPWN point server and say "Laaaaaaaa". Do it. please(it would be cool)_

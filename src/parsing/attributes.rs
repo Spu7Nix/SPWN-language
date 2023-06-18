@@ -1,11 +1,12 @@
 use ahash::AHashMap;
 use paste::paste;
 
-use super::ast::{DictItem, Expression, Spanned};
+use super::ast::{DictItem, Expression};
 use crate::lexing::tokens::Token;
 use crate::parsing::ast::Statement;
 use crate::parsing::error::SyntaxError;
 use crate::parsing::parser::{ParseResult, Parser};
+use crate::sources::{Spannable, Spanned};
 use crate::util::hyperlink;
 use crate::SpwnSource;
 

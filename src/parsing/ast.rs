@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::attributes::{Attributes, FileAttribute};
 use super::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
-use crate::sources::CodeSpan;
+use crate::sources::{CodeSpan, Spannable, Spanned};
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
@@ -389,44 +389,4 @@ impl StmtNode {
 pub struct Ast {
     pub statements: Vec<StmtNode>,
     pub file_attributes: Vec<FileAttribute>,
-}
-
-#[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Spanned<T> {
-    pub value: T,
-    pub span: CodeSpan,
-}
-
-impl<T> Spanned<T> {
-    pub fn split(self) -> (T, CodeSpan) {
-        (self.value, self.span)
-    }
-
-    pub fn extended(self, other: CodeSpan) -> Self {
-        Self {
-            span: self.span.extend(other),
-            ..self
-        }
-    }
-
-    pub fn apply_fn<U, F: FnOnce(T) -> U>(self, f: F) -> Spanned<U> {
-        f(self.value).spanned(self.span)
-    }
-}
-
-impl<T: Copy> Copy for Spanned<T> {}
-
-pub trait Spannable {
-    fn spanned(self, span: CodeSpan) -> Spanned<Self>
-    where
-        Self: Sized;
-}
-
-impl<T> Spannable for T {
-    fn spanned(self, span: CodeSpan) -> Spanned<Self>
-    where
-        Self: Sized,
-    {
-        Spanned { value: self, span }
-    }
 }

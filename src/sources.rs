@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::fs;
 use std::ops::Range;
 use std::path::PathBuf;
@@ -144,5 +145,68 @@ impl From<Range<usize>> for CodeSpan {
 impl From<CodeSpan> for Range<usize> {
     fn from(s: CodeSpan) -> Self {
         s.start..s.end
+    }
+}
+
+// impl<T: Copy> Copy for Spanned<T> {}
+
+pub trait Spannable {
+    fn spanned(self, span: CodeSpan) -> Spanned<Self>
+    where
+        Self: Sized;
+}
+
+impl<T> Spannable for T {
+    fn spanned(self, span: CodeSpan) -> Spanned<Self>
+    where
+        Self: Sized,
+    {
+        Spanned { value: self, span }
+    }
+}
+
+#[derive(Clone, Hash, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Spanned<T> {
+    pub value: T,
+    pub span: CodeSpan,
+}
+
+impl<T> Spanned<T> {
+    pub fn split(self) -> (T, CodeSpan) {
+        (self.value, self.span)
+    }
+
+    pub fn extended(self, other: CodeSpan) -> Self {
+        Self {
+            span: self.span.extend(other),
+            ..self
+        }
+    }
+
+    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Spanned<U> {
+        f(self.value).spanned(self.span)
+    }
+}
+
+impl<T> std::ops::Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+impl<T> std::ops::DerefMut for Spanned<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
+}
+
+impl<T: Debug> Debug for Spanned<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?}.spanned({}..{})",
+            self.value, self.span.start, self.span.end
+        )
     }
 }

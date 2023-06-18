@@ -8,15 +8,14 @@ use unindent::unindent;
 
 use super::ast::{
     Ast, DictItem, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, ObjectType,
-    Pattern, PatternNode, Spannable, Spanned, Statement, Statements, StmtNode, StringContent,
-    StringType,
+    Pattern, PatternNode, Statement, Statements, StmtNode, StringContent, StringType,
 };
 use super::attributes::{Attributes, FileAttribute, IsValidOn, ParseAttribute};
 use super::error::SyntaxError;
 use super::utils::operators::{self, unary_prec};
 use crate::lexing::tokens::{Lexer, Token};
 use crate::parsing::utils::operators::Operator;
-use crate::sources::{CodeArea, CodeSpan, SpwnSource};
+use crate::sources::{CodeArea, CodeSpan, Spannable, Spanned, SpwnSource};
 use crate::util::Interner;
 
 #[derive(Clone)]
