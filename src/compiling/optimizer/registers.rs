@@ -152,14 +152,22 @@ impl InterferenceGraph {
             }
         }
 
-        for g in func
+        for r1 in func
             .capture_regs
             .iter()
             .map(|(_, r)| r)
             .chain(&func.arg_regs)
-            .combinations(2)
+            .chain(&func.ref_arg_regs)
+            .chain(
+                func.inner_funcs
+                    .iter()
+                    .flat_map(|f| &b.functions[*f as usize].capture_regs)
+                    .map(|(r, _)| r),
+            )
         {
-            graph.add_edge(*g[0], *g[1])
+            for r2 in 0..func.regs_used {
+                graph.add_edge(*r1, r2)
+            }
         }
         // for g in func.arg_regs.iter().combinations(2) {
         //     graph.add_edge(*g[0], *g[1])
@@ -194,9 +202,9 @@ pub fn optimize(code: &mut Bytecode<UnoptRegister>, func: u16) -> bool {
     for (_, reg) in &mut code.functions[func as usize].capture_regs {
         *reg = coloring[*reg];
     }
-    // for reg in &mut code.functions[func as usize].ref_arg_regs {
-    //     *reg = coloring[*reg];
-    // }
+    for reg in &mut code.functions[func as usize].ref_arg_regs {
+        *reg = coloring[*reg];
+    }
     for reg in &mut code.functions[func as usize].arg_regs {
         // dbg!(&reg);
         *reg = coloring[*reg];
