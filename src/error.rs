@@ -73,7 +73,7 @@ macro_rules! error_maker {
             )*
         }
         $(#[$($meta:tt)*])*
-        pub enum $enum:ident {
+        pub enum $enum:ident $(<$lt:lifetime>)? {
             $(
                 #[
                     Message: $msg:expr, Note: $note:expr;
@@ -96,7 +96,7 @@ macro_rules! error_maker {
     ) => {
         #[derive(Debug, Clone)]
         $(#[$($meta)*])*
-        pub enum $enum {
+        pub enum $enum $(<$lt>)?  {
             $(
                 $err_name {
                     $(
@@ -107,7 +107,7 @@ macro_rules! error_maker {
             )*
         }
 
-        impl $enum {
+        impl$(<$lt>)? $enum$(<$lt>)? {
             pub fn to_report(&self $(, $extra_arg: $extra_type)* ) -> $crate::error::ErrorReport {
                 use colored::Colorize;
                 use $crate::error::RainbowColorGenerator;

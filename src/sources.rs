@@ -1,7 +1,8 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::fs;
 use std::ops::Range;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
@@ -19,7 +20,7 @@ pub enum SpwnSource {
 impl SpwnSource {
     pub fn area(&self, span: CodeSpan) -> CodeArea {
         CodeArea {
-            src: self.clone(),
+            src: Rc::new(self.clone()),
             span,
         }
     }
@@ -79,7 +80,7 @@ impl SpwnSource {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeArea {
-    pub src: SpwnSource,
+    pub src: Rc<SpwnSource>,
     pub span: CodeSpan,
 }
 impl CodeArea {
@@ -99,22 +100,14 @@ impl CodeArea {
     // }
 }
 
-#[allow(clippy::derived_hash_with_manual_eq)]
-#[allow(renamed_and_removed_lints)]
-#[allow(unknown_lints)]
-#[allow(clippy::derive_hash_xor_eq)]
-#[cfg_attr(not(test), derive(PartialEq))]
-#[derive(Debug, Clone, Eq, Copy, Default, Serialize, Deserialize, Hash)]
+#[allow(renamed_and_removed_lints, unknown_lints)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Copy, Default, Serialize, Deserialize, Hash, derive_more::Display,
+)]
+#[display(fmt = "{}..{}", start, end)]
 pub struct CodeSpan {
     pub start: usize,
     pub end: usize,
-}
-
-#[cfg(test)]
-impl PartialEq for CodeSpan {
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
 }
 
 impl CodeSpan {

@@ -1,10 +1,15 @@
+use std::borrow::Cow;
+use std::marker::PhantomData;
+use std::ops::{Index, IndexMut};
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use ahash::AHashMap;
 use colored::{ColoredString, Colorize};
 use lazy_static::lazy_static;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
+use slab::Slab;
 
 pub type RandomState = ahash::RandomState;
 pub type Interner = lasso::Rodeo<lasso::Spur, RandomState>;
@@ -167,12 +172,116 @@ lazy_static! {
     ));
 }
 
+// this is equivalent to if you were to do
+// something like String in the case of no mutability
+// specky are you reading this if you
+// a re reading this specky tag me on SPWN point server and say "Laaaaaaaa". Do it. please(it would be cool)_
 pub type ImmutCloneStr = Rc<str>;
 pub type ImmutStr = Box<str>;
 pub type ImmutCloneVec<T> = Rc<[T]>;
 pub type ImmutVec<T> = Box<[T]>;
 
-// this is equivalent to if you were to do
-// something like String in the case of no mutability
-// specky are you reading this if you
-// a re reading this specky tag me on SPWN point server and say "Laaaaaaaa". Do it. please(it would be cool)_
+#[derive(Debug, Clone)]
+pub struct SlabMap<K, V>
+where
+    K: From<usize>,
+    usize: From<K>,
+{
+    slab: Slab<V>,
+    _p: PhantomData<K>,
+}
+
+impl<K, V> SlabMap<K, V>
+where
+    K: From<usize>,
+    usize: From<K>,
+{
+    pub fn new() -> Self {
+        Self {
+            slab: Slab::new(),
+            _p: PhantomData,
+        }
+    }
+
+    pub fn insert(&mut self, val: V) -> K {
+        self.slab.insert(val).into()
+    }
+
+    pub fn get(&self, key: K) -> Option<&V> {
+        self.slab.get(key.into())
+    }
+
+    pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
+        self.slab.get_mut(key.into())
+    }
+
+    // pub fn test(&mut self) {
+    //     self.slab.insert(val)
+    // }
+}
+impl<K, V> Index<K> for SlabMap<K, V>
+where
+    K: From<usize>,
+    usize: From<K>,
+{
+    type Output = V;
+
+    fn index(&self, index: K) -> &Self::Output {
+        &self.slab[index.into()]
+    }
+}
+impl<K, V> IndexMut<K> for SlabMap<K, V>
+where
+    K: From<usize>,
+    usize: From<K>,
+{
+    fn index_mut(&mut self, index: K) -> &mut Self::Output {
+        &mut self.slab[index.into()]
+    }
+}
+
+#[macro_export]
+macro_rules! new_id_wrapper {
+    ($($name:ident : $inner:ty;)*) => {
+        $(
+            #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Deref, derive_more::DerefMut, serde::Serialize, serde::Deserialize)]
+            pub struct $name($inner);
+
+            impl std::fmt::Display for $name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}({})", stringify!($name), self.0)
+                }
+            }
+
+            impl From<usize> for $name {
+                fn from(value: usize) -> Self {
+                    Self(value as $inner)
+                }
+            }
+            impl From<$inner> for $name {
+                fn from(value: $inner) -> Self {
+                    Self(value)
+                }
+            }
+
+            impl From<$name> for usize {
+                fn from(value: $name) -> Self {
+                    value.0 as usize
+                }
+            }
+            impl From<$name> for $inner {
+                fn from(value: $name) -> Self {
+                    value.0
+                }
+            }
+        )*
+    };
+}
+
+lazy_static! {
+    static ref ANSI_REGEX: Regex = Regex::new(r#"(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]"#).unwrap();
+}
+
+pub fn clear_ansi(s: &str) -> Cow<'_, str> {
+    ANSI_REGEX.replace_all(s, "")
+}

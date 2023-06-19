@@ -8,5 +8,3 @@ standard-macro-braces = [
     { name = "unimplemented", brace = "(" },
     { name = "unreachable", brace = "(" },
 ]
-
-result_large_err = []

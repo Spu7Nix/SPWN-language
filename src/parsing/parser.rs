@@ -21,14 +21,14 @@ use crate::util::Interner;
 #[derive(Clone)]
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
-    pub src: SpwnSource,
+    pub src: Rc<SpwnSource>,
     interner: Rc<RefCell<Interner>>,
 }
 
 pub type ParseResult<T> = Result<T, SyntaxError>;
 
 impl<'a> Parser<'a> {
-    pub fn new(code: &'a str, src: SpwnSource, interner: Rc<RefCell<Interner>>) -> Self {
+    pub fn new(code: &'a str, src: Rc<SpwnSource>, interner: Rc<RefCell<Interner>>) -> Self {
         let lexer = Token::lex(code);
         Parser {
             lexer,
@@ -123,7 +123,7 @@ impl Parser<'_> {
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
         CodeArea {
             span,
-            src: self.src.clone(),
+            src: Rc::clone(&self.src),
         }
     }
 
@@ -270,7 +270,7 @@ impl Parser<'_> {
         self.interner.borrow_mut().get_or_intern(string)
     }
 
-    pub fn resolve(&self, s: &Spur) -> String {
+    pub fn resolve(&self, s: &Spur) -> Box<str> {
         self.interner.borrow_mut().resolve(s).into()
     }
 
@@ -408,7 +408,7 @@ impl Parser<'_> {
             // this is so backwards if only u could use enum variants as types. . . .
             let mut item = DictItem { name: key.spanned(key_span), attributes: vec![], value: elem, private }.spanned(start.extend(self.span()));
 
-            attrs.is_valid_on(&item, self.src.clone())?;
+            attrs.is_valid_on(&item, &self.src)?;
 
             item.value.attributes = attrs;
 
@@ -436,6 +436,7 @@ impl Parser<'_> {
                 self.next();
                 ImportType::Module(
                     self.resolve(&self.parse_plain_string(self.slice(), self.span())?)
+                        .to_string()
                         .into(),
                     ModuleImport::Regular,
                 )
@@ -971,7 +972,7 @@ impl Parser<'_> {
             };
         };
 
-        attrs.is_valid_on(&expr, self.src.clone())?;
+        attrs.is_valid_on(&expr, &self.src)?;
 
         Ok(expr
             .value
@@ -1474,7 +1475,7 @@ impl Parser<'_> {
         }
         .spanned(start.extend(self.span()));
 
-        attrs.is_valid_on(&stmt, self.src.clone())?;
+        attrs.is_valid_on(&stmt, &self.src)?;
 
         Ok(stmt.value.into_node(attrs, stmt.span))
     }

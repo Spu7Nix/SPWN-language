@@ -25,19 +25,16 @@ hex-serde = "0.1.0"
 home = "0.5.4"
 rand = "0.8.5"
 slab = "0.4.8"
-semver = "1.0.17"
-derive_more = { version = "0.99.17", features = ["from", "deref", "deref_mut"], default-features = false }
-
+semver = { version = "1.0.17", features = ["serde"]}
+derive_more = { version = "0.99.17", features = ["from", "deref", "deref_mut", "display"], default-features = false }
 quick-xml = "0.27.1"
 libflate = "1.1.0"
 crc32fast = "1.2.0"
 aes = "0.7.4"
 block-modes = "0.8.1"
-
 spinoff = "0.7.0"
-
 indoc = "2"
 defile = "0.1.2"
-
 itertools = "0.10.5"
 heuristic-graph-coloring = "0.1.0"
+unicode-segmentation = "1.10.1"

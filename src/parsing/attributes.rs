@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use ahash::AHashMap;
 use paste::paste;
 
@@ -6,7 +8,7 @@ use crate::lexing::tokens::Token;
 use crate::parsing::ast::Statement;
 use crate::parsing::error::SyntaxError;
 use crate::parsing::parser::{ParseResult, Parser};
-use crate::sources::{Spannable, Spanned};
+use crate::sources::{CodeSpan, Spannable, Spanned};
 use crate::util::hyperlink;
 use crate::SpwnSource;
 
@@ -17,13 +19,13 @@ pub trait ParseAttribute {
 }
 
 pub trait IsValidOn<T: Into<&'static str>> {
-    fn is_valid_on(&self, node: &Spanned<T>, src: SpwnSource) -> ParseResult<()>;
+    fn is_valid_on(&self, node: &Spanned<T>, src: &Rc<SpwnSource>) -> ParseResult<()>;
 }
 
 fn into_t<T: std::str::FromStr>(
     parser: &mut Parser,
     s: &str,
-    span: crate::CodeSpan,
+    span: CodeSpan,
     t_name: &'static str,
 ) -> ParseResult<T> {
     T::from_str(s).map_err(|_| SyntaxError::InvalidAttributeArgType {
@@ -53,7 +55,7 @@ macro_rules! attributes {
         }
     ) => {
         impl IsValidOn<Expression> for Vec<Spanned<$enum>> {
-            fn is_valid_on(&self, node: &Spanned<Expression>, src: SpwnSource) -> ParseResult<()> {
+            fn is_valid_on(&self, node: &Spanned<Expression>, src: &Rc<SpwnSource>) -> ParseResult<()> {
                 let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
                 paste! {
                     for attr in self {
@@ -100,7 +102,7 @@ macro_rules! attributes {
         }
 
         impl IsValidOn<Statement> for Vec<Spanned<$enum>> {
-            fn is_valid_on(&self, node: &Spanned<Statement>, src: SpwnSource) -> ParseResult<()> {
+            fn is_valid_on(&self, node: &Spanned<Statement>, src: &Rc<SpwnSource>) -> ParseResult<()> {
                 let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
 
                 paste! {
@@ -191,11 +193,12 @@ macro_rules! attributes {
                                     }
 
 
-                                    let mut fields: Vec<($crate::CodeSpan, String)> = Vec::new();
+                                    let mut fields: Vec<($crate::sources::CodeSpan, String)> = Vec::new();
 
                                     for i in 0..TOTAL {
                                         parser.expect_tok(Token::String)?;
-                                        fields.push((parser.span(), parser.resolve(&parser.parse_plain_string(parser.slice(), parser.span())?)));
+                                        todo!();
+                                        // fields.push((parser.span(), parser.resolve(&parser.parse_plain_string(&parser.slice().to_string(), parser.span())?)));
 
                                         // cant underflow if the loop nevers runs
                                         if i < TOTAL - 1 {
@@ -211,7 +214,7 @@ macro_rules! attributes {
                                 )?
                                 $(
                                     const FIELD_NAMES: &[&str] = &[stringify!($field1) $(,stringify!($field))*];
-                                    let mut field_map: AHashMap<String, ($crate::CodeSpan, String)> = AHashMap::new();
+                                    let mut field_map: AHashMap<String, ($crate::sources::CodeSpan, String)> = AHashMap::new();
 
                                     parser.expect_tok(Token::LParen)?;
 
@@ -239,7 +242,8 @@ macro_rules! attributes {
                                         parser.expect_tok(Token::Assign)?;
                                         parser.expect_tok(Token::String)?;
 
-                                        field_map.insert(name, (parser.span(), parser.resolve(&parser.parse_plain_string(parser.slice(), parser.span())?)));
+                                        todo!();
+                                        // field_map.insert(name, (parser.span(), parser.resolve(&parser.parse_plain_string(parser.slice(), parser.span())?)));
 
                                         if i < FIELD_NAMES.len() - 1 {
                                             parser.expect_tok(Token::Comma)?;
@@ -359,7 +363,7 @@ attributes! {
 }
 
 impl IsValidOn<DictItem> for Vec<Spanned<Attributes>> {
-    fn is_valid_on(&self, node: &Spanned<DictItem>, src: SpwnSource) -> ParseResult<()> {
+    fn is_valid_on(&self, node: &Spanned<DictItem>, src: &Rc<SpwnSource>) -> ParseResult<()> {
         for attr in self {
             match &attr.value {
                 Attributes::Deprecated { .. } => (),
