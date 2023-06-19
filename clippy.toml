@@ -1,0 +1,12 @@
+standard-macro-braces = [
+    { name = "assert", brace = "(" },
+    { name = "assert_eq", brace = "(" },
+    { name = "assert_ne", brace = "(" },
+    { name = "format_ident", brace = "(" },
+    { name = "panic", brace = "(" },
+    { name = "todo", brace = "(" },
+    { name = "unimplemented", brace = "(" },
+    { name = "unreachable", brace = "(" },
+]
+
+result_large_err = []

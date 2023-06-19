@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use derive_more::{Deref, From};
 use slab::Slab;
 
 use super::bytecode::{Bytecode, ConstID, Constant, Register, UnoptRegister};
@@ -10,16 +11,8 @@ use crate::compiling::bytecode::OpcodePos;
 use crate::sources::{CodeSpan, Spannable, Spanned};
 use crate::util::{ImmutVec, UniqueRegister};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::From)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, Deref)]
 pub struct BlockID(usize);
-
-impl std::ops::Deref for BlockID {
-    type Target = usize;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 enum JumpTo {
@@ -152,7 +145,7 @@ impl ProtoBytecode {
 
         // Bytecode {
         //     source_hash: hash.into(),
-        //     version: env!("CARGO_PKG_VERSION").into(),
+        //     version: env!("CARGO_PKG_VERSION"),
         //     constants: constants.into_boxed_slice(),
         //     opcodes: todo!(),
         // }

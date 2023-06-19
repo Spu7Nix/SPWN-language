@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use crate::lexer;
 
 lexer! {
