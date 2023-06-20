@@ -34,9 +34,7 @@ macro_rules! opcodes {
                     )+
                 })?,
             )*
-
         }
-
 
         impl TryFrom<Opcode<UnoptRegister>> for Opcode<OptRegister> {
             type Error = ();

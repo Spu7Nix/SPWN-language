@@ -101,7 +101,6 @@ mod debug_bytecode {
     use regex::{Captures, Regex};
 
     use super::*;
-    use crate::error::RainbowColorGenerator;
     use crate::util::clear_ansi;
 
     fn clear_len(v: &str) -> usize {
@@ -117,7 +116,7 @@ mod debug_bytecode {
         snippet: String,
     }
 
-    // holds the max length of each string (new len, len without ansi)
+    // holds the max length of each string
     #[derive(Default, Debug)]
     struct TableRowMax {
         idx: usize,
@@ -161,7 +160,7 @@ mod debug_bytecode {
                     idx: i.to_string().bright_blue().to_string(),
                     opcode_name: Into::<&str>::into(opcode).bright_white().to_string(),
                     opcode_str: {
-                        let c: Cow<'_, str> = format!("{}", opcode).into();
+                        let c: Cow<'_, str> = format!("{opcode}").into();
                         let c = mem_arrow_regex.replace_all(&c, "~>".bright_green().to_string());
                         let c = reg_regex.replace_all(&c, "$1".bright_red().to_string());
                         let c = opcode_pos_regex.replace_all(&c, "$1".bright_blue().to_string());
@@ -187,8 +186,6 @@ mod debug_bytecode {
                 max.update(&row);
                 rows.push(row);
             }
-
-            println!("{:?}", max);
 
             println!(
                 "{}",
@@ -242,7 +239,7 @@ mod debug_bytecode {
                 "│ constants:".bright_yellow(),
                 self.constants
                     .iter()
-                    .map(|c| format!("{}", c).bright_green())
+                    .map(|c| format!("{c}").bright_green())
                     .join(", ")
             );
             println!(

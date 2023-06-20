@@ -193,12 +193,12 @@ macro_rules! attributes {
                                     }
 
 
-                                    let mut fields: Vec<($crate::sources::CodeSpan, String)> = Vec::new();
+                                    let mut fields: Vec<($crate::sources::CodeSpan, Box<str>)> = Vec::new();
 
                                     for i in 0..TOTAL {
                                         parser.expect_tok(Token::String)?;
-                                        todo!();
-                                        // fields.push((parser.span(), parser.resolve(&parser.parse_plain_string(&parser.slice().to_string(), parser.span())?)));
+
+                                        fields.push((parser.span(), parser.resolve(&parser.parse_plain_string(&parser.slice().to_string(), parser.span())?)));
 
                                         // cant underflow if the loop nevers runs
                                         if i < TOTAL - 1 {
@@ -214,7 +214,7 @@ macro_rules! attributes {
                                 )?
                                 $(
                                     const FIELD_NAMES: &[&str] = &[stringify!($field1) $(,stringify!($field))*];
-                                    let mut field_map: AHashMap<String, ($crate::sources::CodeSpan, String)> = AHashMap::new();
+                                    let mut field_map: AHashMap<String, ($crate::sources::CodeSpan, Box<str>)> = AHashMap::new();
 
                                     parser.expect_tok(Token::LParen)?;
 
@@ -242,8 +242,7 @@ macro_rules! attributes {
                                         parser.expect_tok(Token::Assign)?;
                                         parser.expect_tok(Token::String)?;
 
-                                        todo!();
-                                        // field_map.insert(name, (parser.span(), parser.resolve(&parser.parse_plain_string(parser.slice(), parser.span())?)));
+                                        field_map.insert(name, (parser.span(), parser.resolve(&parser.parse_plain_string(parser.slice(), parser.span())?)));
 
                                         if i < FIELD_NAMES.len() - 1 {
                                             parser.expect_tok(Token::Comma)?;
