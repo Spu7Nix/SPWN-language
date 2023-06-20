@@ -12,7 +12,7 @@ use crate::compiling::opcodes::Opcode;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Ast, ExprNode, Expression, Statement, StmtNode};
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
-use crate::sources::{CodeArea, CodeSpan, SpwnSource};
+use crate::sources::{CodeArea, CodeSpan, Spanned, SpwnSource};
 use crate::util::{ImmutCloneStr, ImmutStr, Interner, SlabMap};
 
 pub type CompileResult<T> = Result<T, CompileError>;
@@ -48,6 +48,7 @@ pub struct Compiler {
     src: Rc<SpwnSource>,
     interner: Rc<RefCell<Interner>>,
     scopes: SlabMap<ScopeID, Scope>,
+    global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
 }
 
 impl Compiler {
@@ -56,6 +57,7 @@ impl Compiler {
             src,
             interner,
             scopes: SlabMap::new(),
+            global_return: None,
         }
     }
 }
@@ -107,6 +109,22 @@ impl Compiler {
         }
     }
 
+    fn is_inside_loop(&self, scope: ScopeID) -> Option<BlockID> {
+        let scope = &self.scopes[scope];
+        match &scope.typ {
+            Some(ScopeType::ArrowStmt(_) | ScopeType::TriggerFunc(_)) | None => {
+                match scope.parent {
+                    Some(k) => self.is_inside_loop(k),
+                    None => None,
+                }
+            },
+            Some(t) => match t {
+                ScopeType::Loop(v) => Some(*v),
+                _ => None,
+            },
+        }
+    }
+
     pub fn assert_can_return(&self, scope: ScopeID, span: CodeSpan) -> CompileResult<()> {
         fn can_return_d(slf: &Compiler, scope: ScopeID, span: CodeSpan) -> CompileResult<()> {
             let scope = &slf.scopes[scope];
@@ -138,6 +156,34 @@ impl Compiler {
         }
 
         can_return_d(self, scope, span)
+    }
+
+    pub fn assert_can_break_loop(&self, scope: ScopeID, span: CodeSpan) -> CompileResult<()> {
+        let scope = &self.scopes[scope];
+        match &scope.typ {
+            Some(t) => match t {
+                ScopeType::Loop(_) => return Ok(()),
+                ScopeType::TriggerFunc(def) => {
+                    return Err(CompileError::BreakInTriggerFuncScope {
+                        area: self.make_area(span),
+                        def: self.make_area(*def),
+                    })
+                },
+                ScopeType::ArrowStmt(def) => {
+                    return Err(CompileError::BreakInArrowStmtScope {
+                        area: self.make_area(span),
+                        def: self.make_area(*def),
+                    })
+                },
+
+                _ => (),
+            },
+            None => (),
+        }
+        match scope.parent {
+            Some(k) => self.assert_can_break_loop(k, span),
+            None => unreachable!(), // should only be called after is_inside_loop
+        }
     }
 
     pub fn compile_expr(
@@ -508,13 +554,39 @@ impl Compiler {
                     let inner_scope =
                         self.derive_scope(scope, Some(ScopeType::ArrowStmt(stmt.span))); // variables made in arrow statements shouldnt be allowed anyways
                     b.enter_arrow(stmt.span);
-                    self.compile_stmt(&s, inner_scope, b)?;
+                    self.compile_stmt(s, inner_scope, b)?;
                     b.yeet_context(stmt.span);
                     Ok(())
                 })?;
             },
             Statement::Return(v) => match self.scopes[scope].typ {
-                Some(ScopeType::Global) => {},
+                Some(ScopeType::Global) => match v {
+                    Some(e) => match &*e.expr {
+                        Expression::Dict(items) => {
+                            if let Some((_, prev_span)) = self.global_return {
+                                return Err(CompileError::DuplicateModuleReturn {
+                                    area: self.make_area(stmt.span),
+                                    prev_area: self.make_area(prev_span),
+                                });
+                            }
+
+                            let ret_reg = self.compile_expr(e, scope, builder)?;
+                            self.global_return =
+                                Some((items.iter().map(|i| i.name).collect(), stmt.span));
+                            builder.ret(ret_reg, true, stmt.span);
+                        },
+                        _ => {
+                            return Err(CompileError::InvalidModuleReturn {
+                                area: self.make_area(stmt.span),
+                            })
+                        },
+                    },
+                    None => {
+                        return Err(CompileError::InvalidModuleReturn {
+                            area: self.make_area(stmt.span),
+                        })
+                    },
+                },
                 _ => {
                     if self.is_inside_macro(scope) {
                         self.assert_can_return(scope, stmt.span)?;
@@ -536,14 +608,40 @@ impl Compiler {
                     }
                 },
             },
-            Statement::Break => todo!(),
-            Statement::Continue => todo!(),
+            Statement::Break => match self.is_inside_loop(scope) {
+                Some(path) => {
+                    self.assert_can_break_loop(scope, stmt.span)?;
+                    builder.jump(Some(path), JumpType::End, stmt.span)
+                },
+                _ => {
+                    return Err(CompileError::BreakOutsideLoop {
+                        area: self.make_area(stmt.span),
+                    })
+                },
+            },
+            Statement::Continue => match self.is_inside_loop(scope) {
+                Some(path) => {
+                    self.assert_can_break_loop(scope, stmt.span)?;
+                    builder.jump(Some(path), JumpType::Start, stmt.span)
+                },
+                _ => {
+                    return Err(CompileError::ContinueOutsideLoop {
+                        area: self.make_area(stmt.span),
+                    })
+                },
+            },
             Statement::TypeDef { name, private } => todo!(),
             Statement::ExtractImport(_) => todo!(),
             Statement::Impl { base, items } => todo!(),
             Statement::Overload { op, macros } => todo!(),
-            Statement::Dbg(_) => todo!(),
-            Statement::Throw(_) => todo!(),
+            Statement::Dbg(v) => {
+                let v = self.compile_expr(v, scope, builder)?;
+                builder.dbg(v, stmt.span);
+            },
+            Statement::Throw(v) => {
+                let v = self.compile_expr(v, scope, builder)?;
+                builder.throw(v, stmt.span);
+            },
         }
         Ok(())
     }
@@ -562,7 +660,6 @@ impl Compiler {
             Ok(())
         })?;
         let code = code.build(&self.src).unwrap();
-        // println!("{:#?}", code);
 
         code.debug_str(&self.src);
 

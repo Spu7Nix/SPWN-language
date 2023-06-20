@@ -79,5 +79,51 @@ error_maker! {
         ReturnOutsideMacro {
             area: CodeArea,
         },
+
+        // ==================================================================
+        #[
+            Message: "Invalid module return", Note: None;
+            Labels: [
+                area => "Module return expects a dictionary value";
+            ]
+        ]
+        InvalidModuleReturn {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Duplicate module return", Note: None;
+            Labels: [
+                area => "Invalid second module return found here";
+                prev_area => "Previous module return used here";
+            ]
+        ]
+        DuplicateModuleReturn {
+            area: CodeArea,
+            prev_area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Break used outside of loop", Note: None;
+            Labels: [
+                area => "Break used here";
+            ]
+        ]
+        BreakOutsideLoop {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Continue used outside of loop", Note: None;
+            Labels: [
+                area => "Continue used here";
+            ]
+        ]
+        ContinueOutsideLoop {
+            area: CodeArea,
+        },
     }
 }

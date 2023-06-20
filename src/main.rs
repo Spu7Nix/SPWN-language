@@ -18,6 +18,7 @@ use crate::util::{BasicError, RandomState};
 
 mod compiling;
 mod error;
+mod interpreting;
 mod lexing;
 mod parsing;
 mod sources;

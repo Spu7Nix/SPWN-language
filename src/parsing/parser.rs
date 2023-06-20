@@ -1429,15 +1429,13 @@ impl Parser<'_> {
             },
             Token::Dbg => {
                 self.next();
-                let v = self.parse_expr(true)?;
 
-                Statement::Dbg(v)
+                Statement::Dbg(self.parse_expr(true)?)
             },
             Token::Throw => {
                 self.next();
-                self.expect_tok(Token::String)?;
 
-                Statement::Throw(self.parse_plain_string(self.slice(), self.span())?)
+                Statement::Throw(self.parse_expr(false)?)
             },
             _ => {
                 let left = self.parse_expr(true)?;

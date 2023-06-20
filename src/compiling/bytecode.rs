@@ -64,8 +64,8 @@ impl Eq for Constant {}
     Serialize,
     Deserialize,
 )]
-#[display(fmt = "R{}", _0)]
-pub struct Register<T: Copy>(pub T);
+#[display(fmt = "R{_0}")]
+pub struct Register<T: Copy + Display>(pub T);
 
 new_id_wrapper! {
     ConstID: u16;

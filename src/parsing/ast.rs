@@ -1,12 +1,13 @@
 use std::path::{Path, PathBuf};
 
 use delve::{EnumDisplay, EnumToStr};
+use derive_more::Deref;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::attributes::{Attributes, FileAttribute};
 use super::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
-use crate::sources::{CodeSpan, Spannable, Spanned};
+use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
@@ -147,12 +148,6 @@ impl<N, D, P> MacroArg<N, D, P> {
             MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
         }
     }
-
-    // pub fn name_mut(&mut self) -> &mut N {
-    //     match self {
-    //         MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
-    //     }
-    // }
 
     pub fn default(&self) -> &Option<D> {
         match self {
@@ -326,7 +321,7 @@ pub enum Statement {
 
     Dbg(ExprNode),
 
-    Throw(Spur),
+    Throw(ExprNode),
 }
 
 pub type Statements = Vec<StmtNode>;
@@ -389,4 +384,27 @@ impl StmtNode {
 pub struct Ast {
     pub statements: Vec<StmtNode>,
     pub file_attributes: Vec<FileAttribute>,
+}
+
+#[derive(Clone, Debug)]
+pub enum VisibilityType {
+    Private(SpwnSource),
+    Public,
+}
+
+#[derive(Clone, Debug, Deref)]
+struct Visibility<T> {
+    #[deref]
+    value: T,
+    pub vis: VisibilityType,
+}
+
+impl<T> Visibility<T> {
+    pub fn is_priv(&self) -> bool {
+        matches!(self.vis, VisibilityType::Private(..))
+    }
+
+    pub fn is_pub(&self) -> bool {
+        matches!(self.vis, VisibilityType::Public)
+    }
 }

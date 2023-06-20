@@ -173,4 +173,10 @@ opcodes! {
 
     #[delve(display = |src: &R, mr: &bool| format!("{} R{src}", if *mr { "export" } else { "return" }))]
     Return { [src], module_ret: bool },
+
+    #[delve(display = |reg: &R| format!("dbg {reg}"))]
+    Dbg { [reg] },
+
+    #[delve(display = |reg: &R| format!("throw {reg}"))]
+    Throw { [reg] },
 }
