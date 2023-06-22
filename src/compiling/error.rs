@@ -211,5 +211,31 @@ error_maker! {
             area: CodeArea,
             type_name: String,
         },
+
+
+
+
+        // ==================================================================
+        #[
+            Message: "Illegal expression for augmented assigment", Note: None;
+            Labels: [
+                area => "This expression cannot be assigned to";
+            ]
+        ]
+        IllegalExpressionForAugmentedAssignment {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Illegal expression in assigment", Note: if *is_let { Some("Try removing the `let`".into()) } else { None };
+            Labels: [
+                area => "This expression is illegal in this assignment";
+            ]
+        ]
+        IllegalExpressionInAssigment {
+            area: CodeArea,
+            is_let: bool,
+        },
     }
 }

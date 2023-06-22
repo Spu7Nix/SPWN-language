@@ -9,7 +9,7 @@ use ahash::{AHashMap, RandomState};
 use derive_more::{Deref, DerefMut};
 use lasso::Spur;
 
-use super::context::{CallInfo, Context, ContextSplitMode, ContextStack, FullContext};
+use super::context::{CallInfo, Context, ContextSplitMode, ContextStack, FullContext, FuncStorage};
 use super::value::{StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::{Bytecode, Constant, Function, OptRegister, UnoptRegister};
@@ -107,7 +107,7 @@ impl Vm {
 
     pub fn set_reg(&mut self, reg: OptRegister, v: StoredValue) {
         let mut binding = self.contexts.current_mut();
-        let mut g = binding.registers.last_mut().unwrap()[reg.0 as usize].borrow_mut();
+        let mut g = binding.stack.last_mut().unwrap().registers[reg.0 as usize].borrow_mut();
         *g = v;
     }
 
@@ -115,22 +115,27 @@ impl Vm {
     where
         F: FnOnce(Ref<'_, StoredValue>) -> RuntimeResult<R>,
     {
-        f(self.contexts.current().registers.last().unwrap()[*reg as usize].borrow())
+        f(self.contexts.current().stack.last().unwrap().registers[*reg as usize].borrow())
     }
 
     pub fn borrow_reg_mut<F, R>(&self, reg: OptRegister, f: F) -> RuntimeResult<R>
     where
         F: FnOnce(RefMut<'_, StoredValue>) -> RuntimeResult<R>,
     {
-        f(self.contexts.current().registers.last().unwrap()[*reg as usize].borrow_mut())
+        f(self.contexts.current().stack.last().unwrap().registers[*reg as usize].borrow_mut())
     }
 
     pub fn get_reg_ref(&self, reg: OptRegister) -> &ValueRef {
-        &self.contexts.current().registers.last().unwrap()[*reg as usize]
+        &self.contexts.current().stack.last().unwrap().registers[*reg as usize]
     }
 
     pub fn change_reg_ref(&mut self, reg: OptRegister, k: ValueRef) {
-        self.contexts.current_mut().registers.last_mut().unwrap()[*reg as usize] = k
+        self.contexts
+            .current_mut()
+            .stack
+            .last_mut()
+            .unwrap()
+            .registers[*reg as usize] = k
     }
 }
 
@@ -154,7 +159,7 @@ impl DeepClone<&ValueRef> for Vm {
 }
 impl DeepClone<OptRegister> for Vm {
     fn deep_clone(&self, input: OptRegister) -> StoredValue {
-        let v = &self.contexts.current().registers.last().unwrap()[*input as usize];
+        let v = &self.contexts.current().stack.last().unwrap().registers[*input as usize];
         self.deep_clone(v)
     }
 }
@@ -203,7 +208,10 @@ impl Vm {
                 });
             }
 
-            context.registers.push(regs);
+            context.stack.push(FuncStorage {
+                registers: regs,
+                mem_reg: unsafe { std::mem::zeroed() },
+            });
         }
 
         self.contexts.push(FullContext::new(context, call_info));
@@ -232,7 +240,7 @@ impl Vm {
                         let return_dest = self.contexts.last().call_info.return_dest;
                         {
                             let mut current = self.contexts.current_mut();
-                            current.registers.pop();
+                            current.stack.pop();
                         }
 
                         let mut top = self.contexts.last_mut().yeet_current().unwrap();
@@ -261,9 +269,7 @@ impl Vm {
                     self.set_reg(to, value.into_stored(self.make_area(opcode_span, &program)));
                 },
                 Opcode::CopyDeep { from, to } => self.set_reg(to, self.deep_clone(from)),
-                Opcode::CopyMem { from, to } => {
-                    self.change_reg_ref(to, self.get_reg_ref(from).clone())
-                },
+
                 Opcode::Plus { a, b, to } => {
                     self.bin_op(value_ops::plus, &program, a, b, to, opcode_span)?;
                 },
@@ -507,6 +513,16 @@ impl Vm {
                 Opcode::Member { from, dest, member } => todo!(),
                 Opcode::EnterTryCatch { err, id } => todo!(),
                 Opcode::ExitTryCatch { id } => todo!(),
+                Opcode::Assert { reg } => todo!(),
+                Opcode::TypeOf { src, dest } => todo!(),
+                Opcode::IndexSetMem { index } => todo!(),
+                Opcode::MemberSetMem { member } => todo!(),
+                Opcode::ChangeMem { from } => {
+                    todo!()
+                },
+                Opcode::WriteMem { from } => todo!(),
+                Opcode::MatchCatch { jump } => todo!(),
+                Opcode::AssertMatches { reg, pat } => todo!(),
             }
 
             {
@@ -613,9 +629,10 @@ impl Vm {
             let mut hashes = AHashMap::new();
             for ctx in top {
                 let mut state = DefaultHasher::default();
-                for val in ctx.registers.last().unwrap() {
+                for val in &ctx.stack.last().unwrap().registers {
                     self.hash_value(val, &mut state);
                 }
+                self.hash_value(&ctx.stack.last().unwrap().mem_reg, &mut state);
                 let hash = state.finish();
                 hashes.entry(hash).or_insert_with(Vec::new).push(ctx);
             }

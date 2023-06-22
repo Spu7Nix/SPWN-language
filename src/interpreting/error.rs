@@ -1,7 +1,7 @@
 use std::string::ToString;
 
 use super::context::CallInfo;
-use super::value::ValueType;
+use super::value::{Value, ValueType};
 use super::vm::Vm;
 use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
@@ -33,7 +33,7 @@ error_maker! {
             [call_stack]
         },
 
-        // // ==================================================================
+        // ==================================================================
         #[
             Message: "Invalid unary operand", Note: None;
             Labels: [
@@ -409,3 +409,17 @@ error_maker! {
         // },
     }
 }
+
+// impl RuntimeError {
+//     pub fn to_value(&self, vm: &mut Vm) -> Value {
+//         match self {
+//             RuntimeError::InvalidOperands { a, b, op, area, call_stack } => todo!(),
+//             RuntimeError::InvalidUnaryOperand { v, op, area, call_stack } => todo!(),
+//             RuntimeError::TypeMismatch { v, area, expected, call_stack } => todo!(),
+//             RuntimeError::ThrownError { area, message, call_stack } => todo!(),
+//             RuntimeError::ContextSplitDisallowed { area, call_stack } => todo!(),
+//         }
+//     }
+
+//     pub fn get
+// }

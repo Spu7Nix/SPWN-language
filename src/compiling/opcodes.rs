@@ -71,8 +71,6 @@ opcodes! {
     LoadConst { id: ConstID, [to] },
     #[delve(display = |from: &R, to: &R| format!("{from} -> {to}"))]
     CopyDeep { [from], [to] },
-    #[delve(display = |from: &R, to: &R| format!("{from} ~> {to}"))]
-    CopyMem { [from], [to] },
 
     #[delve(display = |a: &R, b: &R, to: &R| format!("{a} + {b} -> {to}"))]
     Plus { [a], [b], [to] },
@@ -188,9 +186,9 @@ opcodes! {
     #[delve(display = |id: &ImportID, dest| format!("import {id} -> {dest}"))]
     Import { id: ImportID, [dest] },
 
-    #[delve(display = |b: &R, d: &R, i: &R| format!("{b}[{i}] ~> {d}"))]
+    #[delve(display = |b: &R, d: &R, i: &R| format!("{b}[{i}] -> {d}"))]
     Index { [base], [dest], [index] },
-    #[delve(display = |f: &R, d: &R, i: &R| format!("{f}.{i} ~> {d}"))]
+    #[delve(display = |f: &R, d: &R, i: &R| format!("{f}.{i} -> {d}"))]
     Member { [from], [dest], [member] },
 
     #[delve(display = |e: &R, _a: &TryCatchID| format!("try {{...}} -> {e}"))]
@@ -198,4 +196,25 @@ opcodes! {
 
     #[delve(display = |_a: &TryCatchID| format!(" TODO "))]
     ExitTryCatch { id: TryCatchID },
+
+    #[delve(display = |r: &R| format!("assert {r}"))]
+    Assert { [reg] },
+    #[delve(display = |r: &R, p: &R| format!("assert {r} matches {p}"))]
+    AssertMatches { [reg], [pat] },
+    #[delve(display = |s: &R, d: &R| format!("{s}.type -> {d}"))]
+    TypeOf { [src], [dest] },
+
+
+    #[delve(display = |i: &R| format!("R:mem[{i}] ~> R:mem"))]
+    IndexSetMem { [index] },
+    #[delve(display = |i: &R| format!("R:mem.{i} ~> R:mem"))]
+    MemberSetMem { [member] },
+
+    #[delve(display = |from: &R| format!("{from} ~> R:mem"))]
+    ChangeMem { [from] },
+    #[delve(display = |from: &R| format!("{from} -> R:mem"))]
+    WriteMem { [from] },
+
+    #[delve(display = |jump: &OpcodePos| format!("catch match, to {jump}"))]
+    MatchCatch { jump: OpcodePos },
 }

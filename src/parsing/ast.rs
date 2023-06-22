@@ -140,6 +140,13 @@ impl<N, D, P> MacroArg<N, D, P> {
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone, EnumToStr)]
+pub enum MatchBranch {
+    Expr(ExprNode),
+    Block(Statements),
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone, EnumToStr)]
 pub enum Expression {
     Int(i64),
     Float(f64),
@@ -215,6 +222,10 @@ pub enum Expression {
         items: Vec<Vis<DictItem>>,
     },
     // Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
+    Match {
+        value: ExprNode,
+        branches: Vec<(ExprNode, MatchBranch)>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash)]
@@ -253,8 +264,6 @@ pub enum Statement {
     },
     TryCatch {
         try_code: Statements,
-        // error_var: Option<Spur>,
-        // catch_code: Statements,
         branches: Vec<(ExprNode, Statements)>,
         catch_all: Option<Statements>,
     },

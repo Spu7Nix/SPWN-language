@@ -26,6 +26,7 @@ lexer! {
     Try: text("try"),
     Catch: text("catch"),
     Throw: text("throw"),
+    Match: text("match"),
 
     Return: text("return"),
     Break: text("break"),
@@ -168,6 +169,7 @@ impl Token {
             Self::In => "in",
             Self::Try => "try",
             Self::Catch => "catch",
+            Self::Match => "match",
             Self::Return => "return",
             Self::Break => "break",
             Self::Continue => "continue",

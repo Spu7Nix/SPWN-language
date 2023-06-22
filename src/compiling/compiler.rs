@@ -19,7 +19,8 @@ use crate::compiling::opcodes::Opcode;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{
-    Ast, ExprNode, Expression, Import, ImportType, Statement, StmtNode, Vis, VisTrait,
+    Ast, DictItem, ExprNode, Expression, Import, ImportType, MatchBranch, Statement, StmtNode, Vis,
+    VisTrait,
 };
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
@@ -60,6 +61,21 @@ pub struct Scope {
     vars: AHashMap<Spur, VarData>,
     parent: Option<ScopeID>,
     typ: Option<ScopeType>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AssignType {
+    Normal { is_let: bool },
+    Match,
+}
+
+impl AssignType {
+    fn is_declare(&self) -> bool {
+        matches!(
+            self,
+            AssignType::Match | AssignType::Normal { is_let: true }
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -360,6 +376,211 @@ impl Compiler<'_> {
         // }
     }
 
+    pub fn do_assign(
+        &mut self,
+        left: &ExprNode,
+        right: UnoptRegister,
+        scope: ScopeID,
+        builder: &mut CodeBuilder,
+        typ: AssignType,
+    ) -> CompileResult<()> {
+        macro_rules! destructure_dict {
+            ($v:expr) => {
+                for e in $v {
+                    let item = e.value();
+
+                    // avoid uneccessary allocation
+                    let default = if item.value.is_none() {
+                        Some(ExprNode {
+                            expr: Box::new(Expression::Var(item.name.value)),
+                            attributes: vec![],
+                            span: item.name.span,
+                        })
+                    } else {
+                        None
+                    };
+
+                    let key = match &item.value {
+                        Some(e) => e,
+                        None => default.as_ref().unwrap(), // use the key as the value ( `{a}` -> `{a: a}` )
+                    };
+
+                    let elem_reg = builder.next_reg();
+
+                    if let AssignType::Match = typ {
+                        builder.match_catch(None, true, left.span);
+                    }
+                    builder.member(
+                        right,
+                        elem_reg,
+                        item.name.map(|v| self.resolve_arr(&v)),
+                        left.span,
+                    );
+                    self.do_assign(key, elem_reg, scope, builder, typ)?;
+                }
+            };
+        }
+
+        match &*left.expr {
+            Expression::Var(n) => {
+                match typ {
+                    AssignType::Normal { is_let: false } => match self.get_var(*n, scope) {
+                        Some(data) if data.mutable => {
+                            builder.copy_deep(right, data.reg, left.span);
+                        },
+                        Some(data) => {
+                            return Err(CompileError::ImmutableAssign {
+                                area: self.make_area(left.span),
+                                def_area: self.make_area(data.def_span),
+                                var: self.resolve(n),
+                            })
+                        },
+                        None => {
+                            let reg = builder.next_reg();
+                            self.scopes[scope].vars.insert(
+                                *n,
+                                VarData {
+                                    mutable: false,
+                                    def_span: left.span,
+                                    reg,
+                                },
+                            );
+                            builder.copy_deep(right, reg, left.span);
+                        },
+                    },
+                    _ => {
+                        let reg = builder.next_reg();
+                        self.scopes[scope].vars.insert(
+                            *n,
+                            VarData {
+                                mutable: true,
+                                def_span: left.span,
+                                reg,
+                            },
+                        );
+                        builder.copy_deep(right, reg, left.span);
+                    },
+                }
+                Ok(())
+            },
+            Expression::Array(v) => {
+                for (i, e) in v.iter().enumerate() {
+                    let elem_reg = builder.next_reg();
+                    let idx_reg = builder.next_reg();
+                    builder.load_const(i as i64, idx_reg, left.span);
+                    if let AssignType::Match = typ {
+                        builder.match_catch(None, true, left.span);
+                    }
+                    builder.index(right, elem_reg, idx_reg, left.span);
+                    self.do_assign(e, elem_reg, scope, builder, typ)?;
+                }
+                Ok(())
+            },
+            Expression::Dict(v) => {
+                destructure_dict!(v);
+                Ok(())
+            },
+            Expression::Instance { base, items } => {
+                let base_reg = self.compile_expr(base, scope, builder)?;
+                let type_reg = builder.next_reg();
+                builder.type_of(right, type_reg, left.span);
+
+                let eq_reg = builder.next_reg();
+
+                builder.push_raw_opcode(
+                    Opcode::Eq {
+                        a: base_reg,
+                        b: type_reg,
+                        to: eq_reg,
+                    },
+                    left.span,
+                );
+                if let AssignType::Match = typ {
+                    builder.match_catch(None, true, left.span);
+                }
+                builder.assert(eq_reg, left.span);
+
+                destructure_dict!(items);
+                Ok(())
+            },
+            Expression::Maybe(v) => todo!(),
+            Expression::Index { .. } => {
+                if let AssignType::Normal { is_let: true } = typ {
+                    return Err(CompileError::IllegalExpressionInAssigment {
+                        area: self.make_area(left.span),
+                        is_let: true,
+                    });
+                }
+                self.compile_mem_expr(left, scope, builder)?;
+                builder.write_mem(right, left.span);
+                Ok(())
+            },
+            Expression::Member { base, name } => {
+                if let AssignType::Normal { is_let: true } = typ {
+                    return Err(CompileError::IllegalExpressionInAssigment {
+                        area: self.make_area(left.span),
+                        is_let: true,
+                    });
+                }
+                self.compile_mem_expr(left, scope, builder)?;
+                builder.write_mem(right, left.span);
+                Ok(())
+            },
+            Expression::Associated { base, name } => todo!(),
+            _ => match typ {
+                AssignType::Normal { .. } => Err(CompileError::IllegalExpressionInAssigment {
+                    area: self.make_area(left.span),
+                    is_let: false,
+                }),
+                AssignType::Match => {
+                    let pat = self.compile_expr(left, scope, builder)?;
+                    if let AssignType::Match = typ {
+                        builder.match_catch(None, true, left.span);
+                    }
+                    builder.assert_matches(right, pat, left.span);
+                    Ok(())
+                },
+            },
+        }
+    }
+
+    pub fn compile_mem_expr(
+        &mut self,
+        expr: &ExprNode,
+        scope: ScopeID,
+        builder: &mut CodeBuilder,
+    ) -> CompileResult<()> {
+        match &*expr.expr {
+            Expression::Var(v) => match self.get_var(*v, scope) {
+                Some(v) => {
+                    builder.change_mem(v.reg, expr.span);
+                },
+                None => {
+                    return Err(CompileError::NonexistentVariable {
+                        area: self.make_area(expr.span),
+                        var: self.resolve(v),
+                    })
+                },
+            },
+            Expression::Index { base, index } => {
+                self.compile_mem_expr(base, scope, builder)?;
+                let index = self.compile_expr(index, scope, builder)?;
+                builder.index_set_mem(index, expr.span);
+            },
+            Expression::Member { base, name } => {
+                self.compile_mem_expr(base, scope, builder)?;
+                builder.member_set_mem(name.map(|v| self.resolve_arr(&v)), expr.span);
+            },
+            _ => {
+                return Err(CompileError::IllegalExpressionInAssigment {
+                    area: self.make_area(expr.span),
+                    is_let: false,
+                })
+            },
+        }
+        Ok(())
+    }
+
     pub fn compile_expr(
         &mut self,
         expr: &ExprNode,
@@ -517,7 +738,13 @@ impl Compiler<'_> {
             },
             Expression::Maybe(_) => todo!(),
             Expression::Is(..) => todo!(),
-            Expression::Index { base, index } => todo!(),
+            Expression::Index { base, index } => {
+                let base = self.compile_expr(base, scope, builder)?;
+                let index = self.compile_expr(index, scope, builder)?;
+                let out = builder.next_reg();
+                builder.index(base, out, index, expr.span);
+                Ok(out)
+            },
             Expression::Member { base, name } => {
                 let base = self.compile_expr(base, scope, builder)?;
                 let out = builder.next_reg();
@@ -555,6 +782,43 @@ impl Compiler<'_> {
                 Ok(out)
             },
             Expression::Instance { base, items } => todo!(),
+            Expression::Match { value, branches } => {
+                let value_reg = self.compile_expr(value, scope, builder)?;
+
+                let out_reg = builder.next_reg();
+
+                builder.new_block(|b| {
+                    let outer = b.block;
+
+                    for (pattern, branch) in branches {
+                        b.new_block(|b| {
+                            let derived = self.derive_scope(scope, None);
+                            self.do_assign(pattern, value_reg, derived, b, AssignType::Match)?;
+
+                            match branch {
+                                MatchBranch::Expr(e) => {
+                                    let e = self.compile_expr(e, derived, b)?;
+                                    b.copy_deep(e, out_reg, expr.span);
+                                    b.jump(Some(outer), JumpType::End, expr.span);
+                                },
+                                MatchBranch::Block(stmts) => {
+                                    b.load_empty(out_reg, expr.span);
+                                    for s in stmts {
+                                        self.compile_stmt(s, derived, b)?;
+                                    }
+                                    b.jump(Some(outer), JumpType::End, expr.span);
+                                },
+                            }
+
+                            Ok(())
+                        })?;
+                    }
+
+                    Ok(())
+                })?;
+
+                Ok(out_reg)
+            },
         }
     }
 
@@ -568,32 +832,28 @@ impl Compiler<'_> {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder)?;
             },
-            Statement::Let(left, right) => match &*left.expr {
-                Expression::Var(v) => {
-                    let reg = builder.next_reg();
-                    self.scopes[scope].vars.insert(
-                        *v,
-                        VarData {
-                            mutable: true,
-                            def_span: stmt.span,
-                            reg,
-                        },
-                    );
-                    let e = self.compile_expr(right, scope, builder)?;
-                    builder.copy_deep(e, reg, stmt.span);
-                },
-                _ => todo!("destruction !!!!!!!!!!!!!!!!!!!!!!!!"),
+            Statement::Let(left, right) => {
+                let right = self.compile_expr(right, scope, builder)?;
+                self.do_assign(
+                    left,
+                    right,
+                    scope,
+                    builder,
+                    AssignType::Normal { is_let: true },
+                )?;
             },
             Statement::AssignOp(left, op, right) => {
-                let right_reg = self.compile_expr(right, scope, builder)?;
-
-                let var = match &*left.expr {
-                    Expression::Var(v) => *v,
-                    _ => todo!("destruction !!!!!!!!!!!!!!!!!!!!!!!!"),
-                };
-
                 macro_rules! assign_op {
-                    ($opcode_name:ident) => {
+                    ($opcode_name:ident) => {{
+                        let var = match &*left.expr {
+                            Expression::Var(v) => *v,
+                            _ => {
+                                return Err(CompileError::IllegalExpressionForAugmentedAssignment {
+                                    area: self.make_area(left.span),
+                                })
+                            },
+                        };
+                        let right_reg = self.compile_expr(right, scope, builder)?;
                         match self.get_var(var, scope) {
                             Some(data) if data.mutable => builder.push_raw_opcode(
                                 Opcode::$opcode_name {
@@ -616,33 +876,19 @@ impl Compiler<'_> {
                                 })
                             },
                         }
-                    };
+                    }};
                 }
 
                 match op {
-                    AssignOp::Assign => match self.get_var(var, scope) {
-                        Some(data) if data.mutable => {
-                            builder.copy_deep(right_reg, data.reg, stmt.span);
-                        },
-                        Some(data) => {
-                            return Err(CompileError::ImmutableAssign {
-                                area: self.make_area(stmt.span),
-                                def_area: self.make_area(data.def_span),
-                                var: self.resolve(&var),
-                            })
-                        },
-                        None => {
-                            let reg = builder.next_reg();
-                            self.scopes[scope].vars.insert(
-                                var,
-                                VarData {
-                                    mutable: false,
-                                    def_span: stmt.span,
-                                    reg,
-                                },
-                            );
-                            builder.copy_deep(right_reg, reg, stmt.span);
-                        },
+                    AssignOp::Assign => {
+                        let right = self.compile_expr(right, scope, builder)?;
+                        self.do_assign(
+                            left,
+                            right,
+                            scope,
+                            builder,
+                            AssignType::Normal { is_let: false },
+                        )?;
                     },
                     AssignOp::PlusEq => assign_op!(PlusEq),
                     AssignOp::MinusEq => assign_op!(MinusEq),
@@ -756,6 +1002,14 @@ impl Compiler<'_> {
                 branches,
                 catch_all,
             } => {
+                /*
+
+
+
+
+
+                */
+
                 builder.new_block(|b| {
                     //df d
                     Ok(())

@@ -10,6 +10,12 @@ use crate::gd::ids::Id;
 use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FuncStorage {
+    pub registers: [ValueRef; 256],
+    pub mem_reg: ValueRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallInfo {
     pub func: FuncCoord,
     pub return_dest: OptRegister,
@@ -21,7 +27,7 @@ pub struct Context {
     pub ip: usize,
 
     pub group: Id,
-    pub registers: Vec<[ValueRef; 256]>,
+    pub stack: Vec<FuncStorage>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -35,7 +41,7 @@ impl Context {
         Self {
             ip: 0,
             group: Id::Specific(0),
-            registers: vec![],
+            stack: vec![],
         }
     }
 }

@@ -14,6 +14,7 @@ use super::attributes::{Attributes, FileAttribute, IsValidOn, ParseAttribute};
 use super::error::SyntaxError;
 use super::utils::operators::{self, unary_prec};
 use crate::lexing::tokens::{Lexer, Token};
+use crate::parsing::ast::MatchBranch;
 use crate::parsing::utils::operators::Operator;
 use crate::sources::{CodeArea, CodeSpan, Spannable, Spanned, SpwnSource};
 use crate::util::Interner;
@@ -957,6 +958,33 @@ impl Parser<'_> {
 
                     Expression::Import(import_type).spanned(start.extend(self.span()))
                 },
+                Token::Match => {
+                    self.next();
+
+                    let v = self.parse_expr(true)?;
+                    self.expect_tok(Token::LBracket)?;
+
+                    let mut branches = vec![];
+
+                    list_helper!(self, RBracket {
+
+                        let pattern = self.parse_expr(true)?;
+                        self.expect_tok(Token::FatArrow)?;
+
+                        let branch = if self.next_is(Token::LBracket) {
+                            self.next();
+                            let stmts = self.parse_statements()?;
+                            self.expect_tok(Token::RBracket)?;
+                            MatchBranch::Block(stmts)
+                        } else {
+                            let expr = self.parse_expr(true)?;
+                            MatchBranch::Expr(expr)
+                        };
+
+                        branches.push((pattern, branch));
+                    });
+                    Expression::Match { value: v, branches }.spanned(start.extend(self.span()))
+                },
                 unary_op
                     if {
                         unary = unary_prec(unary_op);
@@ -1240,7 +1268,7 @@ impl Parser<'_> {
         let stmt = match self.peek() {
             Token::Let => {
                 self.next();
-                let var = self.parse_unit(true)?;
+                let var = self.parse_expr(true)?;
                 self.expect_tok(Token::Assign)?;
                 let value = self.parse_expr(true)?;
 

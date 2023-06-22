@@ -42,6 +42,17 @@ pub enum Constant {
     Type(ValueType),
 }
 
+// pub enum DestructurePattern<R: Copy + std::fmt::Display> {
+//     Read(R),
+//     Write(R),
+//     Array(ImmutVec<Self>),
+//     Dict(AHashMap<ImmutStr, Self>),
+//     Instance {
+//         typ: CustomTypeID,
+//         items: AHashMap<ImmutStr, Self>,
+//     },
+// }
+
 impl Hash for Constant {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -208,7 +219,7 @@ mod debug_bytecode {
             let const_regex = Regex::new(r"ConstID\((\d+)\)").unwrap();
             let opcode_pos_regex = Regex::new(r"OpcodePos\((\d+)\)").unwrap();
             let import_regex = Regex::new(r"ImportID\((\d+)\)").unwrap();
-            let reg_regex = Regex::new(r"(R\d+)").unwrap();
+            let reg_regex = Regex::new(r"(R\d+|R:mem)").unwrap();
             let mem_arrow_regex = Regex::new(r"~>").unwrap();
 
             for (func_id, func) in self.functions.iter().enumerate() {
