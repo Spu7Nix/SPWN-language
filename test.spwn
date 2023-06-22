@@ -1,8 +1,10 @@
 
+import "test2.spwn"
 
-
-while  1 > 5 {
-    dbg 6;
-    break;
-    dbg 8;
+a = {
+    boing: {
+        dog: true
+    },
+    private dick: 69.69,
 }
+

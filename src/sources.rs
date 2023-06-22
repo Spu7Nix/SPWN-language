@@ -5,10 +5,13 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use derive_more::{Deref, DerefMut};
 use serde::{Deserialize, Serialize};
 
-use crate::parsing::ast::ModuleImport;
-use crate::util::hyperlink;
+use crate::compiling::bytecode::Bytecode;
+use crate::new_id_wrapper;
+use crate::parsing::ast::ImportSettings;
+use crate::util::{hyperlink, SlabMap};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpwnSource {
@@ -64,25 +67,14 @@ impl SpwnSource {
             Self::Core(_) => Self::Core(path),
         }
     }
-
-    pub fn change_path_conditional(&self, path: PathBuf, parent_typ: ModuleImport) -> Self {
-        match self {
-            SpwnSource::File(_) => match parent_typ {
-                ModuleImport::Regular => SpwnSource::File(path),
-                ModuleImport::Core => SpwnSource::Core(path),
-                ModuleImport::Std => SpwnSource::Std(path),
-            },
-
-            _ => self.change_path(path),
-        }
-    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CodeArea {
     pub src: Rc<SpwnSource>,
     pub span: CodeSpan,
 }
+
 impl CodeArea {
     pub fn name(&self) -> String {
         self.src.name()
@@ -123,7 +115,7 @@ impl CodeSpan {
     }
 
     pub fn invalid() -> CodeSpan {
-        CodeSpan { start: 0, end: 0 }
+        CodeSpan { start: 1, end: 0 }
     }
 }
 
@@ -141,8 +133,6 @@ impl From<CodeSpan> for Range<usize> {
     }
 }
 
-// impl<T: Copy> Copy for Spanned<T> {}
-
 pub trait Spannable {
     fn spanned(self, span: CodeSpan) -> Spanned<Self>
     where
@@ -158,8 +148,10 @@ impl<T> Spannable for T {
     }
 }
 
-#[derive(Clone, Hash, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, Serialize, Deserialize, PartialEq, Eq, Deref, DerefMut)]
 pub struct Spanned<T> {
+    #[deref]
+    #[deref_mut]
     pub value: T,
     pub span: CodeSpan,
 }
@@ -181,19 +173,6 @@ impl<T> Spanned<T> {
     }
 }
 
-impl<T> std::ops::Deref for Spanned<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
-}
-impl<T> std::ops::DerefMut for Spanned<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.value
-    }
-}
-
 impl<T: Debug> Debug for Spanned<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -203,3 +182,6 @@ impl<T: Debug> Debug for Spanned<T> {
         )
     }
 }
+
+#[derive(Default, Deref, DerefMut)]
+pub struct BytecodeMap(AHashMap<SpwnSource, Bytecode>);

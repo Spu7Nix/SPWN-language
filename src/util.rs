@@ -181,7 +181,7 @@ pub type ImmutStr = Box<str>;
 pub type ImmutCloneVec<T> = Rc<[T]>;
 pub type ImmutVec<T> = Box<[T]>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlabMap<K, V>
 where
     K: From<usize>,

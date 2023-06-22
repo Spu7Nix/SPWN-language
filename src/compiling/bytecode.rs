@@ -1,18 +1,22 @@
 use std::fmt::Display;
 use std::hash::Hash;
+use std::ops::Index;
 use std::rc::Rc;
 
 use colored::Colorize;
 use delve::{EnumDisplay, VariantNames};
 use derive_more::{Deref, DerefMut, Display, From};
 use itertools::Itertools;
+use lasso::Spur;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
+use super::compiler::LocalTypeID;
 use super::opcodes::{Opcode, OptOpcode};
 use crate::new_id_wrapper;
+use crate::parsing::ast::Vis;
 use crate::sources::{CodeSpan, Spanned, SpwnSource};
-use crate::util::{Digest, ImmutStr, ImmutVec};
+use crate::util::{Digest, ImmutStr, ImmutVec, SlabMap};
 
 #[derive(Clone, Debug, From, EnumDisplay, Serialize, Deserialize)]
 pub enum Constant {
@@ -22,8 +26,8 @@ pub enum Constant {
     Float(f64),
     #[delve(display = |i: &bool| format!("{i}"))]
     Bool(bool),
-    #[delve(display = |i: &ImmutStr| format!("{i}"))]
-    String(ImmutStr),
+    #[delve(display = |i: &ImmutVec<char>| format!("{}", String::from_iter(i.iter())))]
+    String(ImmutVec<char>),
 }
 
 impl Hash for Constant {
@@ -70,11 +74,12 @@ pub struct Register<T: Copy + Display>(pub T);
 new_id_wrapper! {
     ConstID: u16;
     OpcodePos: u16;
-    FuncID: u16;
 }
 
 pub type UnoptRegister = Register<usize>;
 pub type OptRegister = Register<u8>;
+
+// impl<T> Index<OptRegister> for T where T: Index<usize> {}
 
 impl TryFrom<UnoptRegister> for OptRegister {
     type Error = ();
@@ -85,14 +90,24 @@ impl TryFrom<UnoptRegister> for OptRegister {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Function {
+    pub regs_used: u8,
+    pub opcodes: ImmutVec<Spanned<OptOpcode>>,
+    pub span: CodeSpan,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Bytecode {
     pub source_hash: Digest,
     pub version: Version,
 
     pub constants: ImmutVec<Constant>,
-    pub opcodes: ImmutVec<Spanned<OptOpcode>>,
 
-    pub regs_used: u8,
+    pub functions: ImmutVec<Function>,
+
+    pub custom_types: SlabMap<LocalTypeID, Vis<Spanned<String>>>,
+
+    pub export_names: ImmutVec<ImmutStr>,
 }
 
 mod debug_bytecode {
@@ -145,107 +160,132 @@ mod debug_bytecode {
             let reg_regex = Regex::new(r"(R\d+)").unwrap();
             let mem_arrow_regex = Regex::new(r"~>").unwrap();
 
-            let mut max = TableRowMax::default();
-            let mut rows = vec![];
-
-            for (
-                i,
-                Spanned {
-                    value: opcode,
-                    span,
-                },
-            ) in self.opcodes.iter().enumerate()
-            {
-                let row = TableRow {
-                    idx: i.to_string().bright_blue().to_string(),
-                    opcode_name: Into::<&str>::into(opcode).bright_white().to_string(),
-                    opcode_str: {
-                        let c: Cow<'_, str> = format!("{opcode}").into();
-                        let c = mem_arrow_regex.replace_all(&c, "~>".bright_green().to_string());
-                        let c = reg_regex.replace_all(&c, "$1".bright_red().to_string());
-                        let c = opcode_pos_regex.replace_all(&c, "$1".bright_blue().to_string());
-                        let c = const_regex.replace_all(&c, |c: &Captures| {
-                            let id = c.get(1).unwrap().as_str().parse::<usize>().unwrap();
-                            format!("{}", self.constants[id]).bright_green().to_string()
-                        });
-
-                        c.bright_white().to_string()
+            for (func_id, func) in self.functions.iter().enumerate() {
+                let mut max = TableRowMax::default();
+                let mut rows = vec![];
+                for (
+                    i,
+                    Spanned {
+                        value: opcode,
+                        span,
                     },
-                    span: format!("{}..{}", span.start, span.end)
-                        .bright_white()
-                        .dimmed()
-                        .to_string(),
-                    snippet: {
-                        let mut s = code[span.start..span.end].to_string();
-                        if s.len() >= 15 {
-                            s = format!("{:?}{}{:?}", &s[..7], "...".dimmed(), &s[8..])
-                        }
-                        s.bright_cyan().to_string()
-                    },
-                };
-                max.update(&row);
-                rows.push(row);
-            }
+                ) in func.opcodes.iter().enumerate()
+                {
+                    let row = TableRow {
+                        idx: i.to_string().bright_blue().to_string(),
+                        opcode_name: Into::<&str>::into(opcode).bright_white().to_string(),
+                        opcode_str: {
+                            let c: Cow<'_, str> = format!("{opcode}").into();
+                            let c =
+                                mem_arrow_regex.replace_all(&c, "~>".bright_green().to_string());
+                            let c = reg_regex.replace_all(&c, "$1".bright_red().to_string());
+                            let c =
+                                opcode_pos_regex.replace_all(&c, "$1".bright_blue().to_string());
+                            let c = const_regex.replace_all(&c, |c: &Captures| {
+                                let id = c.get(1).unwrap().as_str().parse::<usize>().unwrap();
+                                format!("{}", self.constants[id]).bright_green().to_string()
+                            });
 
-            println!(
-                "{}",
-                format!(
+                            c.bright_white().to_string()
+                        },
+                        span: format!("{}..{}", span.start, span.end)
+                            .bright_white()
+                            .dimmed()
+                            .to_string(),
+                        snippet: {
+                            let mut s = code[span.start..span.end].to_string();
+                            if s.len() >= 15 {
+                                s = format!(
+                                    "{}{}{}",
+                                    {
+                                        let s = format!("{:?}", &s[..7]);
+                                        s[1..(s.len() - 1)].to_string()
+                                    },
+                                    "...".dimmed(),
+                                    {
+                                        let s = format!("{:?}", &s[s.len() - 7..]);
+                                        s[1..(s.len() - 1)].to_string()
+                                    }
+                                )
+                            }
+                            s.bright_cyan().to_string()
+                        },
+                    };
+                    max.update(&row);
+                    rows.push(row);
+                }
+
+                let top = format!(
                     "╭─{}────{}──{}─┬─{}─{}─╮",
                     "─".repeat(max.idx),
                     "─".repeat(max.opcode_name),
                     "─".repeat(max.opcode_str),
                     "─".repeat(max.span),
                     "─".repeat(max.snippet),
-                )
-                .bright_yellow()
-            );
+                );
+                let fn_title = format!(" Function {} ", func_id);
 
-            for row in rows {
-                macro_rules! calc {
-                    ($name:ident) => {
-                        max.$name - clear_ansi(&row.$name).len() + row.$name.len()
-                    };
+                let top = top.chars().take(5).collect::<String>()
+                    + &fn_title
+                    + &top.chars().skip(5 + fn_title.len()).collect::<String>();
+
+                println!("{}", top.bright_yellow());
+
+                for row in rows {
+                    macro_rules! calc {
+                        ($name:ident) => {
+                            max.$name - clear_ansi(&row.$name).len() + row.$name.len()
+                        };
+                    }
+
+                    let s = format!(
+                        "│ {:>idx$}    {:>opcode_name$}  {:opcode_str$} │ {:>span$} {:snippet$} │",
+                        row.idx,
+                        row.opcode_name,
+                        row.opcode_str,
+                        row.span,
+                        row.snippet,
+                        idx = calc!(idx),
+                        opcode_name = calc!(opcode_name),
+                        opcode_str = calc!(opcode_str),
+                        span = calc!(span),
+                        snippet = calc!(snippet),
+                    );
+                    println!("{}", s.bright_yellow());
+                }
+                println!(
+                    "{}",
+                    format!(
+                        "├─{}────{}──{}─┴─{}─{}─╯",
+                        "─".repeat(max.idx),
+                        "─".repeat(max.opcode_name),
+                        "─".repeat(max.opcode_str),
+                        "─".repeat(max.span),
+                        "─".repeat(max.snippet),
+                    )
+                    .bright_yellow()
+                );
+
+                let extra = &[
+                    ("regs used", func.regs_used.to_string()),
+                    (
+                        "constants",
+                        self.constants
+                            .iter()
+                            .map(|c| format!("{c}").bright_green())
+                            .join(", "),
+                    ),
+                ];
+
+                for (k, v) in extra {
+                    println!("{} {}", format!("│ {}:", k).bright_yellow(), v);
                 }
 
-                let s = format!(
-                    "│ {:>idx$}    {:>opcode_name$}  {:opcode_str$} │ {:>span$} {:snippet$} │",
-                    row.idx,
-                    row.opcode_name,
-                    row.opcode_str,
-                    row.span,
-                    row.snippet,
-                    idx = calc!(idx),
-                    opcode_name = calc!(opcode_name),
-                    opcode_str = calc!(opcode_str),
-                    span = calc!(span),
-                    snippet = calc!(snippet),
+                println!(
+                    "{}",
+                    "╰─────────────────────────────────────────────╼".bright_yellow()
                 );
-                println!("{}", s.bright_yellow());
             }
-            println!(
-                "{}",
-                format!(
-                    "├─{}────{}──{}─┴─{}─{}─╯",
-                    "─".repeat(max.idx),
-                    "─".repeat(max.opcode_name),
-                    "─".repeat(max.opcode_str),
-                    "─".repeat(max.span),
-                    "─".repeat(max.snippet),
-                )
-                .bright_yellow()
-            );
-            println!(
-                "{} [{}]",
-                "│ constants:".bright_yellow(),
-                self.constants
-                    .iter()
-                    .map(|c| format!("{c}").bright_green())
-                    .join(", ")
-            );
-            println!(
-                "{}",
-                "╰─────────────────────────────────────────────╼".bright_yellow()
-            );
         }
     }
 }

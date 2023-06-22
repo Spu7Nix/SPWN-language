@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 
-use super::bytecode::{ConstID, FuncID, OpcodePos, OptRegister, Register, UnoptRegister};
+use super::bytecode::{ConstID, OpcodePos, OptRegister, Register, UnoptRegister};
 
 pub type UnoptOpcode = Opcode<UnoptRegister>;
 pub type OptOpcode = Opcode<OptRegister>;
@@ -146,9 +146,6 @@ opcodes! {
     #[delve(display = |src: &R, dest: &R| format!("{src}.next() -> {dest}"))]
     IterNext { [src], [dest] },
 
-    #[delve(display = "ret")]
-    Ret,
-
     #[delve(display = |dest: &R, len: &u16| format!("[...; {len}] -> {dest}"))]
     AllocArray { [dest], len: u16 },
     #[delve(display = |elem: &R, dest: &R| format!("push {elem} into {dest}"))]
@@ -158,6 +155,8 @@ opcodes! {
     AllocDict { [dest], capacity: u16 },
     #[delve(display = |elem: &R, dest: &R, key: &R| format!("insert {key}:{elem} into {dest}"))]
     InsertDictElem { [elem], [dest], [key] },
+    #[delve(display = |elem: &R, dest: &R, key: &R| format!("insert priv {key}:{elem} into {dest}"))]
+    InsertPrivDictElem { [elem], [dest], [key] },
 
 
     #[delve(display = |skip: &OpcodePos| format!("skip to {skip}"))]
@@ -169,7 +168,7 @@ opcodes! {
     #[delve(display = |to: &R| format!("() -> {to}"))]
     LoadEmpty { [to] },
 
-    #[delve(display = |src: &R, mr: &bool| format!("{} R{src}", if *mr { "export" } else { "return" }))]
+    #[delve(display = |src: &R, mr: &bool| format!("{} {src}", if *mr { "export" } else { "return" }))]
     Return { [src], module_ret: bool },
 
     #[delve(display = |reg: &R| format!("dbg {reg}"))]

@@ -8,7 +8,7 @@ use crate::lexing::tokens::Token;
 use crate::parsing::ast::Statement;
 use crate::parsing::error::SyntaxError;
 use crate::parsing::parser::{ParseResult, Parser};
-use crate::sources::{CodeSpan, Spannable, Spanned};
+use crate::sources::{CodeSpan, Spanned};
 use crate::util::hyperlink;
 use crate::SpwnSource;
 

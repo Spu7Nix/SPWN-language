@@ -2,9 +2,5 @@
 
 return {
     penis: 69,
-    fuck: ["bulby", 3],
+    fuck: [false, 3],
 }
-
-
-
-(&self, &a)

@@ -2,6 +2,7 @@ use std::string::ToString;
 
 use crate::error_maker;
 use crate::lexing::tokens::Token;
+use crate::parsing::error::SyntaxError;
 use crate::sources::CodeArea;
 use crate::util::{hyperlink, ImmutStr};
 
@@ -125,5 +126,65 @@ error_maker! {
         ContinueOutsideLoop {
             area: CodeArea,
         },
+        // ==================================================================
+        #[
+            Message: "Type definition outside global scope", Note: None;
+            Labels: [
+                area => "Type definitions can only be used on the top level";
+            ]
+        ]
+        TypeDefNotGlobal {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Type already defined in this scope", Note: None;
+            Labels: [
+                area => "Duplicate type defined here";
+            ]
+        ]
+        TypeAlreadyDefined {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Import could not be resolved", Note: None;
+            Labels: [
+                area => "{} `{}` could not be found": => (if *is_file { "File" } else { "Library" }), name;
+            ]
+        ]
+        NonexistentImport {
+            is_file: bool,
+            name: String,
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Cannot override builtin type", Note: None;
+            Labels: [
+                area => "Tried to override a builtin type here";
+            ]
+        ]
+        BuiltinTypeOverride {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Syntax error in import", Note: None;
+            Labels: [
+                area => "Syntax error occured while importing this {}": => (if *is_file { "file" } else { "library" });
+                -> err.to_report().labels
+            ]
+        ]
+        ImportSyntaxError {
+            is_file: bool,
+            err: SyntaxError,
+            area: CodeArea,
+        },
+
     }
 }

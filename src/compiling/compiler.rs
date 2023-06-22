@@ -1,24 +1,40 @@
 use std::cell::RefCell;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHasher};
+use delve::VariantNames;
+use itertools::Itertools;
 use lasso::Spur;
+use serde::{Deserialize, Serialize};
 
 use super::builder::{BlockID, CodeBuilder, JumpType};
 use super::bytecode::{Bytecode, UnoptRegister};
 use super::error::CompileError;
+use crate::cli::Settings;
 use crate::compiling::builder::ProtoBytecode;
 use crate::compiling::opcodes::Opcode;
+use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
-use crate::parsing::ast::{Ast, ExprNode, Expression, Statement, StmtNode};
+use crate::parsing::ast::{
+    Ast, ExprNode, Expression, Import, ImportType, Statement, StmtNode, VisTrait,
+};
+use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
-use crate::sources::{CodeArea, CodeSpan, Spanned, SpwnSource};
-use crate::util::{ImmutCloneStr, ImmutStr, Interner, SlabMap};
+use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spannable, Spanned, SpwnSource};
+use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec, Interner, SlabMap};
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
 new_id_wrapper! {
     ScopeID: u16;
+    LocalTypeID: u16;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct CustomTypeID {
+    pub local: LocalTypeID,
+    pub source_hash: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -44,25 +60,38 @@ pub struct Scope {
     typ: Option<ScopeType>,
 }
 
-pub struct Compiler {
+pub struct Compiler<'a> {
     src: Rc<SpwnSource>,
     interner: Rc<RefCell<Interner>>,
     scopes: SlabMap<ScopeID, Scope>,
-    global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
+    global_return: Option<Spanned<ImmutVec<Spanned<Spur>>>>,
+
+    settings: &'a Settings,
+    bytecode_map: &'a mut BytecodeMap,
+
+    custom_types: AHashMap<Spur, CustomTypeID>,
 }
 
-impl Compiler {
-    pub fn new(src: Rc<SpwnSource>, interner: Rc<RefCell<Interner>>) -> Self {
+impl<'a> Compiler<'a> {
+    pub fn new(
+        src: Rc<SpwnSource>,
+        settings: &'a Settings,
+        bytecode_map: &'a mut BytecodeMap,
+        interner: Rc<RefCell<Interner>>,
+    ) -> Self {
         Self {
             src,
             interner,
             scopes: SlabMap::new(),
             global_return: None,
+            custom_types: AHashMap::new(),
+            settings,
+            bytecode_map,
         }
     }
 }
 
-impl Compiler {
+impl Compiler<'_> {
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
         CodeArea {
             span,
@@ -186,6 +215,109 @@ impl Compiler {
         }
     }
 
+    pub fn compile_import(
+        &mut self,
+        import: &Import,
+        span: CodeSpan,
+        importer_src: &Rc<SpwnSource>,
+    ) -> CompileResult<ImmutCloneVec<ImmutStr>> {
+        let base_dir = importer_src.path().parent().unwrap();
+        let mut path = base_dir.to_path_buf();
+
+        match import.settings.typ {
+            ImportType::File => path.push(&import.path),
+            ImportType::Library => {
+                path.push("libraries");
+                path.push(&import.path);
+                path.push("lib.spwn");
+            },
+        };
+
+        let is_file = matches!(import.settings.typ, ImportType::File);
+
+        let new_src = Rc::new(SpwnSource::File(path.clone()));
+
+        let import_name = path.file_name().unwrap().to_str().unwrap();
+        let import_base = path.parent().unwrap();
+        let spwnc_path = import_base.join(format!(".spwnc/{import_name}.spwnc"));
+
+        let code = match new_src.read() {
+            Some(c) => c,
+            None => {
+                return Err(CompileError::NonexistentImport {
+                    is_file,
+                    name: import.path.to_str().unwrap().into(),
+                    area: self.make_area(span),
+                })
+            },
+        };
+
+        let mut parser: Parser<'_> =
+            Parser::new(&code, Rc::clone(&new_src), Rc::clone(&self.interner));
+
+        let ast = parser
+            .parse()
+            .map_err(|e| CompileError::ImportSyntaxError {
+                is_file,
+                err: e,
+                area: self.make_area(span),
+            })?;
+
+        let mut compiler = Compiler::new(
+            Rc::clone(&new_src),
+            self.settings,
+            self.bytecode_map,
+            Rc::clone(&self.interner),
+        );
+
+        let bytecode = compiler.compile(&ast, (0..code.len()).into())?;
+
+        let bytes = bincode::serialize(&bytecode).unwrap();
+
+        // dont write bytecode if caching is disabled
+        if !self.settings.no_bytecode_cache {
+            let _ = std::fs::create_dir(import_base.join(".spwnc"));
+            std::fs::write(spwnc_path, bytes).unwrap();
+        }
+
+        Ok(bytecode.export_names.clone().into())
+
+        // todo: caching
+        // 'from_cache: {
+        //     if spwnc_path.is_file() {
+        //         let source_bytes = std::fs::read(&spwnc_path).unwrap();
+
+        //         let bytecode: Bytecode<Register> = match bincode::deserialize(&source_bytes) {
+        //             Ok(b) => b,
+        //             Err(_) => {
+        //                 break 'from_cache;
+        //             },
+        //         };
+
+        //         if bytecode.source_hash == hash.into()
+        //             && bytecode.spwn_ver == env!("CARGO_PKG_VERSION")
+        //         {
+        //             for import in &bytecode.import_paths {
+        //                 self.compile_import(&import.value, import.span, import_src.clone())?;
+        //             }
+        //             for (k, (name, private)) in &bytecode.custom_types {
+        //                 self.custom_type_defs.insert(
+        //                     TypeDef {
+        //                         def_src: import_src.clone(),
+        //                         name: self.intern(&name.value),
+        //                         private: *private,
+        //                     },
+        //                     k.spanned(name.span),
+        //                 );
+        //             }
+
+        //             self.map.map.insert(import_src, bytecode);
+        //             return Ok(());
+        //         }
+        //     }
+        // }
+    }
+
     pub fn compile_expr(
         &mut self,
         expr: &ExprNode,
@@ -299,22 +431,29 @@ impl Compiler {
                 let dest = builder.next_reg();
 
                 builder.alloc_dict(dest, v.len() as u16, expr.span);
-                for e in v {
-                    let r = match &e.value {
+                for item in v {
+                    let r = match &item.value().value {
                         Some(e) => self.compile_expr(e, scope, builder)?,
-                        None => match self.get_var(e.name.value, scope) {
+                        None => match self.get_var(item.value().name.value, scope) {
                             Some(v) => v.reg,
                             None => {
                                 return Err(CompileError::NonexistentVariable {
                                     area: self.make_area(expr.span),
-                                    var: self.resolve(&e.name),
+                                    var: self.resolve(&item.value().name),
                                 })
                             },
                         },
                     };
                     let k = builder.next_reg();
-                    builder.load_const::<ImmutStr>(self.resolve(&e.name.value), k, expr.span);
-                    builder.insert_dict_elem(r, dest, k, expr.span)
+
+                    let chars = self
+                        .resolve(&item.value().name.value)
+                        .chars()
+                        .collect_vec()
+                        .into();
+                    builder.load_const::<ImmutVec<char>>(chars, k, item.value().name.span);
+
+                    builder.insert_dict_elem(r, dest, k, expr.span, item.is_priv())
                 }
 
                 Ok(dest)
@@ -346,7 +485,9 @@ impl Compiler {
             Expression::Builtins => todo!(),
             Expression::Empty => todo!(),
             Expression::Epsilon => todo!(),
-            Expression::Import(_) => todo!(),
+            Expression::Import(import) => {
+                todo!()
+            },
             Expression::Instance { base, items } => todo!(),
         }
     }
@@ -563,16 +704,22 @@ impl Compiler {
                 Some(ScopeType::Global) => match v {
                     Some(e) => match &*e.expr {
                         Expression::Dict(items) => {
-                            if let Some((_, prev_span)) = self.global_return {
+                            if let Some(gr) = &self.global_return {
                                 return Err(CompileError::DuplicateModuleReturn {
                                     area: self.make_area(stmt.span),
-                                    prev_area: self.make_area(prev_span),
+                                    prev_area: self.make_area(gr.span),
                                 });
                             }
 
                             let ret_reg = self.compile_expr(e, scope, builder)?;
-                            self.global_return =
-                                Some((items.iter().map(|i| i.name).collect(), stmt.span));
+                            self.global_return = Some(
+                                items
+                                    .iter()
+                                    .map(|i| i.value().name)
+                                    .collect_vec()
+                                    .into_boxed_slice()
+                                    .spanned(stmt.span),
+                            );
                             builder.ret(ret_reg, true, stmt.span);
                         },
                         _ => {
@@ -630,7 +777,41 @@ impl Compiler {
                     })
                 },
             },
-            Statement::TypeDef { name, private } => todo!(),
+            Statement::TypeDef(name) => {
+                if !matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
+                    return Err(CompileError::TypeDefNotGlobal {
+                        area: self.make_area(stmt.span),
+                    });
+                }
+
+                if ValueType::VARIANT_NAMES.contains(&&*self.resolve(name.value())) {
+                    return Err(CompileError::BuiltinTypeOverride {
+                        area: self.make_area(stmt.span),
+                    });
+                } else if self.custom_types.contains_key(name.value()) {
+                    return Err(CompileError::TypeAlreadyDefined {
+                        area: self.make_area(stmt.span),
+                    });
+                }
+
+                // else if let Some(idx) = self.custom_type_defs.iter().position(|d| d.name == *name)
+                // {
+                //     return Err(CompileError::DuplicateTypeDef {
+                //         area: self.make_area(stmt.span),
+                //         prev_area: self.custom_type_defs[idx].def_area.clone(),
+                //     });
+                // } else if self.available_custom_types.iter().any(|d| d.name == *name) {
+                //     // TODO test
+                //     return Err(CompileError::DuplicateImportedType {
+                //         area: self.make_area(stmt.span),
+                //     });
+                // }
+
+                // let k = builder.create_type(self.resolve(name), *private, stmt.span);
+
+                // self.custom_type_defs.insert(info, k.spanned(stmt.span));
+                // self.available_custom_types.insert(*name, k);
+            },
             Statement::ExtractImport(_) => todo!(),
             Statement::Impl { base, items } => todo!(),
             Statement::Overload { op, macros } => todo!(),
@@ -646,23 +827,37 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn compile(&mut self, ast: &Ast) -> CompileResult<Bytecode> {
+    pub fn compile(&mut self, ast: &Ast, span: CodeSpan) -> CompileResult<&Bytecode> {
         let mut code = ProtoBytecode::new();
-        code.new_func(|b| {
-            let base_scope = self.scopes.insert(Scope {
-                vars: Default::default(),
-                parent: None,
-                typ: Some(ScopeType::Global),
-            });
-            for stmt in &ast.statements {
-                self.compile_stmt(stmt, base_scope, b)?;
-            }
-            Ok(())
-        })?;
-        let code = code.build(&self.src).unwrap();
+        code.new_func(
+            |b| {
+                let base_scope = self.scopes.insert(Scope {
+                    vars: Default::default(),
+                    parent: None,
+                    typ: Some(ScopeType::Global),
+                });
+                for stmt in &ast.statements {
+                    self.compile_stmt(stmt, base_scope, b)?;
+                }
+                Ok(())
+            },
+            span,
+        )?;
+        let code = code
+            .build(
+                &self.src,
+                match &self.global_return {
+                    Some(v) => v
+                        .iter()
+                        .map(|s| self.interner.borrow().resolve(&s.value).into())
+                        .collect(),
+                    None => Box::new([]),
+                },
+            )
+            .unwrap();
 
-        code.debug_str(&self.src);
+        self.bytecode_map.insert((*self.src).clone(), code);
 
-        todo!()
+        Ok(&self.bytecode_map[&self.src])
     }
 }

@@ -8,11 +8,11 @@ use slab::Slab;
 use super::bytecode::{Bytecode, ConstID, Constant, Register, UnoptRegister};
 use super::compiler::CompileResult;
 use super::opcodes::{Opcode, UnoptOpcode};
-use crate::compiling::bytecode::OpcodePos;
+use crate::compiling::bytecode::{Function, OpcodePos};
 use crate::compiling::opcodes::OptOpcode;
 use crate::new_id_wrapper;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
-use crate::util::{ImmutVec, SlabMap, UniqueRegister};
+use crate::util::{ImmutStr, ImmutVec, SlabMap, UniqueRegister};
 
 new_id_wrapper! {
     BlockID: u16;
@@ -57,6 +57,8 @@ pub struct Block {
 #[derive(Debug)]
 struct ProtoFunc {
     code: BlockID,
+    regs_used: usize,
+    span: CodeSpan,
 }
 
 #[derive(Debug)]
@@ -64,7 +66,7 @@ pub struct ProtoBytecode {
     consts: UniqueRegister<Constant>,
     functions: Vec<ProtoFunc>,
     blocks: SlabMap<BlockID, Block>,
-    regs_used: usize,
+    // custom_types:
 }
 
 impl ProtoBytecode {
@@ -73,23 +75,32 @@ impl ProtoBytecode {
             consts: UniqueRegister::new(),
             functions: vec![],
             blocks: SlabMap::new(),
-            regs_used: 0,
         }
     }
 
     pub fn new_func<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(
         &mut self,
         f: F,
+        span: CodeSpan,
     ) -> CompileResult<()> {
         let f_block = self.blocks.insert(Default::default());
-        self.functions.push(ProtoFunc { code: f_block });
+        self.functions.push(ProtoFunc {
+            code: f_block,
+            regs_used: 0,
+            span,
+        });
         f(&mut CodeBuilder {
+            func: self.functions.len() - 1,
             bytecode_builder: self,
             block: f_block,
         })
     }
 
-    pub fn build(mut self, src: &Rc<SpwnSource>) -> Result<Bytecode, ()> {
+    pub fn build(
+        mut self,
+        src: &Rc<SpwnSource>,
+        global_returns: ImmutVec<ImmutStr>,
+    ) -> Result<Bytecode, ()> {
         type BlockPos = (u16, u16);
 
         let mut constants = vec![unsafe { std::mem::zeroed() }; self.consts.map.len()];
@@ -97,88 +108,96 @@ impl ProtoBytecode {
             constants[v] = k
         }
 
-        let mut block_positions = AHashMap::new();
+        let mut funcs = vec![];
 
-        let mut code_len = 0;
+        for (func_id, func) in self.functions.iter().enumerate() {
+            let mut block_positions = AHashMap::new();
+            let mut code_len = 0;
 
-        let mut opcodes = vec![];
+            let mut opcodes = vec![];
 
-        fn get_block_pos(
-            code: &ProtoBytecode,
-            block: BlockID,
-            length: &mut u16,
-            positions: &mut AHashMap<BlockID, BlockPos>,
-        ) {
-            let start = *length;
-            for c in &code.blocks[block].content {
-                match c {
-                    BlockContent::Opcode(_) => {
-                        *length += 1;
-                    },
-                    BlockContent::Block(b) => get_block_pos(code, *b, length, positions),
+            fn get_block_pos(
+                code: &ProtoBytecode,
+                block: BlockID,
+                length: &mut u16,
+                positions: &mut AHashMap<BlockID, BlockPos>,
+            ) {
+                let start = *length;
+                for c in &code.blocks[block].content {
+                    match c {
+                        BlockContent::Opcode(_) => {
+                            *length += 1;
+                        },
+                        BlockContent::Block(b) => get_block_pos(code, *b, length, positions),
+                    }
                 }
+                let end = *length;
+                positions.insert(block, (start, end));
             }
-            let end = *length;
-            positions.insert(block, (start, end));
-        }
 
-        fn build_block(
-            code: &ProtoBytecode,
-            block: BlockID,
-            opcodes: &mut Vec<Spanned<OptOpcode>>,
-            positions: &AHashMap<BlockID, BlockPos>,
-        ) -> Result<(), ()> {
-            let get_jump_pos = |jump: JumpTo| -> u16 {
-                match jump {
-                    JumpTo::Start(path) => positions[&path].0,
-                    JumpTo::End(path) => positions[&path].1,
-                }
-            };
+            fn build_block(
+                code: &ProtoBytecode,
+                block: BlockID,
+                opcodes: &mut Vec<Spanned<OptOpcode>>,
+                positions: &AHashMap<BlockID, BlockPos>,
+            ) -> Result<(), ()> {
+                let get_jump_pos = |jump: JumpTo| -> u16 {
+                    match jump {
+                        JumpTo::Start(path) => positions[&path].0,
+                        JumpTo::End(path) => positions[&path].1,
+                    }
+                };
 
-            for content in &code.blocks[block].content {
-                match content {
-                    BlockContent::Opcode(o) => {
-                        let opcode = o.map(|v| match v {
-                            ProtoOpcode::Raw(o) => o,
-                            ProtoOpcode::Jump(to) => UnoptOpcode::Jump {
-                                to: get_jump_pos(to).into(),
-                            },
-                            ProtoOpcode::JumpIfFalse(r, to) => UnoptOpcode::JumpIfFalse {
-                                check: r,
-                                to: get_jump_pos(to).into(),
-                            },
-                            ProtoOpcode::UnwrapOrJump(r, to) => UnoptOpcode::UnwrapOrJump {
-                                check: r,
-                                to: get_jump_pos(to).into(),
-                            },
-                            ProtoOpcode::EnterArrowStatement(skip) => {
-                                UnoptOpcode::EnterArrowStatement {
-                                    skip: get_jump_pos(skip).into(),
-                                }
-                            },
-                        });
-                        opcodes.push(Spanned {
-                            value: opcode.value.try_into().unwrap(),
-                            span: opcode.span,
-                        })
-                    },
-                    BlockContent::Block(b) => build_block(code, *b, opcodes, positions)?,
+                for content in &code.blocks[block].content {
+                    match content {
+                        BlockContent::Opcode(o) => {
+                            let opcode = o.map(|v| match v {
+                                ProtoOpcode::Raw(o) => o,
+                                ProtoOpcode::Jump(to) => UnoptOpcode::Jump {
+                                    to: get_jump_pos(to).into(),
+                                },
+                                ProtoOpcode::JumpIfFalse(r, to) => UnoptOpcode::JumpIfFalse {
+                                    check: r,
+                                    to: get_jump_pos(to).into(),
+                                },
+                                ProtoOpcode::UnwrapOrJump(r, to) => UnoptOpcode::UnwrapOrJump {
+                                    check: r,
+                                    to: get_jump_pos(to).into(),
+                                },
+                                ProtoOpcode::EnterArrowStatement(skip) => {
+                                    UnoptOpcode::EnterArrowStatement {
+                                        skip: get_jump_pos(skip).into(),
+                                    }
+                                },
+                            });
+                            opcodes.push(Spanned {
+                                value: opcode.value.try_into().unwrap(),
+                                span: opcode.span,
+                            })
+                        },
+                        BlockContent::Block(b) => build_block(code, *b, opcodes, positions)?,
+                    }
                 }
+                Ok(())
             }
-            Ok(())
-        }
 
-        for f in &self.functions {
-            get_block_pos(&self, f.code, &mut code_len, &mut block_positions);
-            build_block(&self, f.code, &mut opcodes, &block_positions)?;
+            get_block_pos(&self, func.code, &mut code_len, &mut block_positions);
+            build_block(&self, func.code, &mut opcodes, &block_positions)?;
+
+            funcs.push(Function {
+                regs_used: func.regs_used.try_into().unwrap(),
+                opcodes: opcodes.into(),
+                span: func.span,
+            })
         }
 
         Ok(Bytecode {
             source_hash: md5::compute(src.read().unwrap()).into(),
             version: Version::parse(env!("CARGO_PKG_VERSION")).unwrap(),
             constants: constants.into(),
-            opcodes: opcodes.into(),
-            regs_used: self.regs_used.try_into().unwrap(),
+            functions: funcs.into(),
+            custom_types: SlabMap::new(),
+            export_names: global_returns,
         })
         // Bytecode {
         //     source_hash: hash.into(),
@@ -191,6 +210,7 @@ impl ProtoBytecode {
 
 pub struct CodeBuilder<'a> {
     bytecode_builder: &'a mut ProtoBytecode,
+    pub func: usize,
     pub block: BlockID,
 }
 
@@ -200,8 +220,8 @@ impl CodeBuilder<'_> {
     }
 
     pub fn next_reg(&mut self) -> UnoptRegister {
-        let r = Register(self.bytecode_builder.regs_used);
-        self.bytecode_builder.regs_used += 1;
+        let r = Register(self.bytecode_builder.functions[self.func].regs_used);
+        self.bytecode_builder.functions[self.func].regs_used += 1;
         r
     }
 
@@ -217,6 +237,7 @@ impl CodeBuilder<'_> {
 
         f(&mut CodeBuilder {
             block: f_block,
+            func: self.func,
             bytecode_builder: self.bytecode_builder,
         })
     }
@@ -268,11 +289,19 @@ impl CodeBuilder<'_> {
         dest: UnoptRegister,
         key: UnoptRegister,
         span: CodeSpan,
+        private: bool,
     ) {
-        self.push_opcode(
-            ProtoOpcode::Raw(Opcode::InsertDictElem { elem, dest, key }),
-            span,
-        )
+        if private {
+            self.push_opcode(
+                ProtoOpcode::Raw(Opcode::InsertPrivDictElem { elem, dest, key }),
+                span,
+            )
+        } else {
+            self.push_opcode(
+                ProtoOpcode::Raw(Opcode::InsertDictElem { elem, dest, key }),
+                span,
+            )
+        }
     }
 
     pub fn copy_deep(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
@@ -313,4 +342,10 @@ impl CodeBuilder<'_> {
     pub fn throw(&mut self, reg: UnoptRegister, span: CodeSpan) {
         self.push_opcode(ProtoOpcode::Raw(Opcode::Throw { reg }), span)
     }
+
+    // pub fn create_type(&mut self, name: String, private: bool, span: CodeSpan) -> CustomTypeKey {
+    //     self.code_builder
+    //         .custom_types
+    //         .insert((name.spanned(span), private))
+    // }
 }

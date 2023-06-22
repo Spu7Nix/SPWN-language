@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use delve::{EnumDisplay, EnumToStr};
 use derive_more::Deref;
@@ -24,63 +25,24 @@ pub struct StringType {
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub enum ModuleImport {
-    Regular,
-    Core,
-    Std,
+pub struct ImportSettings {
+    pub typ: ImportType,
+    pub is_absolute: bool,
+    pub allow_builtin_impl: bool,
 }
-impl ModuleImport {
-    pub fn is_absolute(&self) -> bool {
-        !matches!(self, ModuleImport::Regular)
-    }
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ImportType {
+    File,
+    Library,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ImportType {
-    Module(PathBuf, ModuleImport),
-    Library(PathBuf),
-}
-
-impl ImportType {
-    pub fn module_import_type(&self) -> ModuleImport {
-        match self {
-            ImportType::Module(_, t) => *t,
-            ImportType::Library(_) => ModuleImport::Regular,
-        }
-    }
-}
-
-impl ImportType {
-    pub fn name(&self) -> String {
-        match self {
-            ImportType::Module(p, _) => p.file_stem().unwrap().to_str().unwrap().to_string(),
-            ImportType::Library(p) => {
-                let rel_path = PathBuf::from("libraries").join(p).join("lib.spwn");
-                rel_path
-                    .parent()
-                    .unwrap()
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string()
-            },
-        }
-    }
-
-    pub fn full_path(&self, base_dir: &Path) -> PathBuf {
-        match self {
-            ImportType::Module(p, t) => {
-                if !t.is_absolute() {
-                    base_dir.join(p)
-                } else {
-                    p.clone()
-                }
-            },
-            ImportType::Library(p) => PathBuf::from("libraries").join(p).join("lib.spwn"),
-        }
-    }
+pub struct Import {
+    pub path: PathBuf,
+    pub settings: ImportSettings,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -119,7 +81,6 @@ pub struct DictItem {
     pub name: Spanned<Spur>,
     pub attributes: Vec<Spanned<Attributes>>,
     pub value: Option<ExprNode>,
-    pub private: bool,
 }
 
 impl From<DictItem> for &'static str {
@@ -192,7 +153,7 @@ pub enum Expression {
     Type(Spur),
 
     Array(Vec<ExprNode>),
-    Dict(Vec<DictItem>),
+    Dict(Vec<Vis<DictItem>>),
 
     Maybe(Option<ExprNode>),
 
@@ -246,11 +207,11 @@ pub enum Expression {
     Empty,
     Epsilon,
 
-    Import(ImportType),
+    Import(Import),
 
     Instance {
         base: ExprNode,
-        items: Vec<DictItem>,
+        items: Vec<Vis<DictItem>>,
     },
     // Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
 }
@@ -303,16 +264,13 @@ pub enum Statement {
     Break,
     Continue,
 
-    TypeDef {
-        name: Spur,
-        private: bool,
-    },
+    TypeDef(Vis<Spur>),
 
-    ExtractImport(ImportType),
+    ExtractImport(Import),
 
     Impl {
         base: ExprNode,
-        items: Vec<DictItem>,
+        items: Vec<Vis<DictItem>>,
     },
     Overload {
         op: Operator,
@@ -386,25 +344,86 @@ pub struct Ast {
     pub file_attributes: Vec<FileAttribute>,
 }
 
-#[derive(Clone, Debug)]
-pub enum VisibilityType {
-    Private(SpwnSource),
-    Public,
+pub trait VisTrait {
+    type Value;
+
+    fn is_priv(&self) -> bool;
+    fn is_pub(&self) -> bool;
+    fn value(&self) -> &Self::Value;
+    fn value_mut(&mut self) -> &mut Self::Value;
+
+    fn source(&self) -> Option<&Rc<SpwnSource>> {
+        None
+    }
 }
 
-#[derive(Clone, Debug, Deref)]
-struct Visibility<T> {
-    #[deref]
-    value: T,
-    pub vis: VisibilityType,
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum VisSource<T> {
+    Public(T),
+    Private(T, Rc<SpwnSource>),
 }
 
-impl<T> Visibility<T> {
-    pub fn is_priv(&self) -> bool {
-        matches!(self.vis, VisibilityType::Private(..))
+impl<T> VisTrait for VisSource<T> {
+    type Value = T;
+
+    fn is_priv(&self) -> bool {
+        matches!(self, VisSource::Private { .. })
     }
 
-    pub fn is_pub(&self) -> bool {
-        matches!(self.vis, VisibilityType::Public)
+    fn is_pub(&self) -> bool {
+        matches!(self, VisSource::Public { .. })
+    }
+
+    fn value(&self) -> &Self::Value {
+        match self {
+            VisSource::Public(v) => v,
+            VisSource::Private(v, _) => v,
+        }
+    }
+
+    fn value_mut(&mut self) -> &mut Self::Value {
+        match self {
+            VisSource::Public(v) => v,
+            VisSource::Private(v, _) => v,
+        }
+    }
+
+    fn source(&self) -> Option<&Rc<SpwnSource>> {
+        match self {
+            VisSource::Public(..) => None,
+            VisSource::Private(.., s) => Some(s),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Vis<T> {
+    Public(T),
+    Private(T),
+}
+
+impl<T> VisTrait for Vis<T> {
+    type Value = T;
+
+    fn is_priv(&self) -> bool {
+        matches!(self, Vis::Private { .. })
+    }
+
+    fn is_pub(&self) -> bool {
+        matches!(self, Vis::Public { .. })
+    }
+
+    fn value(&self) -> &Self::Value {
+        match self {
+            Vis::Public(v) => v,
+            Vis::Private(v) => v,
+        }
+    }
+
+    fn value_mut(&mut self) -> &mut Self::Value {
+        match self {
+            Vis::Public(v) => v,
+            Vis::Private(v) => v,
+        }
     }
 }

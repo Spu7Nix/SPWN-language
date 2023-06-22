@@ -15,7 +15,7 @@ error_maker! {
     Title: "Syntax Error"
     Extra: {}
     pub enum SyntaxError {
-        /////////
+        // ==================================================================
         #[
             Message: "Unexpected token", Note: None;
             Labels: [
@@ -28,7 +28,7 @@ error_maker! {
             area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Unmatched token", Note: None;
             Labels: [
@@ -41,7 +41,7 @@ error_maker! {
             area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Unexpected character", Note: None;
             Labels: [
@@ -54,7 +54,7 @@ error_maker! {
             area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Unexpected string flag", Note: None;
             Labels: [
@@ -66,7 +66,7 @@ error_maker! {
             area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Error parsing escape sequence", Note: None;
             Labels: [
@@ -78,7 +78,7 @@ error_maker! {
             area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Error parsing unicode escape sequence", Note: None;
             Labels: [
@@ -90,7 +90,7 @@ error_maker! {
             area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Unknown attribute", Note: Some(format!("The valid attributes are: {}", list_join(valid)));
             Labels: [
@@ -104,7 +104,7 @@ error_maker! {
             valid: Vec<String>,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Cannot have multiple spread arguments", Note: None;
             Labels: [
@@ -117,7 +117,7 @@ error_maker! {
             prev_area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Positional argument after keyword argument", Note: None;
             Labels: [
@@ -130,7 +130,7 @@ error_maker! {
             keyword_area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Mismatched attribute", Note: None;
             Labels: [
@@ -150,7 +150,7 @@ error_maker! {
             valid: Option<Vec<String>>,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are {}", attribute, list_join(fields)));
             Labels: [
@@ -164,7 +164,7 @@ error_maker! {
             fields: Vec<String>,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Duplicate attribute field", Note: None;
             Labels: [
@@ -178,7 +178,7 @@ error_maker! {
             first_used: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Invalid number of arguments", Note: None;
             Labels: [
@@ -193,7 +193,7 @@ error_maker! {
             area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Invalid type for attribute", Note: None;
             Labels: [
@@ -205,7 +205,7 @@ error_maker! {
             area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Invalid string type", Note: None;
             Labels: [
@@ -217,7 +217,7 @@ error_maker! {
             area: CodeArea,
         },
 
-        /////////
+        // ==================================================================
         #[
             Message: "Catch-all block must be last", Note: None;
             Labels: [
@@ -230,7 +230,7 @@ error_maker! {
             named_catch_area: CodeArea,
         },
 
-         /////////
+         // ==================================================================
          #[
             Message: "Duplicate catch-all blocks", Note: None;
             Labels: [

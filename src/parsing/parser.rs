@@ -7,8 +7,8 @@ use lasso::Spur;
 use unindent::unindent;
 
 use super::ast::{
-    Ast, DictItem, ExprNode, Expression, ImportType, MacroArg, MacroCode, ModuleImport, ObjectType,
-    Pattern, PatternNode, Statement, Statements, StmtNode, StringContent, StringType,
+    Ast, DictItem, ExprNode, Expression, Import, ImportSettings, ImportType, MacroArg, MacroCode,
+    Pattern, PatternNode, Statement, Statements, StmtNode, StringContent, StringType, Vis,
 };
 use super::attributes::{Attributes, FileAttribute, IsValidOn, ParseAttribute};
 use super::error::SyntaxError;
@@ -362,7 +362,7 @@ impl Parser<'_> {
         .unwrap_or('\u{FFFD}'))
     }
 
-    pub fn parse_dictlike(&mut self, allow_vis: bool) -> ParseResult<Vec<DictItem>> {
+    pub fn parse_dictlike(&mut self, allow_vis: bool) -> ParseResult<Vec<Vis<DictItem>>> {
         let mut items = vec![];
 
         list_helper!(self, RBracket {
@@ -376,11 +376,11 @@ impl Parser<'_> {
 
             let start = self.peek_span();
 
-            let private = if allow_vis && self.next_is(Token::Private) {
+            let vis = if allow_vis && self.next_is(Token::Private) {
                 self.next();
-                true
+                Vis::Private
             } else {
-                false
+                Vis::Public
             };
 
             let key = match self.next() {
@@ -406,13 +406,13 @@ impl Parser<'_> {
             };
 
             // this is so backwards if only u could use enum variants as types. . . .
-            let mut item = DictItem { name: key.spanned(key_span), attributes: vec![], value: elem, private }.spanned(start.extend(self.span()));
+            let mut item = DictItem { name: key.spanned(key_span), attributes: vec![], value: elem }.spanned(start.extend(self.span()));
 
             attrs.is_valid_on(&item, &self.src)?;
 
-            item.value.attributes = attrs;
+            item.attributes = attrs;
 
-            items.push(item.value);
+            items.push(vis(item.value));
         });
 
         Ok(items)
@@ -430,20 +430,33 @@ impl Parser<'_> {
         Ok(attrs)
     }
 
-    pub fn parse_import(&mut self) -> ParseResult<ImportType> {
+    pub fn parse_import(&mut self) -> ParseResult<Import> {
         Ok(match self.peek() {
             Token::String => {
                 self.next();
-                ImportType::Module(
-                    self.resolve(&self.parse_plain_string(self.slice(), self.span())?)
+
+                Import {
+                    path: self
+                        .resolve(&self.parse_plain_string(self.slice(), self.span())?)
                         .to_string()
                         .into(),
-                    ModuleImport::Regular,
-                )
+                    settings: ImportSettings {
+                        typ: ImportType::File,
+                        is_absolute: false,
+                        allow_builtin_impl: false,
+                    },
+                }
             },
             Token::Ident => {
                 self.next();
-                ImportType::Library(self.slice().into())
+                Import {
+                    path: self.slice().into(),
+                    settings: ImportSettings {
+                        typ: ImportType::Library,
+                        is_absolute: false,
+                        allow_builtin_impl: false,
+                    },
+                }
             },
             other => {
                 return Err(SyntaxError::UnexpectedToken {
@@ -918,7 +931,7 @@ impl Parser<'_> {
                 Token::LBracket => {
                     self.next();
 
-                    Expression::Dict(self.parse_dictlike(false)?).spanned(start.extend(self.span()))
+                    Expression::Dict(self.parse_dictlike(true)?).spanned(start.extend(self.span()))
                 },
                 Token::QMark => {
                     self.next();
@@ -1358,20 +1371,16 @@ impl Parser<'_> {
                 self.next();
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
-                Statement::TypeDef {
-                    name: self.intern_string(name),
-                    private: false,
-                }
+
+                Statement::TypeDef(Vis::Public(self.intern_string(name)))
             },
             Token::Private => {
                 self.next();
                 self.expect_tok(Token::Type)?;
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
-                Statement::TypeDef {
-                    name: self.intern_string(name),
-                    private: true,
-                }
+
+                Statement::TypeDef(Vis::Private(self.intern_string(name)))
             },
             Token::Impl => {
                 self.next();
