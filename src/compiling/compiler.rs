@@ -1,6 +1,8 @@
 use std::cell::RefCell;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+use std::str::FromStr;
 
 use ahash::{AHashMap, AHasher};
 use delve::VariantNames;
@@ -17,7 +19,7 @@ use crate::compiling::opcodes::Opcode;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{
-    Ast, ExprNode, Expression, Import, ImportType, Statement, StmtNode, VisTrait,
+    Ast, ExprNode, Expression, Import, ImportType, Statement, StmtNode, Vis, VisTrait,
 };
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
@@ -60,16 +62,23 @@ pub struct Scope {
     typ: Option<ScopeType>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TypeDef {
+    pub def_span: CodeSpan,
+    pub name: Spur,
+}
+
 pub struct Compiler<'a> {
     src: Rc<SpwnSource>,
     interner: Rc<RefCell<Interner>>,
     scopes: SlabMap<ScopeID, Scope>,
-    global_return: Option<Spanned<ImmutVec<Spanned<Spur>>>>,
+    pub global_return: Option<Spanned<ImmutVec<Spanned<Spur>>>>,
 
     settings: &'a Settings,
     bytecode_map: &'a mut BytecodeMap,
 
-    custom_types: AHashMap<Spur, CustomTypeID>,
+    pub custom_type_defs: SlabMap<LocalTypeID, Vis<TypeDef>>,
+    available_custom_types: AHashMap<Spur, CustomTypeID>,
 }
 
 impl<'a> Compiler<'a> {
@@ -84,7 +93,8 @@ impl<'a> Compiler<'a> {
             interner,
             scopes: SlabMap::new(),
             global_return: None,
-            custom_types: AHashMap::new(),
+            custom_type_defs: SlabMap::new(),
+            available_custom_types: AHashMap::new(),
             settings,
             bytecode_map,
         }
@@ -99,8 +109,28 @@ impl Compiler<'_> {
         }
     }
 
-    pub fn resolve(&self, s: &Spur) -> Box<str> {
+    fn intern(&self, s: &str) -> Spur {
+        self.interner.borrow_mut().get_or_intern(s)
+    }
+
+    pub fn src_hash(&self) -> u32 {
+        let mut hasher = DefaultHasher::default();
+        self.src.hash(&mut hasher);
+        let h = hasher.finish();
+        (h % (u32::MAX as u64)) as u32
+    }
+
+    pub fn resolve(&self, s: &Spur) -> ImmutStr {
         self.interner.borrow().resolve(s).into()
+    }
+
+    fn resolve_arr(&self, s: &Spur) -> ImmutVec<char> {
+        self.interner
+            .borrow()
+            .resolve(s)
+            .chars()
+            .collect_vec()
+            .into()
     }
 
     pub fn derive_scope(&mut self, scope: ScopeID, typ: Option<ScopeType>) -> ScopeID {
@@ -219,8 +249,12 @@ impl Compiler<'_> {
         &mut self,
         import: &Import,
         span: CodeSpan,
-        importer_src: &Rc<SpwnSource>,
-    ) -> CompileResult<ImmutCloneVec<ImmutStr>> {
+        importer_src: Rc<SpwnSource>,
+    ) -> CompileResult<(
+        ImmutVec<ImmutStr>,
+        SpwnSource,
+        ImmutVec<(CustomTypeID, Spur)>,
+    )> {
         let base_dir = importer_src.path().parent().unwrap();
         let mut path = base_dir.to_path_buf();
 
@@ -270,9 +304,17 @@ impl Compiler<'_> {
             Rc::clone(&self.interner),
         );
 
-        let bytecode = compiler.compile(&ast, (0..code.len()).into())?;
+        compiler.compile(&ast, (0..code.len()).into())?;
 
-        let bytes = bincode::serialize(&bytecode).unwrap();
+        let export_names = compiler.bytecode_map[&new_src].export_names.clone();
+        let custom_types = compiler.bytecode_map[&new_src]
+            .custom_types
+            .iter()
+            .filter(|(_, v)| v.is_pub())
+            .map(|(id, s)| (*id, compiler.intern(&s.value().value)))
+            .collect();
+
+        let bytes = bincode::serialize(&self.bytecode_map[&new_src]).unwrap();
 
         // dont write bytecode if caching is disabled
         if !self.settings.no_bytecode_cache {
@@ -280,7 +322,7 @@ impl Compiler<'_> {
             std::fs::write(spwnc_path, bytes).unwrap();
         }
 
-        Ok(bytecode.export_names.clone().into())
+        Ok((export_names, (*new_src).clone(), custom_types))
 
         // todo: caching
         // 'from_cache: {
@@ -415,7 +457,26 @@ impl Compiler<'_> {
                     var: self.resolve(v),
                 }),
             },
-            Expression::Type(_) => todo!(),
+            Expression::Type(v) => {
+                let reg = builder.next_reg();
+                let name = self.resolve(v);
+
+                match ValueType::from_str(&name) {
+                    Ok(v) => {
+                        builder.load_const(v, reg, expr.span);
+                    },
+                    Err(_) => match self.available_custom_types.get(v) {
+                        Some(k) => builder.load_const(ValueType::Custom(*k), reg, expr.span),
+                        None => {
+                            return Err(CompileError::NonexistentType {
+                                area: self.make_area(expr.span),
+                                type_name: name.into(),
+                            })
+                        },
+                    },
+                }
+                Ok(reg)
+            },
             Expression::Array(v) => {
                 let dest = builder.next_reg();
 
@@ -446,11 +507,7 @@ impl Compiler<'_> {
                     };
                     let k = builder.next_reg();
 
-                    let chars = self
-                        .resolve(&item.value().name.value)
-                        .chars()
-                        .collect_vec()
-                        .into();
+                    let chars = self.resolve_arr(&item.value().name.value);
                     builder.load_const::<ImmutVec<char>>(chars, k, item.value().name.span);
 
                     builder.insert_dict_elem(r, dest, k, expr.span, item.is_priv())
@@ -461,7 +518,12 @@ impl Compiler<'_> {
             Expression::Maybe(_) => todo!(),
             Expression::Is(..) => todo!(),
             Expression::Index { base, index } => todo!(),
-            Expression::Member { base, name } => todo!(),
+            Expression::Member { base, name } => {
+                let base = self.compile_expr(base, scope, builder)?;
+                let out = builder.next_reg();
+                builder.member(base, out, name.map(|v| self.resolve_arr(&v)), expr.span);
+                Ok(out)
+            },
             Expression::TypeMember { base, name } => todo!(),
             Expression::Associated { base, name } => todo!(),
             Expression::Call {
@@ -486,7 +548,11 @@ impl Compiler<'_> {
             Expression::Empty => todo!(),
             Expression::Epsilon => todo!(),
             Expression::Import(import) => {
-                todo!()
+                let out = builder.next_reg();
+                let (_, s, _) = self.compile_import(import, expr.span, Rc::clone(&self.src))?;
+                builder.import(out, s, expr.span);
+
+                Ok(out)
             },
             Expression::Instance { base, items } => todo!(),
         }
@@ -689,7 +755,12 @@ impl Compiler<'_> {
                 try_code,
                 branches,
                 catch_all,
-            } => todo!(),
+            } => {
+                builder.new_block(|b| {
+                    //df d
+                    Ok(())
+                })?;
+            },
             Statement::Arrow(s) => {
                 builder.new_block(|b| {
                     let inner_scope =
@@ -788,31 +859,66 @@ impl Compiler<'_> {
                     return Err(CompileError::BuiltinTypeOverride {
                         area: self.make_area(stmt.span),
                     });
-                } else if self.custom_types.contains_key(name.value()) {
-                    return Err(CompileError::TypeAlreadyDefined {
+                } else if let Some((_, def)) = self
+                    .custom_type_defs
+                    .iter()
+                    .find(|(_, v)| v.value().name == *name.value())
+                {
+                    return Err(CompileError::DuplicateTypeDef {
+                        area: self.make_area(stmt.span),
+                        prev_area: self.make_area(def.value().def_span),
+                    });
+                } else if self.available_custom_types.contains_key(name.value()) {
+                    return Err(CompileError::DuplicateImportedType {
                         area: self.make_area(stmt.span),
                     });
+                };
+
+                let def = TypeDef {
+                    def_span: stmt.span,
+                    name: *name.value(),
+                };
+
+                let id = self.custom_type_defs.insert(name.map(|_| def));
+                self.available_custom_types.insert(
+                    *name.value(),
+                    CustomTypeID {
+                        local: id,
+                        source_hash: self.src_hash(),
+                    },
+                );
+            },
+            Statement::ExtractImport(import) => {
+                let import_reg = builder.next_reg();
+                let (names, s, types) =
+                    self.compile_import(import, stmt.span, Rc::clone(&self.src))?;
+                builder.import(import_reg, s, stmt.span);
+
+                for name in &*names {
+                    let var_reg = builder.next_reg();
+                    let spur = self.intern(name);
+
+                    self.scopes[scope].vars.insert(
+                        spur,
+                        VarData {
+                            mutable: false,
+                            def_span: stmt.span,
+                            reg: var_reg,
+                        },
+                    );
+
+                    builder.member(
+                        import_reg,
+                        var_reg,
+                        self.resolve_arr(&spur).spanned(stmt.span),
+                        stmt.span,
+                    )
                 }
 
-                // else if let Some(idx) = self.custom_type_defs.iter().position(|d| d.name == *name)
-                // {
-                //     return Err(CompileError::DuplicateTypeDef {
-                //         area: self.make_area(stmt.span),
-                //         prev_area: self.custom_type_defs[idx].def_area.clone(),
-                //     });
-                // } else if self.available_custom_types.iter().any(|d| d.name == *name) {
-                //     // TODO test
-                //     return Err(CompileError::DuplicateImportedType {
-                //         area: self.make_area(stmt.span),
-                //     });
-                // }
-
-                // let k = builder.create_type(self.resolve(name), *private, stmt.span);
-
-                // self.custom_type_defs.insert(info, k.spanned(stmt.span));
-                // self.available_custom_types.insert(*name, k);
+                for (id, name) in types.iter() {
+                    self.available_custom_types.insert(*name, *id);
+                }
             },
-            Statement::ExtractImport(_) => todo!(),
             Statement::Impl { base, items } => todo!(),
             Statement::Overload { op, macros } => todo!(),
             Statement::Dbg(v) => {
@@ -827,7 +933,7 @@ impl Compiler<'_> {
         Ok(())
     }
 
-    pub fn compile(&mut self, ast: &Ast, span: CodeSpan) -> CompileResult<&Bytecode> {
+    pub fn compile(&mut self, ast: &Ast, span: CodeSpan) -> CompileResult<()> {
         let mut code = ProtoBytecode::new();
         code.new_func(
             |b| {
@@ -843,21 +949,10 @@ impl Compiler<'_> {
             },
             span,
         )?;
-        let code = code
-            .build(
-                &self.src,
-                match &self.global_return {
-                    Some(v) => v
-                        .iter()
-                        .map(|s| self.interner.borrow().resolve(&s.value).into())
-                        .collect(),
-                    None => Box::new([]),
-                },
-            )
-            .unwrap();
+        let code = code.build(&self.src, self).unwrap();
 
         self.bytecode_map.insert((*self.src).clone(), code);
 
-        Ok(&self.bytecode_map[&self.src])
+        Ok(())
     }
 }

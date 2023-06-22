@@ -3,7 +3,8 @@ use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 
-use super::bytecode::{ConstID, OpcodePos, OptRegister, Register, UnoptRegister};
+use super::bytecode::{OptRegister, Register, UnoptRegister};
+use crate::new_id_wrapper;
 
 pub type UnoptOpcode = Opcode<UnoptRegister>;
 pub type OptOpcode = Opcode<OptRegister>;
@@ -56,6 +57,13 @@ macro_rules! opcodes {
         }
 
     };
+}
+
+new_id_wrapper! {
+    ConstID: u16;
+    OpcodePos: u16;
+    ImportID: u16;
+    TryCatchID: u16;
 }
 
 opcodes! {
@@ -176,4 +184,18 @@ opcodes! {
 
     #[delve(display = |reg: &R| format!("throw {reg}"))]
     Throw { [reg] },
+
+    #[delve(display = |id: &ImportID, dest| format!("import {id} -> {dest}"))]
+    Import { id: ImportID, [dest] },
+
+    #[delve(display = |b: &R, d: &R, i: &R| format!("{b}[{i}] ~> {d}"))]
+    Index { [base], [dest], [index] },
+    #[delve(display = |f: &R, d: &R, i: &R| format!("{f}.{i} ~> {d}"))]
+    Member { [from], [dest], [member] },
+
+    #[delve(display = |e: &R, _a: &TryCatchID| format!("try {{...}} -> {e}"))]
+    EnterTryCatch { [err], id: TryCatchID },
+
+    #[delve(display = |_a: &TryCatchID| format!(" TODO "))]
+    ExitTryCatch { id: TryCatchID },
 }

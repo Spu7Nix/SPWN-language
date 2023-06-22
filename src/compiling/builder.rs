@@ -5,11 +5,13 @@ use ahash::AHashMap;
 use semver::Version;
 use slab::Slab;
 
-use super::bytecode::{Bytecode, ConstID, Constant, Register, UnoptRegister};
-use super::compiler::CompileResult;
+use super::bytecode::{Bytecode, Constant, Register, UnoptRegister};
+use super::compiler::{CompileResult, Compiler};
 use super::opcodes::{Opcode, UnoptOpcode};
-use crate::compiling::bytecode::{Function, OpcodePos};
+use crate::compiling::bytecode::Function;
+use crate::compiling::compiler::CustomTypeID;
 use crate::compiling::opcodes::OptOpcode;
+use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
 use crate::util::{ImmutStr, ImmutVec, SlabMap, UniqueRegister};
@@ -66,6 +68,8 @@ pub struct ProtoBytecode {
     consts: UniqueRegister<Constant>,
     functions: Vec<ProtoFunc>,
     blocks: SlabMap<BlockID, Block>,
+
+    import_paths: UniqueRegister<SpwnSource>,
     // custom_types:
 }
 
@@ -75,6 +79,7 @@ impl ProtoBytecode {
             consts: UniqueRegister::new(),
             functions: vec![],
             blocks: SlabMap::new(),
+            import_paths: UniqueRegister::new(),
         }
     }
 
@@ -96,15 +101,11 @@ impl ProtoBytecode {
         })
     }
 
-    pub fn build(
-        mut self,
-        src: &Rc<SpwnSource>,
-        global_returns: ImmutVec<ImmutStr>,
-    ) -> Result<Bytecode, ()> {
+    pub fn build(mut self, src: &Rc<SpwnSource>, compiler: &Compiler) -> Result<Bytecode, ()> {
         type BlockPos = (u16, u16);
 
-        let mut constants = vec![unsafe { std::mem::zeroed() }; self.consts.map.len()];
-        for (k, v) in self.consts.map.drain() {
+        let mut constants = vec![unsafe { std::mem::zeroed() }; self.consts.len()];
+        for (v, k) in self.consts.drain() {
             constants[v] = k
         }
 
@@ -191,20 +192,37 @@ impl ProtoBytecode {
             })
         }
 
+        let mut import_paths = vec![unsafe { std::mem::zeroed() }; self.import_paths.len()];
+        for (v, k) in self.import_paths.drain() {
+            import_paths[v] = k
+        }
+
+        let src_hash = compiler.src_hash();
+
         Ok(Bytecode {
             source_hash: md5::compute(src.read().unwrap()).into(),
             version: Version::parse(env!("CARGO_PKG_VERSION")).unwrap(),
             constants: constants.into(),
             functions: funcs.into(),
-            custom_types: SlabMap::new(),
-            export_names: global_returns,
+            custom_types: compiler
+                .custom_type_defs
+                .iter()
+                .map(|(id, v)| {
+                    (
+                        CustomTypeID {
+                            local: id,
+                            source_hash: src_hash,
+                        },
+                        v.map(|def| compiler.resolve(&def.name).spanned(def.def_span)),
+                    )
+                })
+                .collect(),
+            export_names: match &compiler.global_return {
+                Some(v) => v.iter().map(|s| compiler.resolve(&s.value)).collect(),
+                None => Box::new([]),
+            },
+            import_paths: import_paths.into(),
         })
-        // Bytecode {
-        //     source_hash: hash.into(),
-        //     version: env!("CARGO_PKG_VERSION").into(),
-        //     constants: constants.into_boxed_slice(),
-        //     opcodes: todo!(),
-        // }
     }
 }
 
@@ -348,4 +366,28 @@ impl CodeBuilder<'_> {
     //         .custom_types
     //         .insert((name.spanned(span), private))
     // }
+
+    pub fn import(&mut self, dest: UnoptRegister, src: SpwnSource, span: CodeSpan) {
+        let id = self.bytecode_builder.import_paths.insert(src).into();
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Import { id, dest }), span);
+    }
+
+    pub fn member(
+        &mut self,
+        from: UnoptRegister,
+        dest: UnoptRegister,
+        member: Spanned<ImmutVec<char>>,
+        span: CodeSpan,
+    ) {
+        let next_reg = self.next_reg();
+        self.load_const(member.value, next_reg, member.span);
+        self.push_opcode(
+            ProtoOpcode::Raw(UnoptOpcode::Member {
+                from,
+                dest,
+                member: next_reg,
+            }),
+            span,
+        )
+    }
 }

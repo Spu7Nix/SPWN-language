@@ -13,9 +13,8 @@ use sources::BytecodeMap;
 
 use crate::cli::{Arguments, Command};
 use crate::compiling::builder::ProtoBytecode;
-use crate::compiling::bytecode::ConstID;
 use crate::compiling::compiler::Compiler;
-use crate::compiling::opcodes::OptOpcode;
+use crate::compiling::opcodes::{ConstID, OptOpcode};
 use crate::parsing::parser::Parser;
 use crate::sources::SpwnSource;
 use crate::util::{BasicError, RandomState};
@@ -49,7 +48,6 @@ fn run_spwn(settings: &Settings) -> Result<(), Box<dyn Error>> {
         .map_err(|e| e.to_report())?;
 
     for (src, code) in &*bytecode_map {
-        println!("{}", format!("{:?} =============", src).bright_green());
         code.debug_str(&Rc::new(src.clone()))
     }
 

@@ -1,11 +1,15 @@
 use std::borrow::Cow;
+use std::collections::hash_map::Drain;
+use std::iter::Map;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 use std::path::PathBuf;
+use std::process::Output;
 use std::rc::Rc;
 
 use ahash::AHashMap;
 use colored::{ColoredString, Colorize};
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -143,7 +147,7 @@ impl std::fmt::Display for BasicError {
 
 #[derive(Debug, Clone)]
 pub struct UniqueRegister<T: std::hash::Hash + Eq> {
-    pub map: AHashMap<T, usize>,
+    map: AHashMap<T, usize>,
 }
 
 impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
@@ -156,6 +160,14 @@ impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
     pub fn insert(&mut self, value: T) -> usize {
         let len = self.map.len();
         *self.map.entry(value).or_insert(len)
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    pub fn drain(&mut self) -> impl Iterator<Item = (usize, T)> + '_ {
+        self.map.drain().map(|(k, v)| (v, k))
     }
 }
 
@@ -215,10 +227,15 @@ where
         self.slab.get_mut(key.into())
     }
 
-    // pub fn test(&mut self) {
-    //     self.slab.insert(val)
-    // }
+    pub fn iter(&self) -> impl Iterator<Item = (K, &V)> {
+        self.slab.iter().map(|(k, v)| (k.into(), v))
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = (K, V)> {
+        self.slab.into_iter().map(|(k, v)| (k.into(), v))
+    }
 }
+
 impl<K, V> Index<K> for SlabMap<K, V>
 where
     K: From<usize>,
@@ -285,3 +302,21 @@ lazy_static! {
 pub fn clear_ansi(s: &str) -> Cow<'_, str> {
     ANSI_REGEX.replace_all(s, "")
 }
+
+// pub trait IntoCharArray {
+//     fn into_char_array(self) -> ImmutVec<char>;
+//     fn into_clone_char_array(self) -> ImmutCloneVec<char>;
+// }
+
+// impl<T> IntoCharArray for T
+// where
+//     T: AsRef<str>,
+// {
+//     fn into_char_array(self) -> ImmutVec<char> {
+//         self.as_ref().chars().collect_vec().into()
+//     }
+
+//     fn into_clone_char_array(self) -> ImmutCloneVec<char> {
+//         self.as_ref().chars().collect_vec().into()
+//     }
+// }

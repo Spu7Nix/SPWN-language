@@ -1,5 +1,10 @@
 
 
+private type @cum;
+type @blub;
+
+
+
 return {
     penis: 69,
     fuck: [false, 3],

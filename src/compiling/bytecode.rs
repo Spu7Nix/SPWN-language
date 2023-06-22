@@ -3,6 +3,7 @@ use std::hash::Hash;
 use std::ops::Index;
 use std::rc::Rc;
 
+use ahash::AHashMap;
 use colored::Colorize;
 use delve::{EnumDisplay, VariantNames};
 use derive_more::{Deref, DerefMut, Display, From};
@@ -11,10 +12,11 @@ use lasso::Spur;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use super::compiler::LocalTypeID;
+use super::compiler::{CustomTypeID, LocalTypeID};
 use super::opcodes::{Opcode, OptOpcode};
+use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
-use crate::parsing::ast::Vis;
+use crate::parsing::ast::{Vis, VisTrait};
 use crate::sources::{CodeSpan, Spanned, SpwnSource};
 use crate::util::{Digest, ImmutStr, ImmutVec, SlabMap};
 
@@ -28,6 +30,16 @@ pub enum Constant {
     Bool(bool),
     #[delve(display = |i: &ImmutVec<char>| format!("{}", String::from_iter(i.iter())))]
     String(ImmutVec<char>),
+    #[delve(display = |t: &ValueType| {
+        format!(
+            "@{}",
+            match t {
+                ValueType::Custom(i) => format!("<{}:{}>", *i.local, i.source_hash),
+                _ => <ValueType as Into<&str>>::into(*t).into(),
+            }
+        )
+    })]
+    Type(ValueType),
 }
 
 impl Hash for Constant {
@@ -37,6 +49,7 @@ impl Hash for Constant {
             Constant::Float(v) => v.to_bits().hash(state),
             Constant::Bool(v) => v.hash(state),
             Constant::String(v) => v.hash(state),
+            Constant::Type(v) => v.hash(state),
         }
     }
 }
@@ -71,11 +84,6 @@ impl Eq for Constant {}
 #[display(fmt = "R{_0}")]
 pub struct Register<T: Copy + Display>(pub T);
 
-new_id_wrapper! {
-    ConstID: u16;
-    OpcodePos: u16;
-}
-
 pub type UnoptRegister = Register<usize>;
 pub type OptRegister = Register<u8>;
 
@@ -105,9 +113,10 @@ pub struct Bytecode {
 
     pub functions: ImmutVec<Function>,
 
-    pub custom_types: SlabMap<LocalTypeID, Vis<Spanned<String>>>,
+    pub custom_types: AHashMap<CustomTypeID, Vis<Spanned<ImmutStr>>>,
 
     pub export_names: ImmutVec<ImmutStr>,
+    pub import_paths: ImmutVec<SpwnSource>,
 }
 
 mod debug_bytecode {
@@ -153,10 +162,52 @@ mod debug_bytecode {
 
     impl Bytecode {
         pub fn debug_str(&self, src: &Rc<SpwnSource>) {
+            println!(
+                "{}\n",
+                format!(
+                    "================== {} ==================",
+                    format!("{:?}", src).bright_yellow()
+                )
+                .bright_white()
+            );
+            println!(
+                "- Constants: [{}]",
+                self.constants
+                    .iter()
+                    .map(|c| format!("{c}").bright_green())
+                    .join(", "),
+            );
+            println!(
+                "- Export names: [{}]",
+                self.export_names
+                    .iter()
+                    .map(|c| format!("{c}").bright_blue())
+                    .join(", "),
+            );
+            println!(
+                "- Import paths: [{}]",
+                self.import_paths
+                    .iter()
+                    .map(|c| format!("{c:?}").bright_magenta())
+                    .join(", "),
+            );
+            println!("- Custom types:");
+            for (id, s) in &self.custom_types {
+                let t = format!(
+                    "    {}@{}",
+                    if s.is_priv() { "priv " } else { "" }.bright_red(),
+                    s.value().value
+                )
+                .bright_magenta();
+                let id = format!("<{}:{}>", *id.local, id.source_hash,).dimmed();
+                println!("{} {}", t, id);
+            }
+
             let code = src.read().unwrap();
 
             let const_regex = Regex::new(r"ConstID\((\d+)\)").unwrap();
             let opcode_pos_regex = Regex::new(r"OpcodePos\((\d+)\)").unwrap();
+            let import_regex = Regex::new(r"ImportID\((\d+)\)").unwrap();
             let reg_regex = Regex::new(r"(R\d+)").unwrap();
             let mem_arrow_regex = Regex::new(r"~>").unwrap();
 
@@ -184,6 +235,12 @@ mod debug_bytecode {
                             let c = const_regex.replace_all(&c, |c: &Captures| {
                                 let id = c.get(1).unwrap().as_str().parse::<usize>().unwrap();
                                 format!("{}", self.constants[id]).bright_green().to_string()
+                            });
+                            let c = import_regex.replace_all(&c, |c: &Captures| {
+                                let id = c.get(1).unwrap().as_str().parse::<usize>().unwrap();
+                                format!("{:?}", self.import_paths[id])
+                                    .bright_magenta()
+                                    .to_string()
                             });
 
                             c.bright_white().to_string()
@@ -266,16 +323,7 @@ mod debug_bytecode {
                     .bright_yellow()
                 );
 
-                let extra = &[
-                    ("regs used", func.regs_used.to_string()),
-                    (
-                        "constants",
-                        self.constants
-                            .iter()
-                            .map(|c| format!("{c}").bright_green())
-                            .join(", "),
-                    ),
-                ];
+                let extra = &[("regs used", func.regs_used.to_string())];
 
                 for (k, v) in extra {
                     println!("{} {}", format!("│ {}:", k).bright_yellow(), v);
@@ -285,6 +333,9 @@ mod debug_bytecode {
                     "{}",
                     "╰─────────────────────────────────────────────╼".bright_yellow()
                 );
+
+                println!();
+                println!();
             }
         }
     }

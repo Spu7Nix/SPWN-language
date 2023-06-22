@@ -126,6 +126,7 @@ error_maker! {
         ContinueOutsideLoop {
             area: CodeArea,
         },
+
         // ==================================================================
         #[
             Message: "Type definition outside global scope", Note: None;
@@ -139,12 +140,25 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: "Type already defined in this scope", Note: None;
+            Message: "Duplicate type definition", Note: None;
             Labels: [
                 area => "Duplicate type defined here";
+                prev_area => "Previously defined here";
             ]
         ]
-        TypeAlreadyDefined {
+        DuplicateTypeDef {
+            area: CodeArea,
+            prev_area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Duplicate imported type name", Note: None;
+            Labels: [
+                area => "This type definition has the same name as a type from within a previous `extract import`";
+            ]
+        ]
+        DuplicateImportedType {
             area: CodeArea,
         },
 
@@ -186,5 +200,16 @@ error_maker! {
             area: CodeArea,
         },
 
+        // ==================================================================
+        #[
+            Message: "Nonexistent type", Note: None;
+            Labels: [
+                area => "Type {} does not exist or has not been imported and extracted": format!("@{type_name}");
+            ]
+        ]
+        NonexistentType {
+            area: CodeArea,
+            type_name: String,
+        },
     }
 }

@@ -931,7 +931,7 @@ impl Parser<'_> {
                 Token::LBracket => {
                     self.next();
 
-                    Expression::Dict(self.parse_dictlike(true)?).spanned(start.extend(self.span()))
+                    Expression::Dict(self.parse_dictlike(false)?).spanned(start.extend(self.span()))
                 },
                 Token::QMark => {
                     self.next();

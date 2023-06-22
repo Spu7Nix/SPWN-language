@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::attributes::{Attributes, FileAttribute};
 use super::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
+use crate::interpreting::value::Value;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -344,13 +345,15 @@ pub struct Ast {
     pub file_attributes: Vec<FileAttribute>,
 }
 
-pub trait VisTrait {
+pub trait VisTrait
+where
+    Self: Sized,
+{
     type Value;
 
     fn is_priv(&self) -> bool;
     fn is_pub(&self) -> bool;
     fn value(&self) -> &Self::Value;
-    fn value_mut(&mut self) -> &mut Self::Value;
 
     fn source(&self) -> Option<&Rc<SpwnSource>> {
         None
@@ -381,17 +384,22 @@ impl<T> VisTrait for VisSource<T> {
         }
     }
 
-    fn value_mut(&mut self) -> &mut Self::Value {
-        match self {
-            VisSource::Public(v) => v,
-            VisSource::Private(v, _) => v,
-        }
-    }
-
     fn source(&self) -> Option<&Rc<SpwnSource>> {
         match self {
             VisSource::Public(..) => None,
             VisSource::Private(.., s) => Some(s),
+        }
+    }
+}
+
+impl<T> VisSource<T> {
+    pub fn map<F, O>(self, f: F) -> VisSource<O>
+    where
+        F: FnOnce(T) -> O,
+    {
+        match self {
+            VisSource::Public(v) => VisSource::Public(f(v)),
+            VisSource::Private(v, s) => VisSource::Private(f(v), s),
         }
     }
 }
@@ -419,11 +427,16 @@ impl<T> VisTrait for Vis<T> {
             Vis::Private(v) => v,
         }
     }
+}
 
-    fn value_mut(&mut self) -> &mut Self::Value {
+impl<T> Vis<T> {
+    pub fn map<F, O>(self, f: F) -> Vis<O>
+    where
+        F: FnOnce(T) -> O,
+    {
         match self {
-            Vis::Public(v) => v,
-            Vis::Private(v) => v,
+            Vis::Public(v) => Vis::Public(f(v)),
+            Vis::Private(v) => Vis::Private(f(v)),
         }
     }
 }

@@ -161,6 +161,7 @@ impl Value {
             Constant::Float(v) => Value::Float(*v),
             Constant::Bool(v) => Value::Bool(*v),
             Constant::String(v) => Value::String(v.clone()),
+            Constant::Type(v) => Value::Type(*v),
         }
     }
 

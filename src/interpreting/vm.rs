@@ -1,20 +1,19 @@
 use std::cell::{Ref, RefCell, RefMut};
+use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::rc::Rc;
 
-use ahash::{AHashMap, AHasher, RandomState};
+use ahash::{AHashMap, RandomState};
 use derive_more::{Deref, DerefMut};
 use lasso::Spur;
 
 use super::context::{CallInfo, Context, ContextSplitMode, ContextStack, FullContext};
 use super::value::{StoredValue, Value, ValueType};
 use super::value_ops;
-use crate::compiling::bytecode::{
-    Bytecode, ConstID, Constant, Function, OptRegister, UnoptRegister,
-};
-use crate::compiling::opcodes::Opcode;
+use crate::compiling::bytecode::{Bytecode, Constant, Function, OptRegister, UnoptRegister};
+use crate::compiling::opcodes::{ConstID, Opcode};
 use crate::gd::gd_object::{make_spawn_trigger, TriggerObject, TriggerOrder};
 use crate::interpreting::error::RuntimeError;
 use crate::parsing::ast::{VisSource, VisTrait};
@@ -489,6 +488,7 @@ impl Vm {
 
                     // continue;
                 },
+                Opcode::Import { id, dest } => todo!(),
                 Opcode::EnterArrowStatement { skip } => todo!(),
                 Opcode::YeetContext => todo!(),
                 Opcode::LoadEmpty { to } => todo!(),
@@ -503,6 +503,10 @@ impl Vm {
                         call_stack: self.get_call_stack(),
                     });
                 },
+                Opcode::Index { base, dest, index } => todo!(),
+                Opcode::Member { from, dest, member } => todo!(),
+                Opcode::EnterTryCatch { err, id } => todo!(),
+                Opcode::ExitTryCatch { id } => todo!(),
             }
 
             {
@@ -516,7 +520,7 @@ impl Vm {
         Ok(())
     }
 
-    pub fn hash_value(&self, val: &ValueRef, state: &mut AHasher) {
+    pub fn hash_value(&self, val: &ValueRef, state: &mut DefaultHasher) {
         // hash numbers
         if let Value::Int(a) = val.borrow().value {
             mem::discriminant(&Value::Float(0.0)).hash(state);
@@ -608,7 +612,7 @@ impl Vm {
             // hash the contexts
             let mut hashes = AHashMap::new();
             for ctx in top {
-                let mut state = AHasher::default();
+                let mut state = DefaultHasher::default();
                 for val in ctx.registers.last().unwrap() {
                     self.hash_value(val, &mut state);
                 }
