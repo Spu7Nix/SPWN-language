@@ -1,15 +1,18 @@
+use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use ahash::AHashMap;
 use delve::{EnumDisplay, EnumToStr};
 use derive_more::Deref;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::attributes::{Attributes, FileAttribute};
-use super::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
+use super::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::interpreting::value::Value;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
+use crate::util::ImmutStr;
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
@@ -72,7 +75,7 @@ pub struct StmtNode {
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub struct PatternNode {
-    pub pat: Box<Pattern<Spur, PatternNode, ExprNode>>,
+    pub pat: Box<Pattern<Spur, PatternNode, ExprNode, Spur>>,
     pub span: CodeSpan,
 }
 
@@ -295,22 +298,44 @@ pub enum Statement {
 pub type Statements = Vec<StmtNode>;
 
 // T = type, P = pattern, E = expression
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Pattern<T, P, E> {
-    Any,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Pattern<T, P, E, S: Hash + Eq> {
+    Any, // _
 
-    Type(T),
-    Either(P, P),
-    Both(P, P),
+    Type(T),      // @<type>
+    Either(P, P), // <pattern> | <pattern>
+    Both(P, P),   // <pattern> & <pattern>
 
-    Eq(E),
-    Neq(E),
-    Lt(E),
-    Lte(E),
-    Gt(E),
-    Gte(E),
+    Eq(E),  // == <expr>
+    Neq(E), // != <expr>
+    Lt(E),  // < <expr>
+    Lte(E), // <= <expr>
+    Gt(E),  // > <expr>
+    Gte(E), // >= <expr>
+
+    In(E), // in <pattern>
+
+    ArrayPattern(P, Option<u32>), // <pattern>[...]
+    DictPattern(P),               // { <pattern> }
+
+    ArrayDestructure(Vec<P>),                // [ <pattern> ]
+    DictDestructure(AHashMap<S, Option<P>>), // { key: <pattern> }
+    MaybeDestructure(Option<P>),             // <pattern>? or ?
+    InstanceDestructure(T, AHashMap<S, Option<P>>),
+
+    Path(AssignPath<E, S>),
+    Let(S),
 
     MacroPattern { args: Vec<P>, ret_type: P },
+}
+
+// T = type, P = pattern, E = expression
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AssignPath<E, S: Hash + Eq> {
+    Var(S),
+    Index(Box<Self>, E),
+    Member(Box<Self>, S),
+    Associated(Box<Self>, S),
 }
 
 impl Expression {

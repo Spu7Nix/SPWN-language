@@ -4,7 +4,7 @@ use super::context::CallInfo;
 use super::value::{Value, ValueType};
 use super::vm::Vm;
 use crate::error_maker;
-use crate::parsing::utils::operators::{BinOp, UnaryOp};
+use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;
 
 error_maker! {

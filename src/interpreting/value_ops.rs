@@ -4,7 +4,7 @@ use super::error::RuntimeError;
 use super::value::{StoredValue, Value, ValueType};
 use super::vm::{Program, RuntimeResult, Vm};
 use crate::parsing::ast::VisTrait;
-use crate::parsing::utils::operators::{BinOp, UnaryOp};
+use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::CodeSpan;
 
 pub fn to_bool(

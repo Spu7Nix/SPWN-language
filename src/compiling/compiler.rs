@@ -22,8 +22,8 @@ use crate::parsing::ast::{
     Ast, DictItem, ExprNode, Expression, Import, ImportType, MatchBranch, Statement, StmtNode, Vis,
     VisTrait,
 };
+use crate::parsing::operators::operators::{AssignOp, BinOp, UnaryOp};
 use crate::parsing::parser::Parser;
-use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spannable, Spanned, SpwnSource};
 use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec, Interner, SlabMap};
 
