@@ -32,6 +32,8 @@ pub enum JumpType {
     End,
     StartIfFalse(UnoptRegister),
     EndIfFalse(UnoptRegister),
+    StartIfTrue(UnoptRegister),
+    EndIfTrue(UnoptRegister),
     UnwrapOrStart(UnoptRegister),
     UnwrapOrEnd(UnoptRegister),
 }
@@ -41,6 +43,7 @@ enum ProtoOpcode {
     Raw(UnoptOpcode),
     Jump(JumpTo),
     JumpIfFalse(UnoptRegister, JumpTo),
+    JumpIfTrue(UnoptRegister, JumpTo),
     UnwrapOrJump(UnoptRegister, JumpTo),
     EnterArrowStatement(JumpTo),
     MatchCatch(JumpTo),
@@ -159,6 +162,10 @@ impl ProtoBytecode {
                                     to: get_jump_pos(to).into(),
                                 },
                                 ProtoOpcode::JumpIfFalse(r, to) => UnoptOpcode::JumpIfFalse {
+                                    check: r,
+                                    to: get_jump_pos(to).into(),
+                                },
+                                ProtoOpcode::JumpIfTrue(r, to) => UnoptOpcode::JumpIfTrue {
                                     check: r,
                                     to: get_jump_pos(to).into(),
                                 },
@@ -286,6 +293,8 @@ impl CodeBuilder<'_> {
             JumpType::End => ProtoOpcode::Jump(JumpTo::End(block)),
             JumpType::StartIfFalse(reg) => ProtoOpcode::JumpIfFalse(reg, JumpTo::Start(block)),
             JumpType::EndIfFalse(reg) => ProtoOpcode::JumpIfFalse(reg, JumpTo::End(block)),
+            JumpType::StartIfTrue(reg) => ProtoOpcode::JumpIfTrue(reg, JumpTo::Start(block)),
+            JumpType::EndIfTrue(reg) => ProtoOpcode::JumpIfTrue(reg, JumpTo::End(block)),
             JumpType::UnwrapOrStart(reg) => ProtoOpcode::UnwrapOrJump(reg, JumpTo::Start(block)),
             JumpType::UnwrapOrEnd(reg) => ProtoOpcode::UnwrapOrJump(reg, JumpTo::End(block)),
         };
@@ -416,11 +425,8 @@ impl CodeBuilder<'_> {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Assert { reg }), span)
     }
 
-    pub fn assert_matches(&mut self, reg: UnoptRegister, pat: UnoptRegister, span: CodeSpan) {
-        self.push_opcode(
-            ProtoOpcode::Raw(UnoptOpcode::AssertMatches { reg, pat }),
-            span,
-        )
+    pub fn assert_type(&mut self, reg: UnoptRegister, typ: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::AssertType { reg, typ }), span)
     }
 
     pub fn index_set_mem(&mut self, index: UnoptRegister, span: CodeSpan) {
@@ -453,5 +459,69 @@ impl CodeBuilder<'_> {
         };
 
         self.push_opcode(opcode, span);
+    }
+
+    // pub fn and_op(
+    //     &mut self,
+    //     left: UnoptRegister,
+    //     right: UnoptRegister,
+    //     dest: UnoptRegister,
+    //     span: CodeSpan,
+    // ) -> CompileResult<()> {
+    //     self.new_block(|b| {
+    //         b.copy_deep(left, dest, span);
+    //         b.jump(None, JumpType::EndIfFalse(dest), span);
+    //         b.copy_deep(right, dest, span);
+    //         Ok(())
+    //     })?;
+    //     Ok(())
+    // }
+
+    // pub fn or_op(
+    //     &mut self,
+    //     left: UnoptRegister,
+    //     right: UnoptRegister,
+    //     dest: UnoptRegister,
+    //     span: CodeSpan,
+    // ) -> CompileResult<()> {
+    //     self.new_block(|b| {
+    //         b.copy_deep(left, dest, span);
+    //         b.jump(None, JumpType::EndIfFalse(dest), span);
+    //         b.copy_deep(right, dest, span);
+    //         Ok(())
+    //     })?;
+    //     Ok(())
+    // }
+
+    pub fn eq(&mut self, a: UnoptRegister, b: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Eq { a, b, to }), span)
+    }
+
+    pub fn neq(&mut self, a: UnoptRegister, b: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Neq { a, b, to }), span)
+    }
+
+    pub fn gt(&mut self, a: UnoptRegister, b: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Gt { a, b, to }), span)
+    }
+
+    pub fn gte(&mut self, a: UnoptRegister, b: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Gte { a, b, to }), span)
+    }
+
+    pub fn lt(&mut self, a: UnoptRegister, b: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Lt { a, b, to }), span)
+    }
+
+    pub fn lte(&mut self, a: UnoptRegister, b: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Lte { a, b, to }), span)
+    }
+
+    pub fn in_op(&mut self, a: UnoptRegister, b: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::In { a, b, to }), span)
+    }
+
+    pub fn len(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Len { src, dest }), span)
     }
 }

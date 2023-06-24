@@ -40,6 +40,10 @@ fn run_spwn(settings: &Settings) -> Result<(), Box<dyn Error>> {
 
     let ast = parser.parse().map_err(|e| e.to_report())?;
 
+    println!("{:#?}", ast);
+
+    todo!();
+
     let mut bytecode_map = BytecodeMap::default();
 
     let mut cum = Compiler::new(Rc::clone(&src), settings, &mut bytecode_map, interner);

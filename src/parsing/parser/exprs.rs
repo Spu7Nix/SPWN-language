@@ -153,7 +153,8 @@ impl Parser<'_> {
 
                             let pattern = if self.next_is(Token::Colon) {
                                 self.next();
-                                Some(self.parse_pattern()?)
+                                todo!()
+                                // Some(self.parse_pattern()?)
                             } else {
                                 None
                             };
@@ -165,7 +166,8 @@ impl Parser<'_> {
 
                             let pattern = if self.next_is(Token::Colon) {
                                 self.next();
-                                Some(self.parse_pattern()?)
+                                todo!()
+                                // Some(self.parse_pattern()?)
                             } else {
                                 None
                             };
@@ -198,7 +200,8 @@ impl Parser<'_> {
 
                             let pattern = if self.next_is(Token::Colon) {
                                 self.next();
-                                Some(self.parse_pattern()?)
+                                todo!()
+                                // Some(self.parse_pattern()?)
                             } else {
                                 None
                             };
@@ -469,7 +472,7 @@ impl Parser<'_> {
                         expected: "expression".into(),
                         found: other,
                         area: self.make_area(start),
-                    });
+                    })
                 },
             };
         };
@@ -523,9 +526,10 @@ impl Parser<'_> {
                 }
                 Token::Is => {
                     self.next();
-                    let typ = self.parse_pattern()?;
+                    todo!();
+                    // let typ = self.parse_pattern()?;
 
-                    Expression::Is(value, typ)
+                    // Expression::Is(value, typ)
                 }
                 Token::LParen => {
                     self.next();

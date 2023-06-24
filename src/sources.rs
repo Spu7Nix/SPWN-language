@@ -69,7 +69,7 @@ impl SpwnSource {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct CodeArea {
     pub src: Rc<SpwnSource>,
     pub span: CodeSpan,
@@ -94,7 +94,7 @@ impl CodeArea {
 
 #[allow(renamed_and_removed_lints, unknown_lints)]
 #[derive(
-    Debug, Clone, PartialEq, Eq, Copy, Default, Serialize, Deserialize, Hash, derive_more::Display,
+    Clone, PartialEq, Eq, Copy, Default, Serialize, Deserialize, Hash, derive_more::Display,
 )]
 #[display(fmt = "{}..{}", start, end)]
 pub struct CodeSpan {
@@ -175,11 +175,17 @@ impl<T> Spanned<T> {
 
 impl<T: Debug> Debug for Spanned<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{:?}.spanned({}..{})",
-            self.value, self.span.start, self.span.end
-        )
+        write!(f, "{:?}.spanned({:?})", self.value, self.span)
+    }
+}
+impl Debug for CodeSpan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}..{}", self.start, self.end)
+    }
+}
+impl Debug for CodeArea {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}:{:?}", self.src, self.span)
     }
 }
 

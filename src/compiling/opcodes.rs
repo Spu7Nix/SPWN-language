@@ -143,6 +143,8 @@ opcodes! {
     // FuncJump { to: FuncID },
     #[delve(display = |check: &R, to: &OpcodePos| format!("if not {check}, to {to}"))]
     JumpIfFalse { [check], to: OpcodePos },
+    #[delve(display = |check: &R, to: &OpcodePos| format!("if {check}, to {to}"))]
+    JumpIfTrue { [check], to: OpcodePos },
     #[delve(display = |check: &R, to: &OpcodePos| format!("if {check} == ?, to {to}"))]
     UnwrapOrJump { [check], to: OpcodePos },
 
@@ -197,12 +199,18 @@ opcodes! {
     #[delve(display = |_a: &TryCatchID| format!(" TODO "))]
     ExitTryCatch { id: TryCatchID },
 
-    #[delve(display = |r: &R| format!("assert {r}"))]
-    Assert { [reg] },
-    #[delve(display = |r: &R, p: &R| format!("assert {r} matches {p}"))]
-    AssertMatches { [reg], [pat] },
     #[delve(display = |s: &R, d: &R| format!("{s}.type -> {d}"))]
     TypeOf { [src], [dest] },
+
+
+    #[delve(display = |s: &R, d: &R| format!("{s}.len() -> {d}"))]
+    Len { [src], [dest] },
+
+
+    #[delve(display = |r: &R| format!("assert {r}"))]
+    Assert { [reg] },
+    #[delve(display = |r: &R, t: &R| format!("assert {r}.type == {t}"))]
+    AssertType { [reg], [typ] },
 
 
     #[delve(display = |i: &R| format!("R:mem[{i}] ~> R:mem"))]

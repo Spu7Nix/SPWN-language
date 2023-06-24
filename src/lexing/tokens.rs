@@ -11,7 +11,7 @@ lexer! {
     Id: regex(r"([0-9]+|\?)[gbci]"),
     TypeIndicator: regex(r"@[a-zA-Z_]\w*"),
 
-    Let: text("let"),
+    Mut: text("mut"),
 
     True: text("true"),
     False: text("false"),
@@ -132,7 +132,7 @@ impl Token {
             Self::Id => "ID literal",
             Self::String => "string literal",
             Self::TypeIndicator => "type indicator",
-            Self::Let => "let",
+            Self::Mut => "let",
             Self::Ident => "identifier",
             Self::Error => "unknown",
             Self::Eof => "end of file",

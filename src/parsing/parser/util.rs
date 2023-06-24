@@ -52,7 +52,6 @@ impl Parser<'_> {
     pub fn parse_string(&self, s: &str, span: CodeSpan) -> ParseResult<StringType> {
         let mut chars = s.chars();
 
-        // TODO: a single character is a valid string in attributes cause this deletes it so it will never error
         // Remove trailing "
         chars.next_back();
 
@@ -211,8 +210,7 @@ impl Parser<'_> {
         let mut items = vec![];
 
         list_helper!(self, RBracket {
-            let attrs = if self.next_is(Token::Hashtag) {
-                self.next();
+            let attrs = if self.skip_tok(Token::Hashtag) {
 
                 self.parse_attributes::<Attributes>()?
             } else {

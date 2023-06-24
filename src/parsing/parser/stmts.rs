@@ -19,59 +19,13 @@ impl Parser<'_> {
     pub fn parse_statement(&mut self) -> ParseResult<StmtNode> {
         let start = self.peek_span();
 
-        let attrs = if self.next_is(Token::Hashtag) {
-            let mut check = self.clone();
-
-            check.next();
-            check.expect_tok(Token::LSqBracket)?;
-
-            let mut indent = 1;
-
-            let after_close = loop {
-                match check.next() {
-                    Token::LSqBracket => indent += 1,
-                    Token::Eof => {
-                        return Err(SyntaxError::UnmatchedToken {
-                            not_found: Token::RSqBracket,
-                            for_char: Token::LSqBracket,
-                            area: self.make_area(start),
-                        })
-                    },
-                    Token::RSqBracket => {
-                        indent -= 1;
-                        if indent == 0 {
-                            break check.next();
-                        }
-                    },
-                    _ => (),
-                }
-            };
-
-            if matches!(
-                after_close,
-                Token::Let
-                    | Token::If
-                    | Token::While
-                    | Token::For
-                    | Token::Try
-                    | Token::Return
-                    | Token::Continue
-                    | Token::Break
-                    | Token::Type
-                    | Token::Impl
-                    | Token::Overload
-                    | Token::Extract
-                    | Token::Dbg
-                    | Token::Arrow
-            ) {
-                self.next();
-                self.parse_attributes::<Attributes>()?
-            } else {
-                vec![]
-            }
+        let attrs = if self.skip_tok(Token::Hashtag) {
+            self.parse_attributes::<Attributes>()?
         } else {
             vec![]
         };
+
+        let attrs = vec![];
 
         let is_arrow = if self.next_is(Token::Arrow) {
             self.next();
@@ -83,14 +37,6 @@ impl Parser<'_> {
         let inner_start = self.peek_span();
 
         let stmt = match self.peek() {
-            Token::Let => {
-                self.next();
-                let var = self.parse_expr(true)?;
-                self.expect_tok(Token::Assign)?;
-                let value = self.parse_expr(true)?;
-
-                Statement::Let(var, value)
-            },
             Token::If => {
                 self.next();
                 let mut branches = vec![];
@@ -292,14 +238,27 @@ impl Parser<'_> {
                 Statement::Throw(self.parse_expr(false)?)
             },
             _ => {
-                let left = self.parse_expr(true)?;
-                let peek = self.peek();
-                if let Some(op) = peek.to_assign_op() {
-                    self.next();
-                    let right = self.parse_expr(true)?;
-                    Statement::AssignOp(left, op, right)
-                } else {
-                    Statement::Expr(left)
+                let mut check = self.clone();
+
+                match check.parse_pattern() {
+                    Ok(pat) => {
+                        if check.skip_tok(Token::Assign) {
+                            self.lexer = check.lexer;
+                            let e = self.parse_expr(true)?;
+                            Statement::Assign(pat, e)
+                        } else {
+                            let e = self.parse_expr(true)?;
+                            Statement::Expr(e)
+                        }
+                    },
+                    Err(pattern_err) => {
+                        println!("{:?}", pattern_err);
+                        let e = self.parse_expr(true)?;
+                        if self.next_is(Token::Assign) {
+                            return Err(pattern_err);
+                        }
+                        Statement::Expr(e)
+                    },
                 }
             },
         };

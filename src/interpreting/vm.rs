@@ -377,6 +377,16 @@ impl Vm {
                         continue;
                     }
                 },
+                Opcode::JumpIfTrue { check, to } => {
+                    let b = self.borrow_reg(check, |check| {
+                        value_ops::to_bool(&check, opcode_span, self, &program)
+                    })?;
+
+                    if b {
+                        self.contexts.jump_current(*to as usize);
+                        continue;
+                    }
+                },
                 Opcode::UnwrapOrJump { check, to } => {
                     match &self.get_reg_ref(check).clone().borrow().value {
                         Value::Maybe(v) => match v {
@@ -522,7 +532,8 @@ impl Vm {
                 },
                 Opcode::WriteMem { from } => todo!(),
                 Opcode::MatchCatch { jump } => todo!(),
-                Opcode::AssertMatches { reg, pat } => todo!(),
+                Opcode::AssertType { reg, typ } => todo!(),
+                Opcode::Len { src, dest } => todo!(),
             }
 
             {

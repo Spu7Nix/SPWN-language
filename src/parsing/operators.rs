@@ -165,7 +165,7 @@ macro_rules! operators {
 }
 
 operators! {
-    Assign: [Assign, PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, ShiftLeftEq, ShiftRightEq];
+    Assign: [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, ShiftLeftEq, ShiftRightEq];
     // lowest precedence
     // Right => [Assign];
     // Right => [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];

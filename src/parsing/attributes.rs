@@ -347,14 +347,14 @@ attributes! {
 
         #[valid_on(
             Statement::TypeDef,
-            Statement::Let,
+            Statement::Assign,
             Statement::AssignOp,
         )]
         Deprecated { since: SemVer, note: String, },
 
         #[valid_on(
             Statement::TypeDef,
-            Statement::Let,
+            Statement::Assign,
             Statement::AssignOp,
         )]
         Doc(String),

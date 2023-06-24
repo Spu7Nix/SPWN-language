@@ -249,7 +249,7 @@ pub enum ObjectType {
 #[derive(Debug, Clone, EnumToStr)]
 pub enum Statement {
     Expr(ExprNode),
-    Let(ExprNode, ExprNode),
+    Assign(PatternNode, ExprNode),
     AssignOp(ExprNode, AssignOp, ExprNode),
 
     If {
@@ -304,7 +304,7 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
 
     Type(T),      // @<type>
     Either(P, P), // <pattern> | <pattern>
-    Both(P, P),   // <pattern> & <pattern>
+    Both(P, P),   // <pattern> & <pattern>, <pattern>: <pattern>
 
     Eq(E),  // == <expr>
     Neq(E), // != <expr>
@@ -315,18 +315,27 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
 
     In(E), // in <pattern>
 
-    ArrayPattern(P, Option<u32>), // <pattern>[...]
-    DictPattern(P),               // { <pattern> }
+    ArrayPattern(P, Option<u64>), // <pattern>[...]
+    DictPattern(P),               // <pattern>{}
 
     ArrayDestructure(Vec<P>),                // [ <pattern> ]
     DictDestructure(AHashMap<S, Option<P>>), // { key: <pattern> }
     MaybeDestructure(Option<P>),             // <pattern>? or ?
     InstanceDestructure(T, AHashMap<S, Option<P>>),
 
-    Path(AssignPath<E, S>),
-    Let(S),
+    Path {
+        path: AssignPath<E, S>,
+        is_ref: bool,
+    },
+    Mut {
+        name: S,
+        is_ref: bool,
+    },
 
-    MacroPattern { args: Vec<P>, ret_type: P },
+    MacroPattern {
+        args: Vec<P>,
+        ret_type: P,
+    },
 }
 
 // T = type, P = pattern, E = expression
