@@ -12,7 +12,6 @@ use crate::sources::CodeArea;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncStorage {
     pub registers: [ValueRef; 256],
-    pub mem_reg: ValueRef,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

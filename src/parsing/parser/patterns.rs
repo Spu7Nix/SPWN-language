@@ -76,36 +76,40 @@ impl<'a> Parser<'a> {
                         (true, self.slice_interned())
                     };
 
-                    let mut path = AssignPath::Var(name);
+                    let mut path = vec![];
 
                     loop {
-                        path = match self.peek_strict() {
+                        match self.peek_strict() {
                             Token::LSqBracket => {
                                 self.next();
                                 let index = self.parse_expr(true)?;
                                 self.expect_tok(Token::RSqBracket)?;
 
-                                AssignPath::Index(Box::new(path), index)
+                                path.push(AssignPath::Index(index));
                             },
                             _ => match self.peek() {
                                 Token::Dot => {
                                     self.next();
                                     self.expect_tok(Token::Ident)?;
                                     let member = self.slice_interned();
-                                    AssignPath::Member(Box::new(path), member)
+                                    path.push(AssignPath::Member(member));
                                 },
                                 Token::DoubleColon => {
                                     self.next();
                                     self.expect_tok(Token::Ident)?;
                                     let member = self.slice_interned();
-                                    AssignPath::Associated(Box::new(path), member)
+                                    path.push(AssignPath::Associated(member));
                                 },
                                 _ => break,
                             },
                         }
                     }
 
-                    Pattern::Path { path, is_ref }
+                    Pattern::Path {
+                        var: name,
+                        path,
+                        is_ref,
+                    }
                 },
                 Token::LSqBracket => {
                     let mut v = vec![];
@@ -187,13 +191,18 @@ impl<'a> Parser<'a> {
                 Token::LSqBracket => {
                     self.next();
                     if self.skip_tok(Token::RSqBracket) {
-                        Pattern::ArrayPattern(node, None)
+                        Pattern::ArrayPattern(
+                            node,
+                            PatternNode {
+                                pat: Box::new(Pattern::Any),
+                                span: start_span,
+                            },
+                        )
                     } else {
-                        self.expect_tok(Token::Int)?;
+                        let pat = self.parse_pattern()?;
 
-                        let len = self.parse_int(self.slice());
                         self.expect_tok(Token::RSqBracket)?;
-                        Pattern::ArrayPattern(node, Some(len as u64))
+                        Pattern::ArrayPattern(node, pat)
                     }
                 },
                 Token::LBracket => {

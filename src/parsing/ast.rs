@@ -315,8 +315,8 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
 
     In(E), // in <pattern>
 
-    ArrayPattern(P, Option<u64>), // <pattern>[...]
-    DictPattern(P),               // <pattern>{}
+    ArrayPattern(P, P), // <pattern>[...]
+    DictPattern(P),     // <pattern>{}
 
     ArrayDestructure(Vec<P>),                // [ <pattern> ]
     DictDestructure(AHashMap<S, Option<P>>), // { key: <pattern> }
@@ -324,7 +324,8 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
     InstanceDestructure(T, AHashMap<S, Option<P>>),
 
     Path {
-        path: AssignPath<E, S>,
+        var: S,
+        path: Vec<AssignPath<E, S>>,
         is_ref: bool,
     },
     Mut {
@@ -341,10 +342,9 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
 // T = type, P = pattern, E = expression
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AssignPath<E, S: Hash + Eq> {
-    Var(S),
-    Index(Box<Self>, E),
-    Member(Box<Self>, S),
-    Associated(Box<Self>, S),
+    Index(E),
+    Member(S),
+    Associated(S),
 }
 
 impl Expression {

@@ -24,7 +24,9 @@ impl Compiler<'_> {
                 self.compile_expr(e, scope, builder)?;
             },
             Statement::Assign(left, right) => {
-                todo!()
+                let right_reg = self.compile_expr(right, scope, builder)?;
+                let match_reg = self.compile_pattern_check(right_reg, left, scope, builder)?;
+                builder.mismatch_throw_if_false(match_reg, left.span);
             },
             Statement::AssignOp(left, op, right) => {
                 macro_rules! assign_op {
@@ -168,7 +170,7 @@ impl Compiler<'_> {
                                     reg: var_reg,
                                 },
                             );
-                            b.copy_deep(next_reg, var_reg, iter_var.span);
+                            b.copy(next_reg, var_reg, iter_var.span);
                         },
                         _ => todo!("destruction !!!!!!!!!!!!!!!!!!!!!!!!"),
                     };

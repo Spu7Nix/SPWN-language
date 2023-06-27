@@ -1,11 +1,13 @@
 use itertools::Itertools;
 
-use super::{CompileResult, Compiler, ScopeID};
-use crate::compiling::builder::CodeBuilder;
+use super::{CompileResult, Compiler, ScopeID, VarData};
+use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::bytecode::UnoptRegister;
+use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::Opcode;
 use crate::interpreting::value::ValueType;
-use crate::parsing::ast::{Pattern, PatternNode};
+use crate::parsing::ast::{AssignPath, Pattern, PatternNode};
+use crate::sources::Spannable;
 
 impl Compiler<'_> {
     pub fn compile_pattern_check(
@@ -86,7 +88,78 @@ impl Compiler<'_> {
                 let reg = self.compile_expr(e, scope, builder)?;
                 builder.in_op(expr_reg, reg, out_reg, pattern.span);
             },
-            Pattern::ArrayPattern(p, len) => todo!(),
+            Pattern::ArrayPattern(elem_pat, len_pat) => {
+                let expr_len = builder.next_reg();
+                builder.len(expr_reg, expr_len, pattern.span);
+
+                self.and_op(
+                    &[
+                        &|_, builder| {
+                            let arr_typ = builder.next_reg();
+                            builder.load_const(ValueType::Array, arr_typ, pattern.span);
+
+                            let expr_typ = builder.next_reg();
+                            builder.type_of(expr_reg, expr_typ, pattern.span);
+
+                            let eq_reg = builder.next_reg();
+                            builder.eq(expr_typ, arr_typ, eq_reg, pattern.span);
+
+                            Ok(eq_reg)
+                        },
+                        &|compiler, builder| {
+                            let len_match = compiler
+                                .compile_pattern_check(expr_len, len_pat, scope, builder)?;
+
+                            Ok(len_match)
+                        },
+                        &|compiler, builder| {
+                            let i_reg = builder.next_reg();
+                            builder.load_const(0, i_reg, pattern.span);
+                            let one_reg = builder.next_reg();
+                            builder.load_const(1, one_reg, pattern.span);
+
+                            let out_reg = builder.next_reg();
+                            builder.load_const(true, out_reg, pattern.span);
+                            builder.new_block(|builder| {
+                                let outer = builder.block;
+
+                                builder.new_block(|builder| {
+                                    let gt_reg = builder.next_reg();
+                                    builder.gt(expr_len, i_reg, gt_reg, pattern.span);
+                                    builder.jump(None, JumpType::EndIfFalse(gt_reg), pattern.span);
+
+                                    let elem = builder.next_reg();
+                                    builder.index_mem(expr_reg, elem, i_reg, pattern.span);
+                                    let elem_match = compiler
+                                        .compile_pattern_check(elem, elem_pat, scope, builder)?;
+                                    builder.copy(elem_match, out_reg, pattern.span);
+                                    builder.jump(
+                                        Some(outer),
+                                        JumpType::EndIfFalse(out_reg),
+                                        pattern.span,
+                                    );
+
+                                    builder.push_raw_opcode(
+                                        Opcode::PlusEq {
+                                            a: i_reg,
+                                            b: one_reg,
+                                        },
+                                        pattern.span,
+                                    );
+                                    builder.jump(None, JumpType::Start, pattern.span);
+                                    Ok(())
+                                })?;
+                                Ok(())
+                            })?;
+
+                            Ok(out_reg)
+                        },
+                    ],
+                    out_reg,
+                    pattern.span,
+                    builder,
+                )?;
+            },
             Pattern::DictPattern(_) => todo!(),
             Pattern::ArrayDestructure(v) => {
                 self.and_op(
@@ -132,7 +205,7 @@ impl Compiler<'_> {
                                     builder.load_const(i as i64, idx, pattern.span);
 
                                     let elem_reg = builder.next_reg();
-                                    builder.index(expr_reg, elem_reg, idx, pattern.span);
+                                    builder.index_mem(expr_reg, elem_reg, idx, pattern.span);
 
                                     compiler.compile_pattern_check(elem_reg, elem, scope, builder)
                                 });
@@ -159,8 +232,83 @@ impl Compiler<'_> {
             Pattern::DictDestructure(_) => todo!(),
             Pattern::MaybeDestructure(_) => todo!(),
             Pattern::InstanceDestructure(..) => todo!(),
-            Pattern::Path { path, is_ref } => todo!(),
-            Pattern::Mut { name, is_ref } => todo!(),
+            Pattern::Path { var, path, is_ref } => {
+                let path_reg = match self.get_var(*var, scope) {
+                    Some(v) if v.mutable => v.reg,
+                    Some(v) => {
+                        return Err(CompileError::ImmutableAssign {
+                            area: self.make_area(pattern.span),
+                            def_area: self.make_area(v.def_span),
+                            var: self.resolve(var),
+                        })
+                    },
+                    None => {
+                        let r = builder.next_reg();
+                        if path.is_empty() {
+                            self.scopes[scope].vars.insert(
+                                *var,
+                                VarData {
+                                    mutable: false,
+                                    def_span: pattern.span,
+                                    reg: r,
+                                },
+                            );
+                            r
+                        } else {
+                            todo!()
+                        }
+                    },
+                };
+
+                for i in path {
+                    match i {
+                        AssignPath::Index(v) => {
+                            let v = self.compile_expr(v, scope, builder)?;
+                            builder.index_mem(path_reg, path_reg, v, pattern.span);
+                        },
+                        AssignPath::Member(v) => {
+                            builder.member_mem(
+                                path_reg,
+                                path_reg,
+                                self.resolve_arr(v).spanned(pattern.span),
+                                pattern.span,
+                            );
+                        },
+                        AssignPath::Associated(v) => {
+                            builder.associated_mem(
+                                path_reg,
+                                path_reg,
+                                self.resolve_arr(v).spanned(pattern.span),
+                                pattern.span,
+                            );
+                        },
+                    }
+                }
+
+                if *is_ref {
+                    builder.copy_mem(expr_reg, path_reg, pattern.span);
+                } else {
+                    builder.copy(expr_reg, path_reg, pattern.span);
+                }
+                builder.load_const(true, out_reg, pattern.span);
+            },
+            Pattern::Mut { name, is_ref } => {
+                let var_reg = builder.next_reg();
+                self.scopes[scope].vars.insert(
+                    *name,
+                    VarData {
+                        mutable: false,
+                        def_span: pattern.span,
+                        reg: var_reg,
+                    },
+                );
+                if *is_ref {
+                    builder.copy_mem(expr_reg, var_reg, pattern.span);
+                } else {
+                    builder.copy(expr_reg, var_reg, pattern.span);
+                }
+                builder.load_const(true, out_reg, pattern.span);
+            },
             Pattern::MacroPattern { args, ret_type } => todo!(),
         }
 

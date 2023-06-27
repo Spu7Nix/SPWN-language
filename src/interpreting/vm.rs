@@ -208,10 +208,7 @@ impl Vm {
                 });
             }
 
-            context.stack.push(FuncStorage {
-                registers: regs,
-                mem_reg: unsafe { std::mem::zeroed() },
-            });
+            context.stack.push(FuncStorage { registers: regs });
         }
 
         self.contexts.push(FullContext::new(context, call_info));
@@ -268,7 +265,8 @@ impl Vm {
                     let value = Value::from_const(self, program.get_constant(id));
                     self.set_reg(to, value.into_stored(self.make_area(opcode_span, &program)));
                 },
-                Opcode::CopyDeep { from, to } => self.set_reg(to, self.deep_clone(from)),
+                Opcode::Copy { from, to } => self.set_reg(to, self.deep_clone(from)),
+                Opcode::CopyMem { from, to } => self.set_reg(to, self.deep_clone(from)),
 
                 Opcode::Plus { a, b, to } => {
                     self.bin_op(value_ops::plus, &program, a, b, to, opcode_span)?;
@@ -523,17 +521,13 @@ impl Vm {
                 Opcode::Member { from, dest, member } => todo!(),
                 Opcode::EnterTryCatch { err, id } => todo!(),
                 Opcode::ExitTryCatch { id } => todo!(),
-                Opcode::Assert { reg } => todo!(),
                 Opcode::TypeOf { src, dest } => todo!(),
-                Opcode::IndexSetMem { index } => todo!(),
-                Opcode::MemberSetMem { member } => todo!(),
-                Opcode::ChangeMem { from } => {
-                    todo!()
-                },
-                Opcode::WriteMem { from } => todo!(),
                 Opcode::MatchCatch { jump } => todo!(),
-                Opcode::AssertType { reg, typ } => todo!(),
                 Opcode::Len { src, dest } => todo!(),
+                Opcode::IndexMem { base, dest, index } => todo!(),
+                Opcode::MemberMem { from, dest, member } => todo!(),
+                Opcode::AssociatedMem { from, dest, member } => todo!(),
+                Opcode::MismatchThrowIfFalse { reg } => todo!(),
             }
 
             {
@@ -643,7 +637,6 @@ impl Vm {
                 for val in &ctx.stack.last().unwrap().registers {
                     self.hash_value(val, &mut state);
                 }
-                self.hash_value(&ctx.stack.last().unwrap().mem_reg, &mut state);
                 let hash = state.finish();
                 hashes.entry(hash).or_insert_with(Vec::new).push(ctx);
             }

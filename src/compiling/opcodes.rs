@@ -70,7 +70,10 @@ opcodes! {
     #[delve(display = |id: &ConstID, to: &R| format!("load {id} -> {to}"))]
     LoadConst { id: ConstID, [to] },
     #[delve(display = |from: &R, to: &R| format!("{from} -> {to}"))]
-    CopyDeep { [from], [to] },
+    Copy { [from], [to] },
+
+    #[delve(display = |from: &R, to: &R| format!("{from} ~> {to}"))]
+    CopyMem { [from], [to] },
 
     #[delve(display = |a: &R, b: &R, to: &R| format!("{a} + {b} -> {to}"))]
     Plus { [a], [b], [to] },
@@ -207,21 +210,28 @@ opcodes! {
     Len { [src], [dest] },
 
 
-    #[delve(display = |r: &R| format!("assert {r}"))]
-    Assert { [reg] },
-    #[delve(display = |r: &R, t: &R| format!("assert {r}.type == {t}"))]
-    AssertType { [reg], [typ] },
+    // #[delve(display = |i: &R| format!("R:mem[{i}] ~> R:mem"))]
+    // IndexSetMem { [index] },
+    // #[delve(display = |i: &R| format!("R:mem.{i} ~> R:mem"))]
+    // MemberSetMem { [member] },
 
 
-    #[delve(display = |i: &R| format!("R:mem[{i}] ~> R:mem"))]
-    IndexSetMem { [index] },
-    #[delve(display = |i: &R| format!("R:mem.{i} ~> R:mem"))]
-    MemberSetMem { [member] },
+    #[delve(display = |b: &R, d: &R, i: &R| format!("{b}[{i}] ~> {d}"))]
+    IndexMem { [base], [dest], [index] },
+    #[delve(display = |f: &R, d: &R, i: &R| format!("{f}.{i} ~> {d}"))]
+    MemberMem { [from], [dest], [member] },
+    #[delve(display = |f: &R, d: &R, i: &R| format!("{f}::{i} ~> {d}"))]
+    AssociatedMem { [from], [dest], [member] },
 
-    #[delve(display = |from: &R| format!("{from} ~> R:mem"))]
-    ChangeMem { [from] },
-    #[delve(display = |from: &R| format!("{from} -> R:mem"))]
-    WriteMem { [from] },
+
+    #[delve(display = |r: &R| format!("if not {r}, throw mismatch"))]
+    MismatchThrowIfFalse { [reg] },
+
+
+    // #[delve(display = |from: &R| format!("{from} ~> R:mem"))]
+    // ChangeMem { [from] },
+    // #[delve(display = |from: &R| format!("{from} -> R:mem"))]
+    // WriteMem { [from] },
 
     #[delve(display = |jump: &OpcodePos| format!("catch match, to {jump}"))]
     MatchCatch { jump: OpcodePos },
