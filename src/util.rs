@@ -303,20 +303,8 @@ pub fn clear_ansi(s: &str) -> Cow<'_, str> {
     ANSI_REGEX.replace_all(s, "")
 }
 
-// pub trait IntoCharArray {
-//     fn into_char_array(self) -> ImmutVec<char>;
-//     fn into_clone_char_array(self) -> ImmutCloneVec<char>;
-// }
-
-// impl<T> IntoCharArray for T
-// where
-//     T: AsRef<str>,
-// {
-//     fn into_char_array(self) -> ImmutVec<char> {
-//         self.as_ref().chars().collect_vec().into()
-//     }
-
-//     fn into_clone_char_array(self) -> ImmutCloneVec<char> {
-//         self.as_ref().chars().collect_vec().into()
-//     }
-// }
+#[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
+pub enum Either<L, R> {
+    Left(L),
+    Right(R),
+}

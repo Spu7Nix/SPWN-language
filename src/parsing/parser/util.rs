@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::str::Chars;
 
 use base64::Engine;
@@ -9,11 +10,13 @@ use crate::gd::ids::IDClass;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{
-    DictItem, Expression, Import, ImportSettings, ImportType, StringContent, StringType, Vis,
+    DictItem, ExprNode, Expression, Import, ImportSettings, ImportType, StringContent, StringType,
+    Vis,
 };
 use crate::parsing::attributes::{Attributes, IsValidOn, ParseAttribute};
 use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable, Spanned};
+use crate::util::Either;
 
 impl Parser<'_> {
     pub fn parse_int(&self, s: &str, base: u32) -> i64 {
@@ -24,7 +27,7 @@ impl Parser<'_> {
         let mut n = 0_f64;
         for (i, d) in s.bytes().enumerate() {
             let pow = s.len() - 1 - i;
-            const PHI: f64 = 1.6180339887498948482045868343656381177203091798057;
+            const PHI: f64 = 1.618_033_988_749_895;
             n += PHI.powf(pow as f64) * if d == b'0' { 0.0 } else { 1.0 };
         }
         n
@@ -75,11 +78,14 @@ impl Parser<'_> {
                 let mut is_unindent = false;
                 let mut is_base64 = false;
 
+                let mut is_f_string = false;
+
                 for i in start_slice.bytes() {
                     let flag = match i {
                         b'b' => &mut is_bytes,
                         b'B' => &mut is_base64,
                         b'u' => &mut is_unindent,
+                        b'f' => &mut is_f_string,
                         f => {
                             return Err(SyntaxError::UnexpectedFlag {
                                 flag: (f as char).to_string(),
@@ -90,17 +96,123 @@ impl Parser<'_> {
                     *flag = true;
                 }
 
-                let t = self.next()?;
-                let mut content = self.parse_string(t)?;
-
-                content.bytes = is_bytes;
-                content.base64 = is_base64;
-                content.unindent = is_unindent;
-
-                content
+                if is_f_string {
+                    self.expect_tok(Token::String)?;
+                    let s = self.slice();
+                    let start = self.span().start + 1;
+                    println!("{}", start);
+                    let v = self.parse_f_string(&s[1..(s.len() - 1)], start)?;
+                    StringContent {
+                        s: StringType::FString(v),
+                        bytes: is_bytes,
+                        base64: is_base64,
+                        unindent: is_unindent,
+                    }
+                } else {
+                    let t = self.next()?;
+                    let mut content = self.parse_string(t)?;
+                    content.bytes = is_bytes;
+                    content.base64 = is_base64;
+                    content.unindent = is_unindent;
+                    content
+                }
             },
             _ => unreachable!(),
         })
+    }
+
+    pub fn parse_f_string(
+        &self,
+        s: &str,
+        start: usize,
+    ) -> ParseResult<Vec<Either<Spur, ExprNode>>> {
+        let mut i = 0;
+        let b = s.as_bytes();
+
+        let mut out = vec![Either::Left("".to_string())];
+
+        macro_rules! add_char {
+            ($c:expr) => {
+                match out.last_mut().unwrap() {
+                    Either::Left(s) => s.push($c as char),
+                    Either::Right(_) => out.push(Either::Left(($c as char).to_string())),
+                }
+            };
+        }
+
+        loop {
+            match (b.get(i), b.get(i + 1)) {
+                (Some(b'{'), Some(b'{')) => {
+                    add_char!(b'{');
+                    i += 1;
+                },
+                (Some(b'}'), Some(b'}')) => {
+                    add_char!(b'}');
+                    i += 1;
+                },
+                (Some(b'}'), _) => {
+                    return Err(SyntaxError::UnbalancedFormatStringBlock {
+                        expected: "{",
+                        area: self.make_area(self.span()),
+                    })
+                },
+                (Some(b'{'), _) => {
+                    let mut s = "".to_string();
+                    let expr_start = i;
+                    i += 1;
+                    let mut depth = 1;
+                    loop {
+                        match b.get(i) {
+                            Some(b'{') => {
+                                depth += 1;
+                                s.push('{');
+                            },
+                            Some(b'}') => {
+                                depth -= 1;
+                                if depth == 0 {
+                                    i += 1;
+                                    break;
+                                }
+                                s.push('}');
+                            },
+                            Some(t) => s.push(*t as char),
+                            None => {
+                                return Err(SyntaxError::UnbalancedFormatStringBlock {
+                                    expected: "}",
+                                    area: self.make_area(self.span()),
+                                })
+                            },
+                        }
+                        i += 1;
+                    }
+
+                    let code = " ".repeat(start + expr_start + 1) + &s;
+
+                    let mut parser: Parser<'_> =
+                        Parser::new(&code, Rc::clone(&self.src), Rc::clone(&self.interner));
+
+                    let expr = parser.parse_expr(true)?;
+
+                    out.push(Either::Right(expr));
+
+                    i -= 1;
+                },
+                (Some(t), _) => add_char!(*t),
+                _ => break,
+            }
+            i += 1;
+        }
+
+        Ok(out
+            .into_iter()
+            .map(|e| match e {
+                Either::Left(s) => {
+                    println!("GAGA ({s})");
+                    Either::Left(self.intern_string(s))
+                },
+                Either::Right(e) => Either::Right(e),
+            })
+            .collect())
     }
 
     pub fn parse_plain_string(&self, s: &str) -> ParseResult<String> {

@@ -266,5 +266,17 @@ error_maker! {
         InvalidDictStringKey {
             area: CodeArea,
         },
+
+        // ==================================================================
+        #[
+            Message: "Unbalanced block in format string", Note: None;
+            Labels: [
+                area => "Expected `{}`": expected;
+            ]
+        ]
+        UnbalancedFormatStringBlock {
+            expected: &'static str,
+            area: CodeArea,
+        },
     }
 }

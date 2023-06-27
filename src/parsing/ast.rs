@@ -15,12 +15,13 @@ use super::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::Value;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
-use crate::util::{ImmutStr, Interner};
+use crate::util::{Either, ImmutStr, Interner};
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub enum StringType {
     Normal(Spur),
+    FString(Vec<Either<Spur, ExprNode>>),
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -48,6 +49,7 @@ impl StringContent {
         }
         let mut s = match self.s {
             StringType::Normal(k) => interner.borrow().resolve(&k).to_string(),
+            _ => return None,
         };
         if self.unindent {
             s = unindent::unindent(&s)

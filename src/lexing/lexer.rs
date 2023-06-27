@@ -385,8 +385,12 @@ impl<'a> Lexer<'a> {
                 ret!(Token::Colon);
             },
             0xCE => {
-                self.bump(2);
-                ret!(Token::Epsilon);
+                if is!(0, 0xB5) {
+                    self.bump(1);
+                    ret!(Token::Epsilon);
+                }
+
+                Some(Err(LexerError::UnknownCharacter))
             },
             b'?' => {
                 ret!(match self.read() {
