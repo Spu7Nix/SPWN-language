@@ -17,9 +17,9 @@ impl Parser<'_> {
     }
 
     pub fn parse_statement(&mut self) -> ParseResult<StmtNode> {
-        let start = self.peek_span();
+        let start = self.peek_span()?;
 
-        let attrs = if self.skip_tok(Token::Hashtag) {
+        let attrs = if self.skip_tok(Token::Hashtag)? {
             self.parse_attributes::<Attributes>()?
         } else {
             vec![]
@@ -27,18 +27,18 @@ impl Parser<'_> {
 
         let attrs = vec![];
 
-        let is_arrow = if self.next_is(Token::Arrow) {
-            self.next();
+        let is_arrow = if self.next_is(Token::Arrow)? {
+            self.next()?;
             true
         } else {
             false
         };
 
-        let inner_start = self.peek_span();
+        let inner_start = self.peek_span()?;
 
-        let stmt = match self.peek() {
+        let stmt = match self.peek()? {
             Token::If => {
-                self.next();
+                self.next()?;
                 let mut branches = vec![];
                 let mut else_branch = None;
 
@@ -46,11 +46,11 @@ impl Parser<'_> {
                 let code = self.parse_block()?;
                 branches.push((cond, code));
 
-                while self.next_is(Token::Else) {
-                    self.next();
-                    if self.next_is(Token::If) {
-                        self.next();
-                        let has_paren = self.skip_tok(Token::LParen);
+                while self.next_is(Token::Else)? {
+                    self.next()?;
+                    if self.next_is(Token::If)? {
+                        self.next()?;
+                        let has_paren = self.skip_tok(Token::LParen)?;
                         let cond = self.parse_expr(false)?;
                         if has_paren {
                             self.expect_tok(Token::RParen)?;
@@ -69,14 +69,14 @@ impl Parser<'_> {
                 }
             },
             Token::While => {
-                self.next();
+                self.next()?;
                 let cond = self.parse_expr(false)?;
                 let code = self.parse_block()?;
 
                 Statement::While { cond, code }
             },
             Token::For => {
-                self.next();
+                self.next()?;
                 let iter_var = self.parse_unit(true)?;
                 self.expect_tok(Token::In)?;
                 let iterator = self.parse_expr(false)?;
@@ -90,17 +90,17 @@ impl Parser<'_> {
                 }
             },
             Token::Try => {
-                self.next();
+                self.next()?;
                 let mut branches = vec![];
 
                 let try_code = self.parse_block()?;
 
                 let mut catch_all: Option<(Statements, CodeSpan)> = None;
 
-                while self.next_is(Token::Catch) {
-                    self.next();
+                while self.next_is(Token::Catch)? {
+                    self.next()?;
 
-                    if self.next_is(Token::LBracket) {
+                    if self.next_is(Token::LBracket)? {
                         if let Some((_, s)) = catch_all {
                             return Err(SyntaxError::DuplicateCatchAll {
                                 area: self.make_area(s),
@@ -120,7 +120,7 @@ impl Parser<'_> {
                                 named_catch_area: self.make_area(self.span()),
                             });
                         } else {
-                            self.next();
+                            self.next()?;
                             self.parse_expr(true)?
                         };
 
@@ -136,9 +136,9 @@ impl Parser<'_> {
                 }
             },
             Token::Return => {
-                self.next();
+                self.next()?;
                 if matches!(
-                    self.peek_strict(),
+                    self.peek_strict()?,
                     Token::Eol | Token::RBracket | Token::Eof | Token::Newline
                 ) {
                     Statement::Return(None)
@@ -149,24 +149,24 @@ impl Parser<'_> {
                 }
             },
             Token::Continue => {
-                self.next();
+                self.next()?;
 
                 Statement::Continue
             },
             Token::Break => {
-                self.next();
+                self.next()?;
 
                 Statement::Break
             },
             Token::Type => {
-                self.next();
+                self.next()?;
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
 
                 Statement::TypeDef(Vis::Public(self.intern_string(name)))
             },
             Token::Private => {
-                self.next();
+                self.next()?;
                 self.expect_tok(Token::Type)?;
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
@@ -174,7 +174,7 @@ impl Parser<'_> {
                 Statement::TypeDef(Vis::Private(self.intern_string(name)))
             },
             Token::Impl => {
-                self.next();
+                self.next()?;
                 let base = self.parse_expr(true)?;
                 self.expect_tok(Token::LBracket)?;
                 let items = self.parse_dictlike(true)?;
@@ -182,12 +182,12 @@ impl Parser<'_> {
                 Statement::Impl { base, items }
             },
             Token::Overload => {
-                self.next();
+                self.next()?;
 
-                let tok = self.next();
+                let tok = self.next()?;
 
                 let op = if tok == Token::Unary {
-                    let tok = self.next();
+                    let tok = self.next()?;
                     if let Some(op) = tok.to_unary_op() {
                         Operator::Unary(op)
                     } else {
@@ -220,7 +220,7 @@ impl Parser<'_> {
                 Statement::Overload { op, macros }
             },
             Token::Extract => {
-                self.next();
+                self.next()?;
                 self.expect_tok(Token::Import)?;
 
                 let import_type = self.parse_import()?;
@@ -228,12 +228,12 @@ impl Parser<'_> {
                 Statement::ExtractImport(import_type)
             },
             Token::Dbg => {
-                self.next();
+                self.next()?;
 
                 Statement::Dbg(self.parse_expr(true)?)
             },
             Token::Throw => {
-                self.next();
+                self.next()?;
 
                 Statement::Throw(self.parse_expr(false)?)
             },
@@ -242,7 +242,7 @@ impl Parser<'_> {
 
                 match check.parse_pattern() {
                     Ok(pat) => {
-                        if check.skip_tok(Token::Assign) {
+                        if check.skip_tok(Token::Assign)? {
                             self.lexer = check.lexer;
                             let e = self.parse_expr(true)?;
                             Statement::Assign(pat, e)
@@ -254,7 +254,7 @@ impl Parser<'_> {
                     Err(pattern_err) => {
                         println!("{:?}", pattern_err);
                         let e = self.parse_expr(true)?;
-                        if self.next_is(Token::Assign) {
+                        if self.next_is(Token::Assign)? {
                             return Err(pattern_err);
                         }
                         Statement::Expr(e)
@@ -265,16 +265,19 @@ impl Parser<'_> {
 
         let inner_span = inner_start.extend(self.span());
 
-        if !matches!(self.peek(), Token::RBracket)
-            && !matches!(self.peek_strict(), Token::Eol | Token::Newline | Token::Eof)
+        if !matches!(self.peek()?, Token::RBracket)
+            && !matches!(
+                self.peek_strict()?,
+                Token::Eol | Token::Newline | Token::Eof
+            )
         {
             return Err(SyntaxError::UnexpectedToken {
-                found: self.next(),
+                found: self.next()?,
                 expected: "statement separator (`;` or newline)".to_string(),
                 area: self.make_area(self.span()),
             });
         }
-        self.skip_tok(Token::Eol);
+        self.skip_tok(Token::Eol)?;
 
         let stmt = if is_arrow {
             Statement::Arrow(Box::new(stmt.into_node(vec![], inner_span)))
@@ -291,7 +294,7 @@ impl Parser<'_> {
     pub fn parse_statements(&mut self) -> ParseResult<Statements> {
         let mut statements = vec![];
 
-        while !matches!(self.peek(), Token::Eof | Token::RBracket) {
+        while !matches!(self.peek()?, Token::Eof | Token::RBracket) {
             let stmt = self.parse_statement()?;
             statements.push(stmt);
         }

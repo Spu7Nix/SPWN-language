@@ -1,120 +1,36 @@
 use std::ops::Range;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Token {
-    Any,
-    Int,
-    HexInt,
-    OctalInt,
-    BinaryInt,
-    Float,
-    String,
-    StringFlags,
-    RawString,
-    GroupID,
-    ChannelID,
-    BlockID,
-    ItemID,
-    ArbitraryGroupID,
-    ArbitraryChannelID,
-    ArbitraryBlockID,
-    ArbitraryItemID,
-    TypeIndicator,
-    Mut,
-    True,
-    False,
-    Obj,
-    Trigger,
-    If,
-    Else,
-    While,
-    For,
-    In,
-    Try,
-    Catch,
-    Throw,
-    Match,
-    Return,
-    Break,
-    Continue,
-    Type,
-    Impl,
-    Overload,
-    Unary,
-    Dbg,
-    Private,
-    Extract,
-    Import,
-    Dollar,
-    Slf,
-    Is,
-    As,
-    Plus,
-    Minus,
-    Mult,
-    Div,
-    Mod,
-    Pow,
-    PlusEq,
-    MinusEq,
-    MultEq,
-    DivEq,
-    ModEq,
-    PowEq,
-    BinAndEq,
-    BinOrEq,
-    ShiftLeftEq,
-    ShiftRightEq,
-    BinAnd,
-    BinOr,
-    ShiftLeft,
-    ShiftRight,
-    And,
-    Or,
-    Eol,
-    LParen,
-    RParen,
-    LSqBracket,
-    RSqBracket,
-    LBracket,
-    RBracket,
-    TrigFnBracket,
-    Comma,
-    Eq,
-    Neq,
-    Gt,
-    Gte,
-    Lt,
-    Lte,
-    Assign,
-    Colon,
-    DoubleColon,
-    Dot,
-    Range,
-    Spread,
-    FatArrow,
-    Arrow,
-    QMark,
-    ExclMark,
-    Hashtag,
-    Epsilon,
-    Ident,
-    Newline,
-    Eof,
-}
+use delve::EnumDisplay;
 
-#[derive(Debug)]
+use super::tokens::Token;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumDisplay)]
 pub enum LexerError {
+    #[delve(display = "Invalid type indicator")]
     InvalidTypeIndicator,
+    #[delve(display = "Invalid hex literal")]
     InvalidHexLiteral,
+    #[delve(display = "Invalid octal literal")]
     InvalidOctalLiteral,
+    #[delve(display = "Invalid binary literal")]
     InvalidBinaryLiteral,
+    #[delve(display = "Invalid seximal literal")]
+    InvalidSeximalLiteral,
+    #[delve(display = "Invalid dozenal literal")]
+    InvalidDozenalLiteral,
+    #[delve(display = "Invalid base-φ literal")]
+    InvalidGoldenLiteral,
+    #[delve(display = "Unknown character")]
     UnknownCharacter,
+    #[delve(display = "Unterminated block comment")]
     UnterminatedBlockComment,
+    #[delve(display = "Unterminated string")]
     UnterminatedString,
+    #[delve(display = "Invalid character for raw string")]
     InvalidCharacterForRawString,
 }
 
+#[derive(Clone)]
 pub struct Lexer<'a> {
     src: &'a str,
     bytes: &'a [u8],
@@ -164,26 +80,14 @@ impl<'a> Lexer<'a> {
     pub fn slice(&self) -> &str {
         &self.src[self.token_start..self.token_end]
     }
+
+    pub fn next_or_eof(&mut self) -> Result<Token, LexerError> {
+        self.next().unwrap_or(Ok(Token::Eof))
+    }
 }
 
-#[inline]
-const fn is_id_start(b: Option<u8>) -> bool {
-    matches!(b, Some(b'A'..=b'Z' | b'a'..=b'z' | b'_'))
-}
-#[inline]
-const fn is_id_continue(b: Option<u8>) -> bool {
-    matches!(b, Some(b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_'))
-}
-
-#[inline]
-const fn is_whitespace(b: u8) -> bool {
-    matches!(b, b' ' | b'\t' | b'\r')
-}
-
-impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token, LexerError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
+impl<'a> Lexer<'a> {
+    fn next_tok(&mut self) -> Option<Result<Token, LexerError>> {
         while let Some(c) = self.read() {
             if is_whitespace(c) {
                 self.bump(1);
@@ -695,8 +599,52 @@ impl<'a> Iterator for Lexer<'a> {
 
                     ret!(Token::BinaryInt);
                 },
-                _ => {
-                    numbers!();
+                Some(b's') => {
+                    self.bump(1);
+
+                    if !is!(0, b'0'..=b'5') {
+                        return Some(Err(LexerError::InvalidSeximalLiteral));
+                    }
+                    self.bump(1);
+
+                    while is!(0, b'0'..=b'5' | b'_') {
+                        self.bump(1)
+                    }
+
+                    ret!(Token::SeximalInt);
+                },
+                _ => match [self.read_at(0), self.read_at(1)] {
+                    [Some(0xcf), Some(0x87)] => {
+                        self.bump(2);
+
+                        if !is!(0, b'0'..=b'9' | b'a'..=b'b') {
+                            return Some(Err(LexerError::InvalidDozenalLiteral));
+                        }
+                        self.bump(1);
+
+                        while is!(0, b'0'..=b'9' | b'a'..=b'b' | b'_') {
+                            self.bump(1)
+                        }
+
+                        ret!(Token::DozenalInt);
+                    },
+                    [Some(0xcf), Some(0x86)] => {
+                        self.bump(2);
+
+                        if !is!(0, b'0'..=b'1') {
+                            return Some(Err(LexerError::InvalidGoldenLiteral));
+                        }
+                        self.bump(1);
+
+                        while is!(0, b'0'..=b'1' | b'_') {
+                            self.bump(1)
+                        }
+
+                        ret!(Token::GoldenFloat);
+                    },
+                    _ => {
+                        numbers!();
+                    },
                 },
             },
             b'1'..=b'9' => {
@@ -719,5 +667,27 @@ impl<'a> Iterator for Lexer<'a> {
             },
             _ => Some(Err(LexerError::UnknownCharacter)),
         }
+    }
+}
+
+#[inline]
+const fn is_id_start(b: Option<u8>) -> bool {
+    matches!(b, Some(b'A'..=b'Z' | b'a'..=b'z' | b'_'))
+}
+#[inline]
+const fn is_id_continue(b: Option<u8>) -> bool {
+    matches!(b, Some(b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_'))
+}
+
+#[inline]
+const fn is_whitespace(b: u8) -> bool {
+    matches!(b, b' ' | b'\t' | b'\r')
+}
+
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Result<Token, LexerError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_tok()
     }
 }

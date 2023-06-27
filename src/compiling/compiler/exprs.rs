@@ -237,6 +237,7 @@ impl Compiler<'_> {
 
                 // Ok(out_reg)
             },
+            Expression::Id(..) => todo!(),
         }
     }
 }

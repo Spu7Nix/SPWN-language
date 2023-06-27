@@ -11,7 +11,8 @@ use lasso::Spur;
 use super::ast::Ast;
 use super::attributes::FileAttribute;
 use super::error::SyntaxError;
-use crate::lexing::tokens::{Lexer, Token};
+use crate::lexing::lexer::{Lexer, LexerError};
+use crate::lexing::tokens::Token;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 
@@ -26,7 +27,7 @@ pub type ParseResult<T> = Result<T, SyntaxError>;
 
 impl<'a> Parser<'a> {
     pub fn new(code: &'a str, src: Rc<SpwnSource>, interner: Rc<RefCell<Interner>>) -> Self {
-        let lexer = Token::lex(code);
+        let lexer = Lexer::new(code);
         Parser {
             lexer,
             src,
@@ -38,9 +39,9 @@ impl<'a> Parser<'a> {
 #[macro_export]
 macro_rules! list_helper {
     ($self:ident, $closing_tok:ident $code:block) => {
-        while !$self.next_is(Token::$closing_tok) {
+        while !$self.next_is(Token::$closing_tok)? {
             $code;
-            if !$self.skip_tok(Token::Comma) {
+            if !$self.skip_tok(Token::Comma)? {
                 break;
             }
         }
@@ -49,10 +50,10 @@ macro_rules! list_helper {
 
     ($self:ident, $first:ident, $closing_tok:ident $code:block) => {
         let mut $first = true;
-        while !$self.next_is(Token::$closing_tok) {
+        while !$self.next_is(Token::$closing_tok)? {
             $code;
             $first = false;
-            if !$self.skip_tok(Token::Comma) {
+            if !$self.skip_tok(Token::Comma)? {
                 break;
             }
         }
@@ -61,12 +62,23 @@ macro_rules! list_helper {
 }
 
 impl Parser<'_> {
-    pub fn next(&mut self) -> Token {
-        let out = self.lexer.next_or_eof();
+    fn map_lexer_err(&self, e: LexerError) -> SyntaxError {
+        SyntaxError::LexingError {
+            err: e,
+            area: self.make_area(self.span()),
+        }
+    }
+
+    pub fn next(&mut self) -> ParseResult<Token> {
+        let out = self
+            .lexer
+            .next_or_eof()
+            .map_err(|e| self.map_lexer_err(e))?;
+
         if out == Token::Newline {
             self.next()
         } else {
-            out
+            Ok(out)
         }
     }
 
@@ -78,10 +90,10 @@ impl Parser<'_> {
         self.lexer.span().into()
     }
 
-    pub fn peek_span(&self) -> CodeSpan {
+    pub fn peek_span(&self) -> ParseResult<CodeSpan> {
         let mut peek = self.lexer.clone();
-        while peek.next_or_eof() == Token::Newline {}
-        peek.span().into()
+        while peek.next_or_eof().map_err(|e| self.map_lexer_err(e))? == Token::Newline {}
+        Ok(peek.span().into())
     }
 
     // pub fn peek_span_or_newline(&self) -> CodeSpan {
@@ -98,23 +110,23 @@ impl Parser<'_> {
         self.interner.borrow_mut().get_or_intern(self.lexer.slice())
     }
 
-    pub fn peek(&self) -> Token {
+    pub fn peek(&self) -> ParseResult<Token> {
         let mut peek = self.lexer.clone();
-        let mut out = peek.next_or_eof();
+        let mut out = peek.next_or_eof().map_err(|e| self.map_lexer_err(e))?;
         while out == Token::Newline {
             // should theoretically never be more than one, but having a loop just in case doesn't hurt
-            out = peek.next_or_eof();
+            out = peek.next_or_eof().map_err(|e| self.map_lexer_err(e))?;
         }
-        out
+        Ok(out)
     }
 
-    pub fn peek_strict(&self) -> Token {
+    pub fn peek_strict(&self) -> ParseResult<Token> {
         let mut peek = self.lexer.clone();
-        peek.next_or_eof()
+        peek.next_or_eof().map_err(|e| self.map_lexer_err(e))
     }
 
-    pub fn next_is(&self, tok: Token) -> bool {
-        self.peek() == tok
+    pub fn next_is(&self, tok: Token) -> ParseResult<bool> {
+        Ok(self.peek()? == tok)
     }
 
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
@@ -124,17 +136,17 @@ impl Parser<'_> {
         }
     }
 
-    pub fn skip_tok(&mut self, skip: Token) -> bool {
-        if self.next_is(skip) {
-            self.next();
-            true
+    pub fn skip_tok(&mut self, skip: Token) -> ParseResult<bool> {
+        if self.next_is(skip)? {
+            self.next()?;
+            Ok(true)
         } else {
-            false
+            Ok(false)
         }
     }
 
     pub fn expect_tok_named(&mut self, expect: Token, name: &str) -> ParseResult<()> {
-        let next = self.next();
+        let next = self.next()?;
         if next != expect {
             return Err(SyntaxError::UnexpectedToken {
                 found: next,
@@ -149,14 +161,19 @@ impl Parser<'_> {
         self.expect_tok_named(expect, expect.to_str())
     }
 
-    pub fn next_are(&self, toks: &[Token]) -> bool {
+    pub fn next_are(&self, toks: &[Token]) -> ParseResult<bool> {
         let mut peek = self.lexer.clone();
         for tok in toks {
-            if peek.next().unwrap_or(Token::Eof) != *tok {
-                return false;
+            if peek
+                .next()
+                .unwrap_or(Ok(Token::Eof))
+                .map_err(|e| self.map_lexer_err(e))?
+                != *tok
+            {
+                return Ok(false);
             }
         }
-        true
+        Ok(true)
     }
 
     fn intern_string<T: AsRef<str>>(&self, string: T) -> Spur {
@@ -168,9 +185,9 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> ParseResult<Ast> {
-        let file_attributes = if self.next_are(&[Token::Hashtag, Token::ExclMark]) {
-            self.next();
-            self.next();
+        let file_attributes = if self.next_are(&[Token::Hashtag, Token::ExclMark])? {
+            self.next()?;
+            self.next()?;
 
             self.parse_attributes::<FileAttribute>()?
         } else {

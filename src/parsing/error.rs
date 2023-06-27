@@ -1,6 +1,7 @@
 use std::string::ToString;
 
 use crate::error_maker;
+use crate::lexing::lexer::LexerError;
 use crate::lexing::tokens::Token;
 use crate::sources::CodeArea;
 
@@ -230,8 +231,8 @@ error_maker! {
             named_catch_area: CodeArea,
         },
 
-         // ==================================================================
-         #[
+        // ==================================================================
+        #[
             Message: "Duplicate catch-all blocks", Note: None;
             Labels: [
                 area => "First catch-all defined here";
@@ -241,6 +242,29 @@ error_maker! {
         DuplicateCatchAll {
             area: CodeArea,
             second_area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Lexer error", Note: None;
+            Labels: [
+                area => "{}": =>(err);
+            ]
+        ]
+        LexingError {
+            err: LexerError,
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Invalid string type used for dictionary key", Note: Some("f-strings and byte strings are not allowed as keys".into());
+            Labels: [
+                area => "Invalid string here";
+            ]
+        ]
+        InvalidDictStringKey {
+            area: CodeArea,
         },
     }
 }

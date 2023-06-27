@@ -5,115 +5,115 @@ use lasso::Spur;
 use unindent::unindent;
 
 use super::{ParseResult, Parser};
+use crate::gd::ids::IDClass;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{
-    DictItem, Import, ImportSettings, ImportType, StringContent, StringType, Vis,
+    DictItem, Expression, Import, ImportSettings, ImportType, StringContent, StringType, Vis,
 };
 use crate::parsing::attributes::{Attributes, IsValidOn, ParseAttribute};
 use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable, Spanned};
 
 impl Parser<'_> {
-    pub fn parse_int(&self, s: &str) -> i64 {
-        if s.len() > 2 {
-            match &s[0..2] {
-                "0x" => {
-                    return i64::from_str_radix(&s.trim_start_matches("0x").replace('_', ""), 16)
-                        .unwrap()
-                },
-                "0b" => {
-                    return i64::from_str_radix(&s.trim_start_matches("0b").replace('_', ""), 2)
-                        .unwrap()
-                },
-                "0o" => {
-                    return i64::from_str_radix(&s.trim_start_matches("0o").replace('_', ""), 8)
-                        .unwrap()
-                },
-                _ => (),
-            }
-        }
-        s.replace('_', "").parse::<i64>().unwrap()
+    pub fn parse_int(&self, s: &str, base: u32) -> i64 {
+        i64::from_str_radix(&s.replace('_', ""), base).unwrap()
     }
 
-    // fn parse_id(&self, s: &str) -> (IDClass, Option<u16>) {
-    //     let class = match &s[(s.len() - 1)..(s.len())] {
-    //         "g" => IDClass::Group,
-    //         "c" => IDClass::Color,
-    //         "b" => IDClass::Block,
-    //         "i" => IDClass::Item,
-    //         _ => unreachable!(),
-    //     };
-    //     let value = s[0..(s.len() - 1)].parse::<u16>().ok();
-
-    //     (class, value)
-    // }
-
-    pub fn parse_string(&self, s: &str, span: CodeSpan) -> ParseResult<StringType> {
-        let mut chars = s.chars();
-
-        // Remove trailing "
-        chars.next_back();
-
-        let raw_flags = chars
-            .by_ref()
-            .take_while(|c| !matches!(c, '"' | '\''))
-            .collect::<String>();
-
-        let mut out: String = chars.collect();
-
-        let mut flags = raw_flags.split('_').collect::<Vec<_>>();
-        let last = flags.pop().unwrap();
-
-        if matches!(last, "r" | "r#" | "r##") {
-            out = out[0..(out.len() - last.len() + 1)].into();
-        } else {
-            out = self.parse_escapes(&mut out.chars())?;
-
-            if !raw_flags.is_empty() {
-                flags.push(last);
-            }
+    pub fn parse_golden_float(&self, s: &str) -> f64 {
+        let mut n = 0_f64;
+        for (i, d) in s.bytes().enumerate() {
+            let pow = s.len() - 1 - i;
+            const PHI: f64 = 1.6180339887498948482045868343656381177203091798057;
+            n += PHI.powf(pow as f64) * if d == b'0' { 0.0 } else { 1.0 };
         }
+        n
+    }
 
-        let mut is_bytes = false;
+    pub fn parse_id(&self, s: &str, class: IDClass) -> Expression {
+        let value = s[0..(s.len() - 1)].parse::<u16>().ok();
 
-        for flag in flags {
-            match flag {
-                "b" => is_bytes = true,
-                "u" => out = unindent(&out),
-                "b64" => {
-                    out = base64::engine::general_purpose::STANDARD.encode(out);
-                },
-                other => {
-                    return Err(SyntaxError::UnexpectedFlag {
-                        flag: other.to_string(),
-                        area: self.make_area(span),
-                    });
-                },
-            }
-        }
+        Expression::Id(class, value)
+    }
 
-        Ok(StringType {
-            s: StringContent::Normal(self.intern_string(out)),
-            bytes: is_bytes,
+    pub fn parse_string(&mut self, start_tok: Token) -> ParseResult<StringContent> {
+        let start_slice = self.slice();
+
+        Ok(match start_tok {
+            Token::String => {
+                let s = &start_slice[1..(start_slice.len() - 1)];
+                let s = self.parse_plain_string(s)?;
+                StringContent {
+                    s: StringType::Normal(self.intern_string(s)),
+                    bytes: false,
+                    base64: false,
+                    unindent: false,
+                }
+            },
+            Token::RawString => {
+                let s = &start_slice[1..];
+                let b = s.as_bytes();
+
+                let mut i = 0;
+                loop {
+                    if matches!(b[i], b'"' | b'\'') {
+                        break;
+                    }
+                    i += 1;
+                }
+
+                StringContent {
+                    s: StringType::Normal(self.intern_string(&s[(i + 1)..(s.len() - 1 - i)])),
+
+                    bytes: false,
+                    base64: false,
+                    unindent: false,
+                }
+            },
+            Token::StringFlags => {
+                let mut is_bytes = false;
+                let mut is_unindent = false;
+                let mut is_base64 = false;
+
+                for i in start_slice.bytes() {
+                    let flag = match i {
+                        b'b' => &mut is_bytes,
+                        b'B' => &mut is_base64,
+                        b'u' => &mut is_unindent,
+                        f => {
+                            return Err(SyntaxError::UnexpectedFlag {
+                                flag: (f as char).to_string(),
+                                area: self.make_area(self.span()),
+                            })
+                        },
+                    };
+                    *flag = true;
+                }
+
+                let t = self.next()?;
+                let mut content = self.parse_string(t)?;
+
+                content.bytes = is_bytes;
+                content.base64 = is_base64;
+                content.unindent = is_unindent;
+
+                content
+            },
+            _ => unreachable!(),
         })
     }
 
-    pub fn parse_plain_string(&self, s: &str, span: CodeSpan) -> ParseResult<Spur> {
-        let st = self.parse_string(s, span)?;
+    pub fn parse_plain_string(&self, s: &str) -> ParseResult<String> {
+        self.parse_escapes(&mut s[1..(s.len() - 1)].chars())
+    }
 
-        let s = match st {
-            StringType {
-                s: StringContent::Normal(s),
-                bytes: false,
-            } => s,
-            _ => {
-                return Err(SyntaxError::InvalidStringType {
-                    typ: "plain",
-                    area: self.make_area(span),
-                })
-            },
-        };
+    pub fn parse_compile_time_string(&mut self) -> ParseResult<String> {
+        let s = self
+            .parse_string(Token::String)?
+            .get_compile_time(&self.interner)
+            .ok_or(SyntaxError::InvalidDictStringKey {
+                area: self.make_area(self.span()),
+            })?;
 
         Ok(s)
     }
@@ -144,11 +144,7 @@ impl Parser<'_> {
                         })
                     },
                 }),
-                Some(c) => {
-                    if c != '\'' && c != '"' {
-                        out.push(c)
-                    }
-                },
+                Some(c) => out.push(c),
                 None => break,
             }
         }
@@ -210,25 +206,33 @@ impl Parser<'_> {
         let mut items = vec![];
 
         list_helper!(self, RBracket {
-            let attrs = if self.skip_tok(Token::Hashtag) {
+            let attrs = if self.skip_tok(Token::Hashtag)? {
 
                 self.parse_attributes::<Attributes>()?
             } else {
                 vec![]
             };
 
-            let start = self.peek_span();
+            let start = self.peek_span()?;
 
-            let vis = if allow_vis && self.next_is(Token::Private) {
-                self.next();
+            let vis = if allow_vis && self.next_is(Token::Private)? {
+                self.next()?;
                 Vis::Private
             } else {
                 Vis::Public
             };
 
-            let key = match self.next() {
-                Token::Int => self.intern_string(self.parse_int(self.slice()).to_string()),
-                Token::String => self.parse_plain_string(self.slice(), self.span())?,
+            let key = match self.next()? {
+                Token::Int => self.intern_string(self.parse_int(self.slice(), 10).to_string()),
+                Token::HexInt => self.intern_string(self.parse_int(&self.slice()[2..], 16).to_string()),
+                Token::OctalInt => self.intern_string(self.parse_int(&self.slice()[2..], 8).to_string()),
+                Token::BinaryInt => self.intern_string(self.parse_int(&self.slice()[2..], 2).to_string()),
+                Token::SeximalInt => self.intern_string(self.parse_int(&self.slice()[2..], 6).to_string()),
+                Token::DozenalInt => self.intern_string(self.parse_int(&self.slice()[2..], 12).to_string()),
+                Token::String => {
+                    let s = self.parse_compile_time_string()?;
+                    self.intern_string(s)
+                },
                 Token::Ident => self.intern_string(self.slice()),
                 other => {
                     return Err(SyntaxError::UnexpectedToken {
@@ -241,8 +245,8 @@ impl Parser<'_> {
 
             let key_span = self.span();
 
-            let elem = if self.next_is(Token::Colon) {
-                self.next();
+            let elem = if self.next_is(Token::Colon)? {
+                self.next()?;
                 Some(self.parse_expr(true)?)
             } else {
                 None
@@ -266,7 +270,7 @@ impl Parser<'_> {
         self.expect_tok(Token::LSqBracket)?;
 
         list_helper!(self, RSqBracket {
-            let start = self.peek_span();
+            let start = self.peek_span()?;
             attrs.push(T::parse(self)?.spanned(start.extend(self.span())))
         });
 
@@ -274,15 +278,12 @@ impl Parser<'_> {
     }
 
     pub fn parse_import(&mut self) -> ParseResult<Import> {
-        Ok(match self.peek() {
+        Ok(match self.peek()? {
             Token::String => {
-                self.next();
+                self.next()?;
 
                 Import {
-                    path: self
-                        .resolve(&self.parse_plain_string(self.slice(), self.span())?)
-                        .to_string()
-                        .into(),
+                    path: self.parse_plain_string(self.slice())?.into(),
                     settings: ImportSettings {
                         typ: ImportType::File,
                         is_absolute: false,
@@ -291,7 +292,7 @@ impl Parser<'_> {
                 }
             },
             Token::Ident => {
-                self.next();
+                self.next()?;
                 Import {
                     path: self.slice().into(),
                     settings: ImportSettings {
@@ -305,7 +306,7 @@ impl Parser<'_> {
                 return Err(SyntaxError::UnexpectedToken {
                     expected: "string literal or identifier".into(),
                     found: other,
-                    area: self.make_area(self.peek_span()),
+                    area: self.make_area(self.peek_span()?),
                 })
             },
         })

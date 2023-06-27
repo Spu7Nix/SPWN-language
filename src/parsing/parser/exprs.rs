@@ -1,7 +1,10 @@
 use super::{ParseResult, Parser};
+use crate::gd::ids::IDClass;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
-use crate::parsing::ast::{ExprNode, Expression, MacroArg, MacroCode, MatchBranch};
+use crate::parsing::ast::{
+    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, StringContent, StringType,
+};
 use crate::parsing::attributes::{Attributes, IsValidOn};
 use crate::parsing::error::SyntaxError;
 use crate::parsing::operators::operators::{self, unary_prec};
@@ -9,69 +12,103 @@ use crate::sources::Spannable;
 
 impl Parser<'_> {
     pub fn parse_unit(&mut self, allow_macros: bool) -> ParseResult<ExprNode> {
-        let attrs = if self.next_is(Token::Hashtag) {
-            self.next();
+        let attrs = if self.next_is(Token::Hashtag)? {
+            self.next()?;
 
             self.parse_attributes::<Attributes>()?
         } else {
             vec![]
         };
 
-        let peek = self.peek();
-        let start = self.peek_span();
+        let peek = self.peek()?;
+        let start = self.peek_span()?;
 
         let unary;
 
         let expr = 'out_expr: {
             break 'out_expr match peek {
                 Token::Int => {
-                    self.next();
-                    Expression::Int(self.parse_int(self.slice())).spanned(start)
+                    self.next()?;
+                    Expression::Int(self.parse_int(self.slice(), 10)).spanned(start)
+                },
+                Token::HexInt => {
+                    self.next()?;
+                    Expression::Int(self.parse_int(&self.slice()[2..], 16)).spanned(start)
+                },
+                Token::OctalInt => {
+                    self.next()?;
+                    Expression::Int(self.parse_int(&self.slice()[2..], 8)).spanned(start)
+                },
+                Token::BinaryInt => {
+                    self.next()?;
+                    Expression::Int(self.parse_int(&self.slice()[2..], 2)).spanned(start)
+                },
+                Token::SeximalInt => {
+                    self.next()?;
+                    Expression::Int(self.parse_int(&self.slice()[2..], 6)).spanned(start)
+                },
+                Token::DozenalInt => {
+                    self.next()?;
+                    Expression::Int(self.parse_int(&self.slice()[3..], 12)).spanned(start)
+                },
+                Token::GoldenFloat => {
+                    self.next()?;
+                    Expression::Float(self.parse_golden_float(&self.slice()[3..])).spanned(start)
                 },
                 Token::Float => {
-                    self.next();
+                    self.next()?;
                     Expression::Float(self.slice().replace('_', "").parse::<f64>().unwrap())
                         .spanned(start)
                 },
                 Token::String => {
-                    self.next();
-                    Expression::String(self.parse_string(self.slice(), self.span())?).spanned(start)
+                    let t = self.next()?;
+                    Expression::String(self.parse_string(t)?).spanned(start)
                 },
-                // Token::Id => {
-                //     self.next();
-
-                //     let (id_class, value) = self.parse_id(self.slice());
-                //     Expression::Id(id_class, value).spanned(start)
-                // },
+                Token::StringFlags => {
+                    let t = self.next()?;
+                    Expression::String(self.parse_string(t)?).spanned(start)
+                },
+                Token::RawString => {
+                    let t = self.next()?;
+                    Expression::String(self.parse_string(t)?).spanned(start)
+                },
+                Token::ArbitraryGroupID => Expression::Id(IDClass::Group, None).spanned(start),
+                Token::ArbitraryItemID => Expression::Id(IDClass::Item, None).spanned(start),
+                Token::ArbitraryChannelID => Expression::Id(IDClass::Channel, None).spanned(start),
+                Token::ArbitraryBlockID => Expression::Id(IDClass::Block, None).spanned(start),
+                Token::GroupID => self.parse_id(self.slice(), IDClass::Group).spanned(start),
+                Token::ItemID => self.parse_id(self.slice(), IDClass::Item).spanned(start),
+                Token::ChannelID => self.parse_id(self.slice(), IDClass::Channel).spanned(start),
+                Token::BlockID => self.parse_id(self.slice(), IDClass::Block).spanned(start),
                 Token::Dollar => {
-                    self.next();
+                    self.next()?;
 
                     Expression::Builtins.spanned(start)
                 },
                 Token::True => {
-                    self.next();
+                    self.next()?;
                     Expression::Bool(true).spanned(start)
                 },
                 Token::False => {
-                    self.next();
+                    self.next()?;
                     Expression::Bool(false).spanned(start)
                 },
                 Token::Epsilon => {
-                    self.next();
+                    self.next()?;
                     Expression::Epsilon.spanned(start)
                 },
                 Token::Ident => {
-                    self.next();
+                    self.next()?;
                     let var_name = self.slice_interned();
 
-                    if matches!(self.peek_strict(), Token::FatArrow | Token::Arrow) {
-                        let ret_type = if self.next_is(Token::Arrow) {
-                            self.next();
+                    if matches!(self.peek_strict()?, Token::FatArrow | Token::Arrow) {
+                        let ret_type = if self.next_is(Token::Arrow)? {
+                            self.next()?;
                             let r = Some(self.parse_expr(allow_macros)?);
                             self.expect_tok(Token::FatArrow)?;
                             r
                         } else {
-                            self.next();
+                            self.next()?;
                             None
                         };
 
@@ -93,22 +130,22 @@ impl Parser<'_> {
                     Expression::Var(var_name).spanned(start)
                 },
                 Token::Slf => {
-                    self.next();
+                    self.next()?;
                     Expression::Var(self.intern_string("self")).spanned(start)
                 },
                 Token::TypeIndicator => {
-                    self.next();
+                    self.next()?;
                     let name = self.slice()[1..].to_string();
                     Expression::Type(self.intern_string(name)).spanned(start)
                 },
                 Token::LParen => {
-                    self.next();
+                    self.next()?;
 
                     let mut check = self.clone();
                     let mut indent = 1;
 
                     let after_close = loop {
-                        match check.next() {
+                        match check.next()? {
                             Token::LParen => indent += 1,
                             Token::Eof => {
                                 return Err(SyntaxError::UnmatchedToken {
@@ -120,7 +157,7 @@ impl Parser<'_> {
                             Token::RParen => {
                                 indent -= 1;
                                 if indent == 0 {
-                                    break check.next();
+                                    break check.next()?;
                                 }
                             },
                             _ => (),
@@ -130,8 +167,8 @@ impl Parser<'_> {
                     match after_close {
                         Token::FatArrow | Token::LBracket | Token::Arrow if allow_macros => (),
                         _ => {
-                            if self.next_is(Token::RParen) {
-                                self.next();
+                            if self.next_is(Token::RParen)? {
+                                self.next()?;
                                 break 'out_expr Expression::Empty
                                     .spanned(start.extend(self.span()));
                             }
@@ -147,12 +184,12 @@ impl Parser<'_> {
                     let mut first_spread_span = None;
 
                     list_helper!(self, is_first, RParen {
-                        if is_first && self.next_is(Token::Slf) {
-                            self.next();
+                        if is_first && self.next_is(Token::Slf)? {
+                            self.next()?;
                             let span = self.span();
 
-                            let pattern = if self.next_is(Token::Colon) {
-                                self.next();
+                            let pattern = if self.next_is(Token::Colon)? {
+                                self.next()?;
                                 todo!()
                                 // Some(self.parse_pattern()?)
                             } else {
@@ -160,12 +197,12 @@ impl Parser<'_> {
                             };
 
                             args.push(MacroArg::Single { name: self.intern_string("self").spanned(span), pattern, default: None, is_ref: false })
-                        } else if is_first && self.next_are(&[Token::BinAnd, Token::Slf]) {
-                            self.next();
+                        } else if is_first && self.next_are(&[Token::BinAnd, Token::Slf])? {
+                            self.next()?;
                             let span = self.span();
 
-                            let pattern = if self.next_is(Token::Colon) {
-                                self.next();
+                            let pattern = if self.next_is(Token::Colon)? {
+                                self.next()?;
                                 todo!()
                                 // Some(self.parse_pattern()?)
                             } else {
@@ -174,15 +211,15 @@ impl Parser<'_> {
 
                             args.push(MacroArg::Single { name: self.intern_string("self").spanned(span), pattern, default: None, is_ref: true })
                         } else {
-                            let is_spread = if self.next_is(Token::Spread) {
-                                self.next();
+                            let is_spread = if self.next_is(Token::Spread)? {
+                                self.next()?;
                                 true
                             } else {
                                 false
                             };
 
-                            let is_ref = if !is_spread && self.next_is(Token::BinAnd) {
-                                self.next();
+                            let is_ref = if !is_spread && self.next_is(Token::BinAnd)? {
+                                self.next()?;
                                 true
                             } else {
                                 false
@@ -198,8 +235,8 @@ impl Parser<'_> {
                                 first_spread_span = Some(self.span())
                             }
 
-                            let pattern = if self.next_is(Token::Colon) {
-                                self.next();
+                            let pattern = if self.next_is(Token::Colon)? {
+                                self.next()?;
                                 todo!()
                                 // Some(self.parse_pattern()?)
                             } else {
@@ -207,8 +244,8 @@ impl Parser<'_> {
                             };
 
                             if !is_spread {
-                                let default = if self.next_is(Token::Assign) {
-                                    self.next();
+                                let default = if self.next_is(Token::Assign)? {
+                                    self.next()?;
                                     Some(self.parse_expr(true)?)
                                 } else {
                                     None
@@ -220,15 +257,15 @@ impl Parser<'_> {
                         }
                     });
 
-                    let ret_type = if self.next_is(Token::Arrow) {
-                        self.next();
+                    let ret_type = if self.next_is(Token::Arrow)? {
+                        self.next()?;
                         Some(self.parse_expr(allow_macros)?)
                     } else {
                         None
                     };
 
-                    let code = if self.next_is(Token::FatArrow) {
-                        self.next();
+                    let code = if self.next_is(Token::FatArrow)? {
+                        self.next()?;
                         MacroCode::Lambda(self.parse_expr(allow_macros)?)
                     } else {
                         MacroCode::Normal(self.parse_block()?)
@@ -247,12 +284,12 @@ impl Parser<'_> {
                     //     let mut first_spread_span = None;
 
                     //     list_helper!(self, is_first, RParen {
-                    //         if is_first && self.next_is(Token::Slf) {
-                    //             self.next();
+                    //         if is_first && self.next_is(Token::Slf)? {
+                    //             self.next()?;
                     //             let span = self.span();
 
-                    //             let pattern = if self.next_is(Token::Colon) {
-                    //                 self.next();
+                    //             let pattern = if self.next_is(Token::Colon)? {
+                    //                 self.next()?;
                     //                 Some(self.parse_expr(true)?)
                     //             } else {
                     //                 None
@@ -260,15 +297,15 @@ impl Parser<'_> {
 
                     //             args.push(MacroArg::Single { name: self.intern_string("self").spanned(span), pattern, default: None, is_ref: true })
                     //         } else {
-                    //             let is_spread = if self.next_is(Token::Spread) {
-                    //                 self.next();
+                    //             let is_spread = if self.next_is(Token::Spread)? {
+                    //                 self.next()?;
                     //                 true
                     //             } else {
                     //                 false
                     //             };
 
-                    //             let is_ref = if !is_spread && self.next_is(Token::BinAnd) {
-                    //                 self.next();
+                    //             let is_ref = if !is_spread && self.next_is(Token::BinAnd)? {
+                    //                 self.next()?;
                     //                 true
                     //             } else {
                     //                 false
@@ -284,16 +321,16 @@ impl Parser<'_> {
                     //                 first_spread_span = Some(self.span())
                     //             }
 
-                    //             let pattern = if self.next_is(Token::Colon) {
-                    //                 self.next();
+                    //             let pattern = if self.next_is(Token::Colon)? {
+                    //                 self.next()?;
                     //                 Some(self.parse_expr(true)?)
                     //             } else {
                     //                 None
                     //             };
 
                     //             if !is_spread {
-                    //                 let default = if self.next_is(Token::Assign) {
-                    //                     self.next();
+                    //                 let default = if self.next_is(Token::Assign)? {
+                    //                     self.next()?;
                     //                     Some(self.parse_expr(true)?)
                     //                 } else {
                     //                     None
@@ -305,15 +342,15 @@ impl Parser<'_> {
                     //         }
                     //     });
 
-                    //     let ret_type = if self.next_is(Token::Arrow) {
-                    //         self.next();
+                    //     let ret_type = if self.next_is(Token::Arrow)? {
+                    //         self.next()?;
                     //         Some(self.parse_expr(allow_macros)?)
                     //     } else {
                     //         None
                     //     };
 
-                    //     let code = if self.next_is(Token::FatArrow) {
-                    //         self.next();
+                    //     let code = if self.next_is(Token::FatArrow)? {
+                    //         self.next()?;
                     //         MacroCode::Lambda(self.parse_expr(allow_macros)?)
                     //     } else {
                     //         MacroCode::Normal(self.parse_block()?)
@@ -348,7 +385,7 @@ impl Parser<'_> {
                     // }
                 },
                 Token::LSqBracket => {
-                    self.next();
+                    self.next()?;
 
                     let mut elems = vec![];
 
@@ -359,7 +396,7 @@ impl Parser<'_> {
                     Expression::Array(elems).spanned(start.extend(self.span()))
                 },
                 // typ @ (Token::Obj | Token::Trigger) => {
-                //     self.next();
+                //     self.next()?;
 
                 //     self.expect_tok(Token::LBracket)?;
 
@@ -394,17 +431,17 @@ impl Parser<'_> {
                 //     .spanned(start.extend(self.span()))
                 // },
                 Token::LBracket => {
-                    self.next();
+                    self.next()?;
 
                     Expression::Dict(self.parse_dictlike(false)?).spanned(start.extend(self.span()))
                 },
                 Token::QMark => {
-                    self.next();
+                    self.next()?;
 
                     Expression::Maybe(None).spanned(start.extend(self.span()))
                 },
                 Token::TrigFnBracket => {
-                    self.next();
+                    self.next()?;
 
                     let code = self.parse_statements()?;
                     self.expect_tok(Token::RBracket)?;
@@ -416,14 +453,14 @@ impl Parser<'_> {
                     .spanned(start.extend(self.span()))
                 },
                 Token::Import => {
-                    self.next();
+                    self.next()?;
 
                     let import_type = self.parse_import()?;
 
                     Expression::Import(import_type).spanned(start.extend(self.span()))
                 },
                 Token::Match => {
-                    self.next();
+                    self.next()?;
 
                     let v = self.parse_expr(true)?;
                     self.expect_tok(Token::LBracket)?;
@@ -435,8 +472,8 @@ impl Parser<'_> {
                         let pattern = self.parse_expr(true)?;
                         self.expect_tok(Token::FatArrow)?;
 
-                        let branch = if self.next_is(Token::LBracket) {
-                            self.next();
+                        let branch = if self.next_is(Token::LBracket)? {
+                            self.next()?;
                             let stmts = self.parse_statements()?;
                             self.expect_tok(Token::RBracket)?;
                             MatchBranch::Block(stmts)
@@ -455,7 +492,7 @@ impl Parser<'_> {
                         unary.is_some()
                     } =>
                 {
-                    self.next();
+                    self.next()?;
                     let unary_prec = unary.unwrap();
                     let next_prec = operators::next_infix(unary_prec);
                     let val = match next_prec {
@@ -490,30 +527,30 @@ impl Parser<'_> {
         loop {
             let prev_span = value.span;
 
-            value = match self.peek_strict() {
+            value = match self.peek_strict()? {
                 Token::LSqBracket => {
-                    self.next();
+                    self.next()?;
                     let index = self.parse_expr(true)?;
                     self.expect_tok(Token::RSqBracket)?;
 
                     Expression::Index { base: value, index }
                 }
                 Token::QMark => {
-                    self.next();
+                    self.next()?;
 
                     Expression::Maybe(Some(value))
                 }
                 Token::ExclMark => {
-                    self.next();
+                    self.next()?;
 
                     Expression::TriggerFuncCall(value)
                 }
                 Token::If => {
                     // if there is a newline, treat as separate statement
-                    if self.peek_strict() == Token::Newline {
+                    if self.peek_strict()? == Token::Newline {
                         break;
                     }
-                    self.next();
+                    self.next()?;
                     let cond = self.parse_expr(allow_macros)?;
                     self.expect_tok(Token::Else)?;
                     let if_false = self.parse_expr(allow_macros)?;
@@ -525,14 +562,14 @@ impl Parser<'_> {
                     }
                 }
                 Token::Is => {
-                    self.next();
+                    self.next()?;
                     todo!();
                     // let typ = self.parse_pattern()?;
 
                     // Expression::Is(value, typ)
                 }
                 Token::LParen => {
-                    self.next();
+                    self.next()?;
 
                     let mut params = vec![];
                     let mut named_params = vec![];
@@ -540,11 +577,11 @@ impl Parser<'_> {
                     let mut parsing_named = None;
 
                     list_helper!(self, RParen {
-                        if self.next_are(&[Token::Ident, Token::Assign]) {
-                            self.next();
+                        if self.next_are(&[Token::Ident, Token::Assign])? {
+                            self.next()?;
                             let start = self.span();
                             let name = self.slice_interned();
-                            self.next();
+                            self.next()?;
 
                             let value = self.parse_expr(true)?;
                             parsing_named = Some(start.extend(self.span()));
@@ -568,10 +605,10 @@ impl Parser<'_> {
                         named_params,
                     }
                 }
-                _ => match self.peek() {
+                _ => match self.peek()? {
                     Token::Dot => {
-                        self.next();
-                        match self.next() {
+                        self.next()?;
+                        match self.next()? {
                             Token::Ident => {
                                 let name = self.slice_interned();
                                 Expression::Member {
@@ -597,8 +634,8 @@ impl Parser<'_> {
                         }
                     }
                     Token::DoubleColon => {
-                        self.next();
-                        match self.next() {
+                        self.next()?;
+                        match self.next()? {
                             Token::Ident => {
                                 let name = self.slice_interned();
                                 Expression::Associated {
@@ -639,8 +676,8 @@ impl Parser<'_> {
             None => self.parse_value(allow_macros)?,
         };
 
-        while operators::is_infix_prec(self.peek(), prec) {
-            let op = self.next();
+        while operators::is_infix_prec(self.peek()?, prec) {
+            let op = self.next()?;
             let right = if operators::prec_type(prec) == operators::OpType::Left {
                 match next_prec {
                     Some(next_prec) => self.parse_op(next_prec, allow_macros)?,

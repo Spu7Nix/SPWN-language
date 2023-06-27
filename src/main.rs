@@ -40,9 +40,9 @@ fn run_spwn(settings: &Settings) -> Result<(), Box<dyn Error>> {
 
     let ast = parser.parse().map_err(|e| e.to_report())?;
 
-    // println!("{:#?}", ast);
+    println!("{:#?}", ast);
 
-    // todo!();
+    todo!();
 
     let mut bytecode_map = BytecodeMap::default();
 

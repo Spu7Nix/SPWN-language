@@ -18,16 +18,25 @@ use crate::sources::{CodeSpan, Spannable};
 
 impl<'a> Parser<'a> {
     pub fn parse_pattern_value(&mut self) -> ParseResult<PatternNode> {
-        let start = self.peek_span();
+        let start = self.peek_span()?;
 
         macro_rules! dictlike_destructure {
             () => {{
                 let mut map = AHashMap::new();
 
                 list_helper!(self, RBracket {
-                    let key = match self.next() {
-                        Token::Int => self.intern_string(self.parse_int(self.slice()).to_string()),
-                        Token::String => self.parse_plain_string(self.slice(), self.span())?,
+                    let key = match self.next()? {
+                        Token::Int => self.intern_string(self.parse_int(self.slice(), 10).to_string()),
+                        Token::HexInt => self.intern_string(self.parse_int(&self.slice()[2..], 16).to_string()),
+                        Token::OctalInt => self.intern_string(self.parse_int(&self.slice()[2..], 8).to_string()),
+                        Token::BinaryInt => self.intern_string(self.parse_int(&self.slice()[2..], 2).to_string()),
+                        Token::SeximalInt => self.intern_string(self.parse_int(&self.slice()[2..], 6).to_string()),
+                        Token::DozenalInt => self.intern_string(self.parse_int(&self.slice()[2..], 12).to_string()),
+                        Token::String => {
+                            let s = self.parse_compile_time_string()?;
+
+                            self.intern_string(s)
+                        },
                         Token::Ident => self.intern_string(self.slice()),
                         other => {
                             return Err(SyntaxError::UnexpectedToken {
@@ -38,8 +47,8 @@ impl<'a> Parser<'a> {
                         }
                     };
 
-                    let elem = if self.next_is(Token::Colon) {
-                        self.next();
+                    let elem = if self.next_is(Token::Colon)? {
+                        self.next()?;
                         Some(self.parse_pattern()?)
                     } else {
                         None
@@ -53,7 +62,7 @@ impl<'a> Parser<'a> {
         }
 
         let pat = 'out_pat: {
-            match self.next() {
+            match self.next()? {
                 Token::Mut => {
                     self.expect_tok(Token::Ident)?;
                     Pattern::Mut {
@@ -65,7 +74,7 @@ impl<'a> Parser<'a> {
                     let (is_ref, name) = if t == Token::Ident {
                         (false, self.slice_interned())
                     } else {
-                        if self.skip_tok(Token::Mut) {
+                        if self.skip_tok(Token::Mut)? {
                             self.expect_tok(Token::Ident)?;
                             break 'out_pat Pattern::Mut {
                                 name: self.slice_interned(),
@@ -79,23 +88,23 @@ impl<'a> Parser<'a> {
                     let mut path = vec![];
 
                     loop {
-                        match self.peek_strict() {
+                        match self.peek_strict()? {
                             Token::LSqBracket => {
-                                self.next();
+                                self.next()?;
                                 let index = self.parse_expr(true)?;
                                 self.expect_tok(Token::RSqBracket)?;
 
                                 path.push(AssignPath::Index(index));
                             },
-                            _ => match self.peek() {
+                            _ => match self.peek()? {
                                 Token::Dot => {
-                                    self.next();
+                                    self.next()?;
                                     self.expect_tok(Token::Ident)?;
                                     let member = self.slice_interned();
                                     path.push(AssignPath::Member(member));
                                 },
                                 Token::DoubleColon => {
-                                    self.next();
+                                    self.next()?;
                                     self.expect_tok(Token::Ident)?;
                                     let member = self.slice_interned();
                                     path.push(AssignPath::Associated(member));
@@ -124,7 +133,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::TypeIndicator => {
                     let typ = self.intern_string(&self.slice()[1..]);
-                    if self.skip_tok(Token::DoubleColon) {
+                    if self.skip_tok(Token::DoubleColon)? {
                         let map = dictlike_destructure!();
                         Pattern::InstanceDestructure(typ, map)
                     } else {
@@ -183,14 +192,14 @@ impl<'a> Parser<'a> {
 
         loop {
             let start_span = node.span;
-            let pat = match self.peek_strict() {
+            let pat = match self.peek_strict()? {
                 Token::QMark => {
-                    self.next();
+                    self.next()?;
                     Pattern::MaybeDestructure(Some(node))
                 },
                 Token::LSqBracket => {
-                    self.next();
-                    if self.skip_tok(Token::RSqBracket) {
+                    self.next()?;
+                    if self.skip_tok(Token::RSqBracket)? {
                         Pattern::ArrayPattern(
                             node,
                             PatternNode {
@@ -206,7 +215,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Token::LBracket => {
-                    self.next();
+                    self.next()?;
                     self.expect_tok(Token::RBracket)?;
                     Pattern::DictPattern(node)
                 },
@@ -227,9 +236,9 @@ impl<'a> Parser<'a> {
         let mut left = self.parse_pattern_value()?;
 
         loop {
-            left = match self.peek() {
+            left = match self.peek()? {
                 Token::BinAnd | Token::Colon => {
-                    self.next();
+                    self.next()?;
                     let right = self.parse_pattern_value()?;
                     PatternNode {
                         span: left.span.extend(self.span()),
@@ -237,7 +246,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Token::BinOr => {
-                    self.next();
+                    self.next()?;
                     let right = self.parse_pattern_value()?;
                     PatternNode {
                         span: left.span.extend(self.span()),

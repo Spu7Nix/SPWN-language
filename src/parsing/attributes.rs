@@ -173,21 +173,21 @@ macro_rules! attributes {
                                     const TOTAL: usize = { [stringify!($typ1), $(stringify!($typ)),*].len() };
                                     let mut found = 0;
 
-                                    if parser.next_is(Token::LParen) {
+                                    if parser.next_is(Token::LParen)? {
                                         used_paren = true;
-                                        parser.next();
+                                        parser.next()?;
                                     } else if {
                                         #[allow(unreachable_code, unused_labels)]
                                         'v: {
                                             $(break 'v false; stringify!($typ);)*
-                                            parser.next_is(Token::Assign)
+                                            parser.next_is(Token::Assign)?
                                         }
                                     } {
-                                        parser.next();
+                                        parser.next()?;
                                     } else {
                                         return Err(SyntaxError::UnexpectedToken {
                                             expected: format!("({}", { " or =" $(; stringify!($typ); "")* }),
-                                            found: parser.next(),
+                                            found: parser.next()?,
                                             area: parser.make_area(parser.span()),
                                         })
                                     }
@@ -198,7 +198,7 @@ macro_rules! attributes {
                                     for i in 0..TOTAL {
                                         parser.expect_tok(Token::String)?;
 
-                                        fields.push((parser.span(), parser.resolve(&parser.parse_plain_string(&parser.slice().to_string(), parser.span())?)));
+                                        fields.push((parser.span(), parser.parse_compile_time_string()?.into()));
 
                                         // cant underflow if the loop nevers runs
                                         if i < TOTAL - 1 {
@@ -206,7 +206,7 @@ macro_rules! attributes {
                                         }
                                     }
 
-                                    parser.skip_tok(Token::Comma);
+                                    parser.skip_tok(Token::Comma)?;
 
                                     if used_paren {
                                         parser.expect_tok(Token::RParen)?;
@@ -242,14 +242,14 @@ macro_rules! attributes {
                                         parser.expect_tok(Token::Assign)?;
                                         parser.expect_tok(Token::String)?;
 
-                                        field_map.insert(name, (parser.span(), parser.resolve(&parser.parse_plain_string(parser.slice(), parser.span())?)));
+                                        field_map.insert(name, (parser.span(), parser.parse_compile_time_string()?.into()));
 
                                         if i < FIELD_NAMES.len() - 1 {
                                             parser.expect_tok(Token::Comma)?;
                                         }
                                     }
 
-                                    parser.skip_tok(Token::Comma);
+                                    parser.skip_tok(Token::Comma)?;
 
                                     if field_map.len() != FIELD_NAMES.len() {
                                         return Err(SyntaxError::InvalidAttributeArgCount {
@@ -298,7 +298,7 @@ macro_rules! attributes {
                                     }
                                 )?;
 
-                                parser.skip_tok(Token::RParen);
+                                parser.skip_tok(Token::RParen)?;
 
                                 Ok(v)
                             },

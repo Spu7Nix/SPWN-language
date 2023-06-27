@@ -1,8 +1,10 @@
+use std::cell::RefCell;
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use base64::Engine;
 use delve::{EnumDisplay, EnumToStr};
 use derive_more::Deref;
 use lasso::Spur;
@@ -10,21 +12,51 @@ use serde::{Deserialize, Serialize};
 
 use super::attributes::{Attributes, FileAttribute};
 use super::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
+use crate::gd::ids::IDClass;
 use crate::interpreting::value::Value;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
-use crate::util::ImmutStr;
+use crate::util::{ImmutStr, Interner};
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
-pub enum StringContent {
+pub enum StringType {
     Normal(Spur),
 }
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
-pub struct StringType {
-    pub s: StringContent,
+pub struct StringContent {
+    pub s: StringType,
     pub bytes: bool,
+    pub base64: bool,
+    pub unindent: bool,
+}
+
+impl StringContent {
+    pub fn normal(s: Spur) -> Self {
+        StringContent {
+            s: StringType::Normal(s),
+            bytes: false,
+            base64: false,
+            unindent: false,
+        }
+    }
+
+    pub fn get_compile_time(&self, interner: &Rc<RefCell<Interner>>) -> Option<String> {
+        if self.bytes {
+            return None;
+        }
+        let mut s = match self.s {
+            StringType::Normal(k) => interner.borrow().resolve(&k).to_string(),
+        };
+        if self.unindent {
+            s = unindent::unindent(&s)
+        }
+        if self.base64 {
+            s = base64::engine::general_purpose::URL_SAFE.encode(s)
+        }
+        Some(s)
+    }
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -153,10 +185,10 @@ pub enum MatchBranch {
 pub enum Expression {
     Int(i64),
     Float(f64),
-    String(StringType),
+    String(StringContent),
     Bool(bool),
 
-    // Id(IDClass, Option<u16>),
+    Id(IDClass, Option<u16>),
     Op(ExprNode, BinOp, ExprNode),
     Unary(UnaryOp, ExprNode),
 
