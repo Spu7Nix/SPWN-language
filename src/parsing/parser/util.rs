@@ -16,7 +16,7 @@ use crate::parsing::ast::{
 use crate::parsing::attributes::{Attributes, IsValidOn, ParseAttribute};
 use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable, Spanned};
-use crate::util::Either;
+use crate::util::{remove_quotes, Either};
 
 impl Parser<'_> {
     pub fn parse_int(&self, s: &str, base: u32) -> i64 {
@@ -44,8 +44,7 @@ impl Parser<'_> {
 
         Ok(match start_tok {
             Token::String => {
-                let s = &start_slice[1..(start_slice.len() - 1)];
-                let s = self.parse_plain_string(s)?;
+                let s = self.parse_plain_string(start_slice)?;
                 StringContent {
                     s: StringType::Normal(self.intern_string(s)),
                     bytes: false,
@@ -101,7 +100,7 @@ impl Parser<'_> {
                     let s = self.slice();
                     let start = self.span().start + 1;
                     println!("{}", start);
-                    let v = self.parse_f_string(&s[1..(s.len() - 1)], start)?;
+                    let v = self.parse_f_string(remove_quotes(s), start)?;
                     StringContent {
                         s: StringType::FString(v),
                         bytes: is_bytes,
@@ -216,7 +215,7 @@ impl Parser<'_> {
     }
 
     pub fn parse_plain_string(&self, s: &str) -> ParseResult<String> {
-        self.parse_escapes(&mut s[1..(s.len() - 1)].chars())
+        self.parse_escapes(&mut remove_quotes(s).chars())
     }
 
     pub fn parse_compile_time_string(&mut self) -> ParseResult<String> {

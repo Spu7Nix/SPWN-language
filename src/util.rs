@@ -308,3 +308,7 @@ pub enum Either<L, R> {
     Left(L),
     Right(R),
 }
+
+pub fn remove_quotes<'a>(s: &'a str) -> &'a str {
+    &s[1..(s.len() - 1)]
+}

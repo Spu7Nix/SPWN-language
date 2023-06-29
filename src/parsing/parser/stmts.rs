@@ -77,14 +77,14 @@ impl Parser<'_> {
             },
             Token::For => {
                 self.next()?;
-                let iter_var = self.parse_unit(true)?;
+                let iter = self.parse_pattern()?;
                 self.expect_tok(Token::In)?;
                 let iterator = self.parse_expr(false)?;
 
                 let code = self.parse_block()?;
 
                 Statement::For {
-                    iter_var,
+                    iter,
                     iterator,
                     code,
                 }

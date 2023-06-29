@@ -522,12 +522,19 @@ impl Vm {
                 Opcode::EnterTryCatch { err, id } => todo!(),
                 Opcode::ExitTryCatch { id } => todo!(),
                 Opcode::TypeOf { src, dest } => todo!(),
-                Opcode::MatchCatch { jump } => todo!(),
                 Opcode::Len { src, dest } => todo!(),
                 Opcode::IndexMem { base, dest, index } => todo!(),
                 Opcode::MemberMem { from, dest, member } => todo!(),
                 Opcode::AssociatedMem { from, dest, member } => todo!(),
                 Opcode::MismatchThrowIfFalse { reg } => todo!(),
+                Opcode::LoadNone { to } => todo!(),
+                Opcode::WrapMaybe { from, to } => todo!(),
+                Opcode::TypeMember { from, dest, member } => todo!(),
+                Opcode::LoadBuiltins { to } => todo!(),
+                Opcode::LoadEpsilon { to } => todo!(),
+                Opcode::MakeByteString { reg } => todo!(),
+                Opcode::Associated { from, dest, member } => todo!(),
+                Opcode::ToString { from, dest } => todo!(),
             }
 
             {

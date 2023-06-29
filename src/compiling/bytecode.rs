@@ -18,7 +18,7 @@ use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Vis, VisTrait};
 use crate::sources::{CodeSpan, Spanned, SpwnSource};
-use crate::util::{Digest, ImmutStr, ImmutVec, SlabMap};
+use crate::util::{remove_quotes, Digest, ImmutStr, ImmutVec, SlabMap};
 
 #[derive(Clone, Debug, From, EnumDisplay, Serialize, Deserialize)]
 pub enum Constant {
@@ -28,7 +28,7 @@ pub enum Constant {
     Float(f64),
     #[delve(display = |i: &bool| format!("{i}"))]
     Bool(bool),
-    #[delve(display = |i: &ImmutVec<char>| format!("{}", String::from_iter(i.iter())))]
+    #[delve(display = |i: &ImmutVec<char>| format!("{:?}", String::from_iter(i.iter())))]
     String(ImmutVec<char>),
     #[delve(display = |t: &ValueType| {
         format!(
@@ -267,14 +267,17 @@ mod debug_bytecode {
                                     "{}{}{}",
                                     {
                                         let s = format!("{:?}", &s[..7]);
-                                        s[1..(s.len() - 1)].to_string()
+                                        remove_quotes(&s).to_string()
                                     },
                                     "...".dimmed(),
                                     {
                                         let s = format!("{:?}", &s[s.len() - 7..]);
-                                        s[1..(s.len() - 1)].to_string()
+                                        remove_quotes(&s).to_string()
                                     }
                                 )
+                            } else {
+                                s = format!("{:?}", s);
+                                s = remove_quotes(&s).to_string();
                             }
                             s.bright_cyan().to_string()
                         },

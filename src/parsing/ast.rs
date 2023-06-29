@@ -234,7 +234,6 @@ pub enum Expression {
     },
 
     TriggerFunc {
-        attributes: Vec<Attributes>,
         code: Statements,
     },
 
@@ -295,7 +294,7 @@ pub enum Statement {
         code: Statements,
     },
     For {
-        iter_var: ExprNode,
+        iter: PatternNode,
         iterator: ExprNode,
         code: Statements,
     },

@@ -1,7 +1,8 @@
- 
- 
- 
- 
- f"bingb{1 + 2}{1 + 2}ong"
 
+
+
+
+for b in 3 {
+    dbg b;
+}
 

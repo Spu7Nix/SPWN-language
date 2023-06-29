@@ -137,7 +137,7 @@ impl Compiler<'_> {
                 })?;
             },
             Statement::For {
-                iter_var,
+                iter,
                 iterator,
                 code,
             } => {
@@ -153,27 +153,14 @@ impl Compiler<'_> {
 
                 builder.new_block(|b| {
                     let next_reg = b.next_reg();
-                    b.iter_next(iter_reg, next_reg, iter_var.span);
+                    b.iter_next(iter_reg, next_reg, iter.span);
 
                     b.jump(None, JumpType::UnwrapOrEnd(next_reg), iterator.span);
 
                     let derived = self.derive_scope(scope, Some(ScopeType::Loop(b.block)));
 
-                    match &*iter_var.expr {
-                        Expression::Var(v) => {
-                            let var_reg = b.next_reg();
-                            self.scopes[derived].vars.insert(
-                                *v,
-                                VarData {
-                                    mutable: false,
-                                    def_span: iter_var.span,
-                                    reg: var_reg,
-                                },
-                            );
-                            b.copy(next_reg, var_reg, iter_var.span);
-                        },
-                        _ => todo!("destruction !!!!!!!!!!!!!!!!!!!!!!!!"),
-                    };
+                    let match_reg = self.compile_pattern_check(next_reg, iter, derived, b)?;
+                    b.mismatch_throw_if_false(match_reg, iter.span);
 
                     for s in code {
                         self.compile_stmt(s, derived, b)?;

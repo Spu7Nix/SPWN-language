@@ -46,7 +46,6 @@ enum ProtoOpcode {
     JumpIfTrue(UnoptRegister, JumpTo),
     UnwrapOrJump(UnoptRegister, JumpTo),
     EnterArrowStatement(JumpTo),
-    MatchCatch(JumpTo),
 }
 
 #[derive(Debug)]
@@ -177,9 +176,6 @@ impl ProtoBytecode {
                                     UnoptOpcode::EnterArrowStatement {
                                         skip: get_jump_pos(skip).into(),
                                     }
-                                },
-                                ProtoOpcode::MatchCatch(jump) => UnoptOpcode::MatchCatch {
-                                    jump: get_jump_pos(jump).into(),
                                 },
                             });
                             opcodes.push(Spanned {
@@ -404,6 +400,44 @@ impl CodeBuilder<'_> {
         )
     }
 
+    pub fn associated(
+        &mut self,
+        from: UnoptRegister,
+        dest: UnoptRegister,
+        member: Spanned<ImmutVec<char>>,
+        span: CodeSpan,
+    ) {
+        let next_reg = self.next_reg();
+        self.load_const(member.value, next_reg, member.span);
+        self.push_opcode(
+            ProtoOpcode::Raw(UnoptOpcode::Associated {
+                from,
+                dest,
+                member: next_reg,
+            }),
+            span,
+        )
+    }
+
+    pub fn type_member(
+        &mut self,
+        from: UnoptRegister,
+        dest: UnoptRegister,
+        member: Spanned<ImmutVec<char>>,
+        span: CodeSpan,
+    ) {
+        let next_reg = self.next_reg();
+        self.load_const(member.value, next_reg, member.span);
+        self.push_opcode(
+            ProtoOpcode::Raw(UnoptOpcode::TypeMember {
+                from,
+                dest,
+                member: next_reg,
+            }),
+            span,
+        )
+    }
+
     pub fn index(
         &mut self,
         from: UnoptRegister,
@@ -452,17 +486,6 @@ impl CodeBuilder<'_> {
     // pub fn write_mem(&mut self, from: UnoptRegister, span: CodeSpan) {
     //     self.push_opcode(ProtoOpcode::Raw(Opcode::WriteMem { from }), span)
     // }
-
-    pub fn match_catch(&mut self, block: Option<BlockID>, end: bool, span: CodeSpan) {
-        let block = block.unwrap_or(self.block);
-        let opcode = if end {
-            ProtoOpcode::MatchCatch(JumpTo::End(block))
-        } else {
-            ProtoOpcode::MatchCatch(JumpTo::Start(block))
-        };
-
-        self.push_opcode(opcode, span);
-    }
 
     // pub fn and_op(
     //     &mut self,

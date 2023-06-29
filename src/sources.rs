@@ -102,6 +102,8 @@ pub struct CodeSpan {
     pub end: usize,
 }
 
+pub const ZEROSPAN: CodeSpan = CodeSpan { start: 0, end: 0 };
+
 impl CodeSpan {
     pub fn extend(&self, other: CodeSpan) -> CodeSpan {
         CodeSpan {
@@ -112,10 +114,6 @@ impl CodeSpan {
 
     pub fn internal() -> CodeSpan {
         CodeSpan { start: 0, end: 0 }
-    }
-
-    pub fn invalid() -> CodeSpan {
-        CodeSpan { start: 1, end: 0 }
     }
 }
 

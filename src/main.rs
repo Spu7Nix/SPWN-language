@@ -6,7 +6,7 @@ use std::error::Error;
 use std::rc::Rc;
 
 use clap::Parser as _;
-use cli::Settings;
+use cli::BuildSettings;
 use colored::Colorize;
 use lasso::Rodeo;
 use sources::BytecodeMap;
@@ -29,7 +29,7 @@ mod parsing;
 mod sources;
 mod util;
 
-fn run_spwn(settings: &Settings) -> Result<(), Box<dyn Error>> {
+fn run_spwn(settings: &BuildSettings) -> Result<(), Box<dyn Error>> {
     let src = Rc::new(SpwnSource::File("test.spwn".into()));
     let code = src
         .read()
@@ -40,9 +40,9 @@ fn run_spwn(settings: &Settings) -> Result<(), Box<dyn Error>> {
 
     let ast = parser.parse().map_err(|e| e.to_report())?;
 
-    println!("{:#?}", ast);
+    // println!("{:#?}", ast);
 
-    todo!();
+    // todo!();
 
     let mut bytecode_map = BytecodeMap::default();
 
@@ -77,7 +77,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 },
             };
         },
-        _ => todo!(),
+        Command::Doc { __hidden, settings } => {
+            dbg!(settings);
+        },
     }
 
     Ok(())

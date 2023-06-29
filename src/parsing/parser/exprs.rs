@@ -446,11 +446,7 @@ impl Parser<'_> {
                     let code = self.parse_statements()?;
                     self.expect_tok(Token::RBracket)?;
 
-                    Expression::TriggerFunc {
-                        code,
-                        attributes: vec![],
-                    }
-                    .spanned(start.extend(self.span()))
+                    Expression::TriggerFunc { code }.spanned(start.extend(self.span()))
                 },
                 Token::Import => {
                     self.next()?;
