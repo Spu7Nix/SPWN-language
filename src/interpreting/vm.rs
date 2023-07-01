@@ -17,7 +17,7 @@ use crate::compiling::opcodes::{ConstID, Opcode};
 use crate::gd::gd_object::{make_spawn_trigger, TriggerObject, TriggerOrder};
 use crate::interpreting::error::RuntimeError;
 use crate::parsing::ast::{VisSource, VisTrait};
-use crate::sources::{CodeArea, CodeSpan, Spanned, SpwnSource};
+use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource};
 use crate::util::Interner;
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -78,25 +78,65 @@ impl Eq for FuncCoord {}
 pub struct Vm {
     src: Rc<SpwnSource>,
     contexts: ContextStack,
-    pub interner: Rc<RefCell<Interner>>,
+
+    is_doc_gen: bool,
 
     pub triggers: Vec<TriggerObject>,
     pub trigger_order_count: TriggerOrder,
 }
 
 impl Vm {
-    pub fn resolve(&self, spur: &Spur) -> String {
-        self.interner.borrow().resolve(spur).to_string()
-    }
+    // pub fn new(bytecode_map: BytecodeMap, is_doc_gen: bool) -> Vm {
+    //     let mut programs = SlotMap::default();
+    //     let mut src_map = AHashMap::new();
 
-    pub fn intern(&self, s: &str) -> Spur {
-        self.interner.borrow_mut().get_or_intern(s)
-    }
+    //     let mut type_src_map: AHashMap<_, Vec<(CustomTypeKey, bool)>> = AHashMap::new();
 
-    pub fn intern_vec(&self, s: &[char]) -> Spur {
-        let s: String = s.iter().collect();
-        self.intern(&s)
-    }
+    //     for (
+    //         TypeDef {
+    //             def_src, private, ..
+    //         },
+    //         k,
+    //     ) in &type_defs
+    //     {
+    //         type_src_map
+    //             .entry(def_src)
+    //             .and_modify(|v| v.push((k.value, *private)))
+    //             .or_insert_with(|| vec![(k.value, *private)]);
+    //     }
+
+    //     for (src, bytecode) in &bytecode_map.map {
+    //         let k = programs.insert((
+    //             src.clone(),
+    //             bytecode,
+    //             type_src_map.remove(src).unwrap_or_default(),
+    //         ));
+    //         src_map.insert(src.clone(), k);
+    //     }
+
+    //     let mut types = SecondaryMap::new();
+
+    //     for (info, k) in type_defs {
+    //         types.insert(k.value, info.clone().spanned(k.span));
+    //     }
+
+    //     Self {
+    //         memory: Memory(Slab::new()),
+    //         last_memory_size: 0,
+    //         interner,
+    //         programs,
+    //         id_counters: [0; 4],
+    //         contexts: ContextStack(vec![]),
+    //         src_map,
+    //         objects: Vec::new(),
+    //         triggers: Vec::new(),
+    //         types,
+    //         impls: AHashMap::new(),
+    //         overloads: AHashMap::new(),
+    //         trigger_order_count: TriggerOrder::new(),
+    //         is_doc_gen,
+    //     }
+    // }
 
     pub fn make_area(&self, span: CodeSpan, program: &Rc<Program>) -> CodeArea {
         CodeArea {
@@ -426,7 +466,7 @@ impl Vm {
                     let push = self.deep_clone_ref(elem);
 
                     let key = self.borrow_reg(key, |key| match &key.value {
-                        Value::String(s) => Ok(self.intern_vec(s)),
+                        Value::String(s) => Ok(Rc::clone(s)),
                         _ => unreachable!(),
                     })?;
 
@@ -439,7 +479,7 @@ impl Vm {
                     let push = self.deep_clone_ref(elem);
 
                     let key = self.borrow_reg(key, |key| match &key.value {
-                        Value::String(s) => Ok(self.intern_vec(s)),
+                        Value::String(s) => Ok(Rc::clone(s)),
                         _ => unreachable!(),
                     })?;
 
@@ -519,8 +559,6 @@ impl Vm {
                 },
                 Opcode::Index { base, dest, index } => todo!(),
                 Opcode::Member { from, dest, member } => todo!(),
-                Opcode::EnterTryCatch { err, id } => todo!(),
-                Opcode::ExitTryCatch { id } => todo!(),
                 Opcode::TypeOf { src, dest } => todo!(),
                 Opcode::Len { src, dest } => todo!(),
                 Opcode::IndexMem { base, dest, index } => todo!(),
@@ -535,6 +573,14 @@ impl Vm {
                 Opcode::MakeByteString { reg } => todo!(),
                 Opcode::Associated { from, dest, member } => todo!(),
                 Opcode::ToString { from, dest } => todo!(),
+                Opcode::MakeInstance { base, items, dest } => todo!(),
+                Opcode::LoadArbitraryGroup { to } => todo!(),
+                Opcode::LoadArbitraryChannel { to } => todo!(),
+                Opcode::LoadArbitraryItem { to } => todo!(),
+                Opcode::LoadArbitraryBlock { to } => todo!(),
+                Opcode::LoadArbitraryID { class, dest } => todo!(),
+                Opcode::PushTryCatch { reg, to } => todo!(),
+                Opcode::PopTryCatch => todo!(),
             }
 
             {

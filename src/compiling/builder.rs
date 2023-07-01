@@ -36,6 +36,8 @@ pub enum JumpType {
     EndIfTrue(UnoptRegister),
     UnwrapOrStart(UnoptRegister),
     UnwrapOrEnd(UnoptRegister),
+    PushTryCatchStart(UnoptRegister),
+    PushTryCatchEnd(UnoptRegister),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -46,6 +48,7 @@ enum ProtoOpcode {
     JumpIfTrue(UnoptRegister, JumpTo),
     UnwrapOrJump(UnoptRegister, JumpTo),
     EnterArrowStatement(JumpTo),
+    PushTryCatch(UnoptRegister, JumpTo),
 }
 
 #[derive(Debug)]
@@ -177,6 +180,10 @@ impl ProtoBytecode {
                                         skip: get_jump_pos(skip).into(),
                                     }
                                 },
+                                ProtoOpcode::PushTryCatch(reg, to) => UnoptOpcode::PushTryCatch {
+                                    reg,
+                                    to: get_jump_pos(to).into(),
+                                },
                             });
                             opcodes.push(Spanned {
                                 value: opcode.value.try_into().unwrap(),
@@ -293,6 +300,10 @@ impl CodeBuilder<'_> {
             JumpType::EndIfTrue(reg) => ProtoOpcode::JumpIfTrue(reg, JumpTo::End(block)),
             JumpType::UnwrapOrStart(reg) => ProtoOpcode::UnwrapOrJump(reg, JumpTo::Start(block)),
             JumpType::UnwrapOrEnd(reg) => ProtoOpcode::UnwrapOrJump(reg, JumpTo::End(block)),
+            JumpType::PushTryCatchStart(reg) => {
+                ProtoOpcode::PushTryCatch(reg, JumpTo::Start(block))
+            },
+            JumpType::PushTryCatchEnd(reg) => ProtoOpcode::PushTryCatch(reg, JumpTo::End(block)),
         };
 
         self.push_opcode(opcode, span);

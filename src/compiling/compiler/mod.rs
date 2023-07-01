@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use super::builder::BlockID;
 use super::bytecode::UnoptRegister;
 use super::error::CompileError;
-use crate::cli::BuildSettings;
+use crate::cli::{BuildSettings, DocSettings};
 use crate::compiling::builder::ProtoBytecode;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Ast, Vis};
@@ -86,7 +86,9 @@ pub struct Compiler<'a> {
     scopes: SlabMap<ScopeID, Scope>,
     pub global_return: Option<Spanned<ImmutVec<Spanned<Spur>>>>,
 
-    settings: &'a BuildSettings,
+    build_settings: &'a BuildSettings,
+    doc_settings: &'a DocSettings,
+    is_doc_gen: bool,
     bytecode_map: &'a mut BytecodeMap,
 
     pub custom_type_defs: SlabMap<LocalTypeID, Vis<TypeDef>>,
@@ -96,7 +98,9 @@ pub struct Compiler<'a> {
 impl<'a> Compiler<'a> {
     pub fn new(
         src: Rc<SpwnSource>,
-        settings: &'a BuildSettings,
+        build_settings: &'a BuildSettings,
+        doc_settings: &'a DocSettings,
+        is_doc_gen: bool,
         bytecode_map: &'a mut BytecodeMap,
         interner: Rc<RefCell<Interner>>,
     ) -> Self {
@@ -107,7 +111,9 @@ impl<'a> Compiler<'a> {
             global_return: None,
             custom_type_defs: SlabMap::new(),
             available_custom_types: AHashMap::new(),
-            settings,
+            build_settings,
+            doc_settings,
+            is_doc_gen,
             bytecode_map,
         }
     }

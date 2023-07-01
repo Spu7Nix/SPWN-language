@@ -15,7 +15,7 @@ use crate::interpreting::vm::ValueRef;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{VisSource, VisTrait};
 use crate::sources::CodeArea;
-use crate::util::{ImmutCloneStr, ImmutStr, ImmutVec};
+use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -91,10 +91,10 @@ value! {
     Int(i64),
     Float(f64),
     Bool(bool),
-    String(ImmutVec<char>),
+    String(ImmutCloneVec<char>),
 
     Array(Vec<ValueRef>),
-    Dict(AHashMap<Spur, VisSource<ValueRef>>),
+    Dict(AHashMap<ImmutCloneVec<char>, VisSource<ValueRef>>),
 
     Group(Id),
     Channel(Id),
@@ -114,7 +114,7 @@ value! {
     Type(ValueType),
 
     Module {
-        exports: AHashMap<Spur, ValueRef>,
+        exports: AHashMap<ImmutCloneVec<char>, ValueRef>,
         types: Vec<(LocalTypeID, bool)>,
     },
 
@@ -138,7 +138,7 @@ value! {
 
     => Instance {
         typ: CustomTypeID,
-        items: AHashMap<Spur, VisSource<ValueRef>>,
+        items: AHashMap<ImmutVec<char>, VisSource<ValueRef>>,
     },
 }
 
@@ -160,7 +160,7 @@ impl Value {
             Constant::Int(v) => Value::Int(*v),
             Constant::Float(v) => Value::Float(*v),
             Constant::Bool(v) => Value::Bool(*v),
-            Constant::String(v) => Value::String(v.clone()),
+            Constant::String(v) => Value::String(v.clone().into()),
             Constant::Type(v) => Value::Type(*v),
             Constant::Id(..) => todo!(),
         }
@@ -187,7 +187,7 @@ impl Value {
                 d.iter()
                     .map(|(s, v)| format!(
                         "{}: {}",
-                        vm.interner.borrow().resolve(s),
+                        s.iter().collect::<String>(),
                         v.value().borrow().value.runtime_display(vm)
                     ))
                     .join(", ")
@@ -238,7 +238,7 @@ impl Value {
                     .iter()
                     .map(|(s, k)| format!(
                         "{}: {}",
-                        vm.interner.borrow().resolve(s),
+                        s.iter().collect::<String>(),
                         k.borrow().value.runtime_display(vm)
                     ))
                     .join(", "),

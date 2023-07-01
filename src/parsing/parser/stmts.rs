@@ -91,48 +91,22 @@ impl Parser<'_> {
             },
             Token::Try => {
                 self.next()?;
-                let mut branches = vec![];
-
                 let try_code = self.parse_block()?;
 
-                let mut catch_all: Option<(Statements, CodeSpan)> = None;
+                self.expect_tok(Token::Catch)?;
 
-                while self.next_is(Token::Catch)? {
-                    self.next()?;
+                let catch_pat = if !self.next_is(Token::LBracket)? {
+                    Some(self.parse_pattern()?)
+                } else {
+                    None
+                };
 
-                    if self.next_is(Token::LBracket)? {
-                        if let Some((_, s)) = catch_all {
-                            return Err(SyntaxError::DuplicateCatchAll {
-                                area: self.make_area(s),
-                                second_area: self.make_area(self.span()),
-                            });
-                        }
-                        let catch_span = self.span();
-
-                        let catch_all_code = self.parse_block()?;
-
-                        catch_all = Some((catch_all_code, catch_span))
-                    } else {
-                        #[allow(clippy::collapsible_else_if)]
-                        let error_typ = if let Some((_, s)) = catch_all {
-                            return Err(SyntaxError::CatchAllNotFinal {
-                                area: self.make_area(s),
-                                named_catch_area: self.make_area(self.span()),
-                            });
-                        } else {
-                            self.next()?;
-                            self.parse_expr(true)?
-                        };
-
-                        let catch_code = self.parse_block()?;
-                        branches.push((error_typ, catch_code));
-                    }
-                }
+                let catch_code = self.parse_block()?;
 
                 Statement::TryCatch {
                     try_code,
-                    branches,
-                    catch_all: catch_all.map(|(v, _)| v),
+                    catch_code,
+                    catch_pat,
                 }
             },
             Token::Return => {

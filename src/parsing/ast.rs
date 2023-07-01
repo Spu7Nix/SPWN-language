@@ -260,7 +260,7 @@ pub enum Expression {
     // Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
     Match {
         value: ExprNode,
-        branches: Vec<(ExprNode, MatchBranch)>,
+        branches: Vec<(PatternNode, MatchBranch)>,
     },
 }
 
@@ -300,8 +300,8 @@ pub enum Statement {
     },
     TryCatch {
         try_code: Statements,
-        branches: Vec<(ExprNode, Statements)>,
-        catch_all: Option<Statements>,
+        catch_pat: Option<PatternNode>,
+        catch_code: Statements,
     },
 
     Arrow(Box<StmtNode>),

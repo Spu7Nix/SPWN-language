@@ -6,8 +6,9 @@ use std::error::Error;
 use std::rc::Rc;
 
 use clap::Parser as _;
-use cli::BuildSettings;
+use cli::{BuildSettings, DocSettings};
 use colored::Colorize;
+use interpreting::vm::Vm;
 use lasso::Rodeo;
 use sources::BytecodeMap;
 
@@ -29,7 +30,11 @@ mod parsing;
 mod sources;
 mod util;
 
-fn run_spwn(settings: &BuildSettings) -> Result<(), Box<dyn Error>> {
+fn run_spwn(
+    build_settings: BuildSettings,
+    doc_settings: DocSettings,
+    is_doc_gen: bool,
+) -> Result<(), Box<dyn Error>> {
     let src = Rc::new(SpwnSource::File("test.spwn".into()));
     let code = src
         .read()
@@ -46,7 +51,14 @@ fn run_spwn(settings: &BuildSettings) -> Result<(), Box<dyn Error>> {
 
     let mut bytecode_map = BytecodeMap::default();
 
-    let mut cum = Compiler::new(Rc::clone(&src), settings, &mut bytecode_map, interner);
+    let mut cum = Compiler::new(
+        Rc::clone(&src),
+        &build_settings,
+        &doc_settings,
+        is_doc_gen,
+        &mut bytecode_map,
+        interner,
+    );
 
     cum.compile(&ast, (0..code.len()).into())
         .map_err(|e| e.to_report())?;
@@ -54,6 +66,8 @@ fn run_spwn(settings: &BuildSettings) -> Result<(), Box<dyn Error>> {
     for (src, code) in &*bytecode_map {
         code.debug_str(&Rc::new(src.clone()))
     }
+
+    //let mut vm = Vm::new(&bytecode_map, cum.available_custom_types, is_doc_gen);
 
     Ok(())
 }
@@ -68,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match args.command {
         Command::Build { file, settings } => {
-            match run_spwn(&settings) {
+            match run_spwn(settings, DocSettings::default(), false) {
                 Ok(o) => o,
                 Err(e) => {
                     eprint!("❌  {e}");
@@ -77,8 +91,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 },
             };
         },
-        Command::Doc { __hidden, settings } => {
-            dbg!(settings);
+        Command::Doc { settings } => match run_spwn(BuildSettings::default(), settings, true) {
+            Ok(o) => o,
+            Err(e) => {
+                eprint!("❌  {e}");
+
+                std::process::exit(1);
+            },
         },
     }
 

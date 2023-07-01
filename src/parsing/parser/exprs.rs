@@ -465,7 +465,7 @@ impl Parser<'_> {
 
                     list_helper!(self, RBracket {
 
-                        let pattern = self.parse_expr(true)?;
+                        let pattern = self.parse_pattern()?;
                         self.expect_tok(Token::FatArrow)?;
 
                         let branch = if self.next_is(Token::LBracket)? {

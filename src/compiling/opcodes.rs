@@ -4,6 +4,7 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 
 use super::bytecode::{OptRegister, Register, UnoptRegister};
+use crate::gd::ids::IDClass;
 use crate::new_id_wrapper;
 
 pub type UnoptOpcode = Opcode<UnoptRegister>;
@@ -188,6 +189,15 @@ opcodes! {
     #[delve(display = |to| format!("ε -> {to}"))]
     LoadEpsilon { [to] },
 
+    #[delve(display = |to| format!("?g -> {to}"))]
+    LoadArbitraryGroup { [to] },
+    #[delve(display = |to| format!("?c -> {to}"))]
+    LoadArbitraryChannel { [to] },
+    #[delve(display = |to| format!("?i -> {to}"))]
+    LoadArbitraryItem{ [to] },
+    #[delve(display = |to| format!("?b -> {to}"))]
+    LoadArbitraryBlock { [to] },
+
 
     #[delve(display = |reg| format!("make {reg} byte string"))]
     MakeByteString { [reg] },
@@ -222,20 +232,11 @@ opcodes! {
     #[delve(display = |f, d, i| format!("{f}.@{i} -> {d}"))]
     TypeMember { [from], [dest], [member] },
 
-    #[delve(display = |e, _a| format!("try {{...}} -> {e}"))]
-    EnterTryCatch { [err], id: TryCatchID },
-
-    #[delve(display = |_a| format!(" TODO "))]
-    ExitTryCatch { id: TryCatchID },
-
     #[delve(display = |s, d| format!("{s}.type -> {d}"))]
     TypeOf { [src], [dest] },
 
-
     #[delve(display = |s, d| format!("{s}.len() -> {d}"))]
     Len { [src], [dest] },
-
-
 
     #[delve(display = |b, d, i| format!("{b}[{i}] ~> {d}"))]
     IndexMem { [base], [dest], [index] },
@@ -248,4 +249,9 @@ opcodes! {
     #[delve(display = |r| format!("if not {r}, throw mismatch"))]
     MismatchThrowIfFalse { [reg] },
 
+    #[delve(display = |reg, to| format!("push try, catch -> {reg}, to {to}"))]
+    PushTryCatch { [reg], to: OpcodePos },
+
+    #[delve(display = || format!("pop try catch"))]
+    PopTryCatch,
 }

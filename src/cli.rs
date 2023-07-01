@@ -23,7 +23,6 @@ pub struct Arguments {
 #[command(rename_all = "lowercase")]
 pub enum Command {
     Build {
-        //#[arg(group = "build")]
         file: PathBuf,
 
         #[clap(flatten)]
@@ -31,12 +30,8 @@ pub enum Command {
     },
 
     Doc {
-        #[arg(required = false, hide = true, default_value = "()")]
-        #[arg(group = "docs")]
-        __hidden: (),
-
         #[clap(flatten)]
-        settings: BuildSettings,
+        settings: DocSettings,
     },
 }
 
@@ -73,17 +68,6 @@ pub struct BuildSettings {
     // #[arg(group = "build")]
     #[arg(short = 'f', long)]
     pub save_file: Option<PathBuf>,
-    ////////////////
-    #[arg(group = "docs")]
-    #[arg(long)]
-    pub test: Option<String>,
-    // #[arg(group = "docs")]
-    // #[arg(short = 'l', long)]
-    // pub lib: Option<String>,
-
-    // #[arg(group = "docs")]
-    // #[arg(short = 't', long)]
-    // pub target_dir: Option<String>,
 }
 
 #[derive(Args, Debug, Default)]

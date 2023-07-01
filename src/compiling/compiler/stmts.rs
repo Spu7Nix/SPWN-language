@@ -66,16 +66,6 @@ impl Compiler<'_> {
                 }
 
                 match op {
-                    // AssignOp::Assign => {
-                    //     let right = self.compile_expr(right, scope, builder)?;
-                    //     self.do_assign(
-                    //         left,
-                    //         right,
-                    //         scope,
-                    //         builder,
-                    //         AssignType::Normal { is_let: false },
-                    //     )?;
-                    // },
                     AssignOp::PlusEq => assign_op!(PlusEq),
                     AssignOp::MinusEq => assign_op!(MinusEq),
                     AssignOp::MultEq => assign_op!(MultEq),
@@ -167,24 +157,6 @@ impl Compiler<'_> {
                     }
                     b.jump(None, JumpType::Start, stmt.span);
 
-                    Ok(())
-                })?;
-            },
-            Statement::TryCatch {
-                try_code,
-                branches,
-                catch_all,
-            } => {
-                /*
-
-
-
-
-
-                */
-
-                builder.new_block(|b| {
-                    //df d
                     Ok(())
                 })?;
             },
@@ -355,6 +327,39 @@ impl Compiler<'_> {
             Statement::Throw(v) => {
                 let v = self.compile_expr(v, scope, builder)?;
                 builder.throw(v, stmt.span);
+            },
+            Statement::TryCatch {
+                try_code,
+                catch_pat,
+                catch_code,
+            } => {
+                let err_reg = builder.next_reg();
+
+                builder.new_block(|builder| {
+                    let outer = builder.block;
+
+                    builder.new_block(|builder| {
+                        builder.jump(None, JumpType::PushTryCatchEnd(err_reg), stmt.span);
+                        let derived = self.derive_scope(scope, None);
+
+                        for s in try_code {
+                            self.compile_stmt(s, derived, builder)?;
+                        }
+
+                        builder.jump(Some(outer), JumpType::End, stmt.span);
+
+                        Ok(())
+                    })?;
+                    let derived = self.derive_scope(scope, None);
+
+                    if let Some(catch_pat) = catch_pat {
+                        let matches_reg =
+                            self.compile_pattern_check(err_reg, catch_pat, derived, builder)?;
+                        builder.mismatch_throw_if_false(matches_reg, catch_pat.span);
+                    }
+
+                    Ok(())
+                })?;
             },
         }
         Ok(())

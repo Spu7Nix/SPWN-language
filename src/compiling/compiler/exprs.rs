@@ -11,7 +11,7 @@ use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::Opcode;
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
-use crate::parsing::ast::{ExprNode, Expression, StringType, VisTrait};
+use crate::parsing::ast::{ExprNode, Expression, MatchBranch, StringType, VisTrait};
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::{CodeSpan, ZEROSPAN};
 use crate::util::{Either, ImmutVec};
@@ -128,14 +128,14 @@ impl Compiler<'_> {
             Expression::Id(class, None) => {
                 let reg = builder.next_reg();
 
-                match class {
-                    IDClass::Group => todo!(),
-                    IDClass::Channel => todo!(),
-                    IDClass::Block => todo!(),
-                    IDClass::Item => todo!(),
-                }
+                let opcode = match class {
+                    IDClass::Group => Opcode::LoadArbitraryGroup { to: reg },
+                    IDClass::Channel => Opcode::LoadArbitraryChannel { to: reg },
+                    IDClass::Block => Opcode::LoadArbitraryBlock { to: reg },
+                    IDClass::Item => Opcode::LoadArbitraryItem { to: reg },
+                };
 
-                builder.load_const(Constant::Id(*class, *id), reg, expr.span);
+                builder.push_raw_opcode(opcode, expr.span);
                 Ok(reg)
             },
             Expression::Op(left, op, right) => {
@@ -372,42 +372,45 @@ impl Compiler<'_> {
                 Ok(dest)
             },
             Expression::Match { value, branches } => {
-                todo!()
-                // let value_reg = self.compile_expr(value, scope, builder)?;
+                let value_reg = self.compile_expr(value, scope, builder)?;
 
-                // let out_reg = builder.next_reg();
+                let out_reg = builder.next_reg();
+                builder.load_empty(out_reg, expr.span);
 
-                // builder.new_block(|b| {
-                //     let outer = b.block;
+                builder.new_block(|builder| {
+                    let outer = builder.block;
 
-                //     for (pattern, branch) in branches {
-                //         b.new_block(|b| {
-                //             let derived = self.derive_scope(scope, None);
-                //             self.do_assign(pattern, value_reg, derived, b, AssignType::Match)?;
+                    for (pattern, branch) in branches {
+                        builder.new_block(|builder| {
+                            let derived = self.derive_scope(scope, None);
 
-                //             match branch {
-                //                 MatchBranch::Expr(e) => {
-                //                     let e = self.compile_expr(e, derived, b)?;
-                //                     b.copy_deep(e, out_reg, expr.span);
-                //                     b.jump(Some(outer), JumpType::End, expr.span);
-                //                 },
-                //                 MatchBranch::Block(stmts) => {
-                //                     b.load_empty(out_reg, expr.span);
-                //                     for s in stmts {
-                //                         self.compile_stmt(s, derived, b)?;
-                //                     }
-                //                     b.jump(Some(outer), JumpType::End, expr.span);
-                //                 },
-                //             }
+                            let matches_reg =
+                                self.compile_pattern_check(value_reg, pattern, derived, builder)?;
+                            builder.jump(None, JumpType::EndIfFalse(matches_reg), pattern.span);
 
-                //             Ok(())
-                //         })?;
-                //     }
+                            match branch {
+                                MatchBranch::Expr(e) => {
+                                    let e = self.compile_expr(e, derived, builder)?;
+                                    builder.copy(e, out_reg, expr.span);
+                                    builder.jump(Some(outer), JumpType::End, expr.span);
+                                },
+                                MatchBranch::Block(stmts) => {
+                                    builder.load_empty(out_reg, expr.span);
+                                    for s in stmts {
+                                        self.compile_stmt(s, derived, builder)?;
+                                    }
+                                    builder.jump(Some(outer), JumpType::End, expr.span);
+                                },
+                            }
 
-                //     Ok(())
-                // })?;
+                            Ok(())
+                        })?;
+                    }
 
-                // Ok(out_reg)
+                    Ok(())
+                })?;
+
+                Ok(out_reg)
             },
         }
     }

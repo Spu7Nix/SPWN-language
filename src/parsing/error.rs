@@ -220,32 +220,6 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: "Catch-all block must be last", Note: None;
-            Labels: [
-                area => "Catch-all block defined here";
-                named_catch_area => "Named catch block defined here, following the catch-all block";
-            ]
-        ]
-        CatchAllNotFinal {
-            area: CodeArea,
-            named_catch_area: CodeArea,
-        },
-
-        // ==================================================================
-        #[
-            Message: "Duplicate catch-all blocks", Note: None;
-            Labels: [
-                area => "First catch-all defined here";
-                second_area => "Next catch-all defined here";
-            ]
-        ]
-        DuplicateCatchAll {
-            area: CodeArea,
-            second_area: CodeArea,
-        },
-
-        // ==================================================================
-        #[
             Message: "Lexer error", Note: None;
             Labels: [
                 area => "{}": =>(err);

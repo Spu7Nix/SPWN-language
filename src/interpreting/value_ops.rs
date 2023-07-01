@@ -97,9 +97,7 @@ pub fn in_op(
             todo!("context shit overloading boboggl") // context shit overloading boboggl
         },
 
-        (Value::String(s), Value::Dict(d)) => {
-            Value::Bool(d.contains_key(&vm.intern(&s.iter().collect::<String>())))
-        },
+        (Value::String(s), Value::Dict(d)) => Value::Bool(d.contains_key(s)),
 
         _ => {
             return Err(RuntimeError::InvalidOperands {

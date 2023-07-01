@@ -187,7 +187,9 @@ impl Compiler<'_> {
 
         let mut compiler = Compiler::new(
             Rc::clone(&new_src),
-            self.settings,
+            self.build_settings,
+            self.doc_settings,
+            self.is_doc_gen,
             self.bytecode_map,
             Rc::clone(&self.interner),
         );
@@ -205,7 +207,7 @@ impl Compiler<'_> {
         let bytes = bincode::serialize(&self.bytecode_map[&new_src]).unwrap();
 
         // dont write bytecode if caching is disabled
-        if !self.settings.no_bytecode_cache {
+        if !self.build_settings.no_bytecode_cache || !self.is_doc_gen {
             let _ = std::fs::create_dir(import_base.join(".spwnc"));
             std::fs::write(spwnc_path, bytes).unwrap();
         }
