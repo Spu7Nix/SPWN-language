@@ -169,6 +169,9 @@ opcodes! {
     #[delve(display = |elem, dest, key| format!("insert priv {key}:{elem} into {dest}"))]
     InsertPrivDictElem { [elem], [dest], [key] },
 
+    #[delve(display = |base, items, dest| format!("@{base}::{{{items}}} -> {dest}"))]
+    MakeInstance { [base], [items], [dest] },
+
 
     #[delve(display = |skip| format!("skip to {skip}"))]
     EnterArrowStatement { skip: OpcodePos },
@@ -188,6 +191,9 @@ opcodes! {
 
     #[delve(display = |reg| format!("make {reg} byte string"))]
     MakeByteString { [reg] },
+
+    #[delve(display = |class: &IDClass, dest| format!("?{:?} -> {dest}", class.suffix()))]
+    LoadArbitraryID { class: IDClass, [dest] },
 
     #[delve(display = |from, to| format!("{from}? -> {to}"))]
     WrapMaybe { [from], [to] },

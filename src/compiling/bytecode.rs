@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use super::compiler::{CustomTypeID, LocalTypeID};
 use super::opcodes::{Opcode, OptOpcode};
+use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Vis, VisTrait};
@@ -40,6 +41,8 @@ pub enum Constant {
         )
     })]
     Type(ValueType),
+    #[delve(display = |class: &IDClass, id: &u16| format!("{:?}{:?}", id, class.suffix()))]
+    Id(IDClass, u16),
 }
 
 // pub enum DestructurePattern<R: Copy + std::fmt::Display> {
@@ -61,6 +64,10 @@ impl Hash for Constant {
             Constant::Bool(v) => v.hash(state),
             Constant::String(v) => v.hash(state),
             Constant::Type(v) => v.hash(state),
+            Constant::Id(class, id) => {
+                class.hash(state);
+                id.hash(state);
+            },
         }
     }
 }

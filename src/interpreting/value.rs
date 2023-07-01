@@ -162,6 +162,7 @@ impl Value {
             Constant::Bool(v) => Value::Bool(*v),
             Constant::String(v) => Value::String(v.clone()),
             Constant::Type(v) => Value::Type(*v),
+            Constant::Id(..) => todo!(),
         }
     }
 

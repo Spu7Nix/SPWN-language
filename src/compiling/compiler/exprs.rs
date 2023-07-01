@@ -6,9 +6,10 @@ use itertools::Itertools;
 
 use super::{CompileResult, Compiler, ScopeID};
 use crate::compiling::builder::{CodeBuilder, JumpType};
-use crate::compiling::bytecode::UnoptRegister;
+use crate::compiling::bytecode::{Constant, UnoptRegister};
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::Opcode;
+use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{ExprNode, Expression, StringType, VisTrait};
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
@@ -117,6 +118,24 @@ impl Compiler<'_> {
             Expression::Bool(v) => {
                 let reg = builder.next_reg();
                 builder.load_const(*v, reg, expr.span);
+                Ok(reg)
+            },
+            Expression::Id(class, Some(id)) => {
+                let reg = builder.next_reg();
+                builder.load_const(Constant::Id(*class, *id), reg, expr.span);
+                Ok(reg)
+            },
+            Expression::Id(class, None) => {
+                let reg = builder.next_reg();
+
+                match class {
+                    IDClass::Group => todo!(),
+                    IDClass::Channel => todo!(),
+                    IDClass::Block => todo!(),
+                    IDClass::Item => todo!(),
+                }
+
+                builder.load_const(Constant::Id(*class, *id), reg, expr.span);
                 Ok(reg)
             },
             Expression::Op(left, op, right) => {
@@ -332,7 +351,26 @@ impl Compiler<'_> {
 
                 Ok(out)
             },
-            Expression::Instance { base, items } => todo!(),
+            Expression::Instance { base, items } => {
+                let dest = builder.next_reg();
+
+                let base = self.compile_expr(base, scope, builder)?;
+
+                let items_reg = builder.next_reg();
+
+                dict_compile!(items_reg, items);
+
+                builder.push_raw_opcode(
+                    Opcode::MakeInstance {
+                        base,
+                        items: items_reg,
+                        dest,
+                    },
+                    expr.span,
+                );
+
+                Ok(dest)
+            },
             Expression::Match { value, branches } => {
                 todo!()
                 // let value_reg = self.compile_expr(value, scope, builder)?;
@@ -371,7 +409,6 @@ impl Compiler<'_> {
 
                 // Ok(out_reg)
             },
-            Expression::Id(class, Some(id)) => Constant::Id(*class, *id),
         }
     }
 }
