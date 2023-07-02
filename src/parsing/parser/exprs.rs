@@ -72,14 +72,38 @@ impl Parser<'_> {
                     let t = self.next()?;
                     Expression::String(self.parse_string(t)?).spanned(start)
                 },
-                Token::ArbitraryGroupID => Expression::Id(IDClass::Group, None).spanned(start),
-                Token::ArbitraryItemID => Expression::Id(IDClass::Item, None).spanned(start),
-                Token::ArbitraryChannelID => Expression::Id(IDClass::Channel, None).spanned(start),
-                Token::ArbitraryBlockID => Expression::Id(IDClass::Block, None).spanned(start),
-                Token::GroupID => self.parse_id(self.slice(), IDClass::Group).spanned(start),
-                Token::ItemID => self.parse_id(self.slice(), IDClass::Item).spanned(start),
-                Token::ChannelID => self.parse_id(self.slice(), IDClass::Channel).spanned(start),
-                Token::BlockID => self.parse_id(self.slice(), IDClass::Block).spanned(start),
+                Token::ArbitraryGroupID => {
+                    self.next()?;
+                    Expression::Id(IDClass::Group, None).spanned(start)
+                },
+                Token::ArbitraryItemID => {
+                    self.next()?;
+                    Expression::Id(IDClass::Item, None).spanned(start)
+                },
+                Token::ArbitraryChannelID => {
+                    self.next()?;
+                    Expression::Id(IDClass::Channel, None).spanned(start)
+                },
+                Token::ArbitraryBlockID => {
+                    self.next()?;
+                    Expression::Id(IDClass::Block, None).spanned(start)
+                },
+                Token::GroupID => {
+                    self.next()?;
+                    self.parse_id(self.slice(), IDClass::Group).spanned(start)
+                },
+                Token::ItemID => {
+                    self.next()?;
+                    self.parse_id(self.slice(), IDClass::Item).spanned(start)
+                },
+                Token::ChannelID => {
+                    self.next()?;
+                    self.parse_id(self.slice(), IDClass::Channel).spanned(start)
+                },
+                Token::BlockID => {
+                    self.next()?;
+                    self.parse_id(self.slice(), IDClass::Block).spanned(start)
+                },
                 Token::Dollar => {
                     self.next()?;
 

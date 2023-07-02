@@ -41,7 +41,7 @@ pub enum Constant {
         )
     })]
     Type(ValueType),
-    #[delve(display = |class: &IDClass, id: &u16| format!("{:?}{:?}", id, class.suffix()))]
+    #[delve(display = |class: &IDClass, id: &u16| format!("{id}{class}"))]
     Id(IDClass, u16),
 }
 
@@ -122,7 +122,7 @@ pub struct Function {
     pub span: CodeSpan,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Bytecode {
     pub source_hash: Digest,
     pub version: Version,

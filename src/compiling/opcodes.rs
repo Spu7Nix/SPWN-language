@@ -67,6 +67,16 @@ new_id_wrapper! {
     TryCatchID: u16;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, delve::EnumDisplay, Serialize, Deserialize)]
+pub enum RuntimeStringFlag {
+    #[delve(display = "byte flag")]
+    ByteString,
+    #[delve(display = "unindent flag")]
+    Unindent,
+    #[delve(display = "b64 flag")]
+    Base64,
+}
+
 opcodes! {
     #[delve(display = |id, to| format!("load {id} -> {to}"))]
     LoadConst { id: ConstID, [to] },
@@ -189,21 +199,14 @@ opcodes! {
     #[delve(display = |to| format!("ε -> {to}"))]
     LoadEpsilon { [to] },
 
-    #[delve(display = |to| format!("?g -> {to}"))]
-    LoadArbitraryGroup { [to] },
-    #[delve(display = |to| format!("?c -> {to}"))]
-    LoadArbitraryChannel { [to] },
-    #[delve(display = |to| format!("?i -> {to}"))]
-    LoadArbitraryItem{ [to] },
-    #[delve(display = |to| format!("?b -> {to}"))]
-    LoadArbitraryBlock { [to] },
 
-
-    #[delve(display = |reg| format!("make {reg} byte string"))]
-    MakeByteString { [reg] },
-
-    #[delve(display = |class: &IDClass, dest| format!("?{:?} -> {dest}", class.suffix()))]
+    #[delve(display = |c: &IDClass, d: &R| format!("?{c} -> {d}"))]
     LoadArbitraryID { class: IDClass, [dest] },
+
+
+    #[delve(display = |flag: &RuntimeStringFlag, reg| format!("apply {flag} to {reg}"))]
+    ApplyStringFlag { flag: RuntimeStringFlag, [reg] },
+
 
     #[delve(display = |from, to| format!("{from}? -> {to}"))]
     WrapMaybe { [from], [to] },

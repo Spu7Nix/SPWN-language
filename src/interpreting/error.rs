@@ -1,7 +1,7 @@
 use std::string::ToString;
 
 use super::context::CallInfo;
-use super::value::{Value, ValueType};
+use super::value::{StoredValue, Value, ValueType};
 use super::vm::Vm;
 use crate::error_maker;
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
@@ -183,19 +183,19 @@ error_maker! {
         //     [call_stack]
         // },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Nonexistent member", Note: None;
-        //     Labels: [
-        //         area => "Member `{}` does not exist on this {}": member, base_type.runtime_display(vm);
-        //     ]
-        // ]
-        // NonexistentMember {
-        //     area: CodeArea,
-        //     member: String,
-        //     base_type: ValueType,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Nonexistent member", Note: None;
+            Labels: [
+                area => "Member `{}` does not exist on this {}": member, base_type.runtime_display(vm);
+            ]
+        ]
+        NonexistentMember {
+            area: CodeArea,
+            member: String,
+            base_type: ValueType,
+            [call_stack]
+        },
 
         // // ==================================================================
         // #[
@@ -283,36 +283,36 @@ error_maker! {
         //     [call_stack]
         // },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Invalid index", Note: None;
-        //     Labels: [
-        //         area => "{} cannot be indexed by {}": base.0.runtime_display(vm), index.0.runtime_display(vm);
-        //         base.1 => "This is of type {}": base.0.runtime_display(vm);
-        //         index.1 => "This is of type {}": index.0.runtime_display(vm);
-        //     ]
-        // ]
-        // InvalidIndex {
-        //     base: (ValueType, CodeArea),
-        //     index: (ValueType, CodeArea),
-        //     area: CodeArea,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Invalid index", Note: None;
+            Labels: [
+                area => "{} cannot be indexed by {}": base.0.runtime_display(vm), index.0.runtime_display(vm);
+                base.1 => "This is of type {}": base.0.runtime_display(vm);
+                index.1 => "This is of type {}": index.0.runtime_display(vm);
+            ]
+        ]
+        InvalidIndex {
+            base: (ValueType, CodeArea),
+            index: (ValueType, CodeArea),
+            area: CodeArea,
+            [call_stack]
+        },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Index out of bounds", Note: None;
-        //     Labels: [
-        //         area => "Index {} is out of bounds for this {} of length {}": index, typ.runtime_display(vm), len;
-        //     ]
-        // ]
-        // IndexOutOfBounds {
-        //     len: usize,
-        //     index: i64,
-        //     area: CodeArea,
-        //     typ: ValueType,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Index out of bounds", Note: None;
+            Labels: [
+                area => "Index {} is out of bounds for this {} of length {}": index, typ.runtime_display(vm), len;
+            ]
+        ]
+        IndexOutOfBounds {
+            len: usize,
+            index: i64,
+            area: CodeArea,
+            typ: ValueType,
+            [call_stack]
+        },
 
         // // ==================================================================
         // #[
@@ -354,14 +354,14 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: "Runtime Error", Note: None;
+            Message: "Thrown error", Note: None;
             Labels: [
-                area => "{}": message;
+                area => "{}": value.value.runtime_display(vm);
             ]
         ]
         ThrownError {
             area: CodeArea,
-            message: String,
+            value: StoredValue,
             [call_stack]
         },
 
@@ -385,6 +385,18 @@ error_maker! {
             ]
         ]
         ContextSplitDisallowed {
+            area: CodeArea,
+            [call_stack]
+        },
+
+        // ==================================================================
+        #[
+            Message: "Attempted to divide by zero", Note: None;
+            Labels: [
+                area => "Division occurs here";
+            ]
+        ]
+        DivisionByZero {
             area: CodeArea,
             [call_stack]
         },

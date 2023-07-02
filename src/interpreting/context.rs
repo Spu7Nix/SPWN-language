@@ -1,29 +1,39 @@
 use std::cmp::Ordering;
 use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
+use std::mem::ManuallyDrop;
 
 use derive_more::{Deref, DerefMut};
 
 use super::vm::{FuncCoord, ValueRef};
 use crate::compiling::bytecode::OptRegister;
+use crate::compiling::opcodes::OpcodePos;
 use crate::gd::ids::Id;
 use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncStorage {
-    pub registers: [ValueRef; 256],
+    pub registers: [ManuallyDrop<ValueRef>; 256],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallInfo {
     pub func: FuncCoord,
-    pub return_dest: OptRegister,
+    pub return_dest: Option<OptRegister>,
     pub call_area: Option<CodeArea>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TryCatch {
+    pub jump_pos: OpcodePos,
+    pub reg: OptRegister,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Context {
     pub ip: usize,
+
+    pub try_catches: Vec<TryCatch>,
 
     pub group: Id,
     pub stack: Vec<FuncStorage>,
@@ -35,12 +45,14 @@ pub enum ContextSplitMode {
     Disallow,
 }
 
+#[allow(clippy::new_without_default)]
 impl Context {
     pub fn new() -> Self {
         Self {
             ip: 0,
             group: Id::Specific(0),
             stack: vec![],
+            try_catches: vec![],
         }
     }
 }

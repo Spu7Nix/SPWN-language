@@ -194,6 +194,7 @@ pub fn mult(
         },
     })
 }
+
 pub fn div(
     a: &StoredValue,
     b: &StoredValue,
@@ -202,7 +203,15 @@ pub fn div(
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
-        (Value::Int(a), Value::Int(b)) => Value::Int(*a / *b),
+        (Value::Int(a), Value::Int(b)) => {
+            if *b == 0 {
+                return Err(RuntimeError::DivisionByZero {
+                    area: vm.make_area(span, program),
+                    call_stack: vm.get_call_stack(),
+                });
+            }
+            Value::Int(*a / *b)
+        },
         (Value::Float(a), Value::Float(b)) => Value::Float(*a / *b),
         (Value::Int(a), Value::Float(b)) => Value::Float(*a as f64 / *b),
         (Value::Float(a), Value::Int(b)) => Value::Float(*a / *b as f64),

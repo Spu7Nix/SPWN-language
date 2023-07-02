@@ -99,7 +99,6 @@ impl Parser<'_> {
                     self.expect_tok(Token::String)?;
                     let s = self.slice();
                     let start = self.span().start + 1;
-                    println!("{}", start);
                     let v = self.parse_f_string(remove_quotes(s), start)?;
                     StringContent {
                         s: StringType::FString(v),

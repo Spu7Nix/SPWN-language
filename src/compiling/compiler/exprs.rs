@@ -8,7 +8,7 @@ use super::{CompileResult, Compiler, ScopeID};
 use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::bytecode::{Constant, UnoptRegister};
 use crate::compiling::error::CompileError;
-use crate::compiling::opcodes::Opcode;
+use crate::compiling::opcodes::{Opcode, RuntimeStringFlag};
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{ExprNode, Expression, MatchBranch, StringType, VisTrait};
@@ -60,16 +60,16 @@ impl Compiler<'_> {
                 builder.load_const(*v, reg, expr.span);
                 Ok(reg)
             },
-            Expression::String(v) => {
+            Expression::String(content) => {
                 let out_reg = builder.next_reg();
 
-                match &v.s {
+                match &content.s {
                     StringType::Normal(s) => {
                         let mut s = self.resolve(s).to_string();
-                        if v.unindent {
+                        if content.unindent {
                             s = unindent::unindent(&s)
                         }
-                        if v.base64 {
+                        if content.base64 {
                             s = base64::engine::general_purpose::URL_SAFE.encode(s)
                         }
                         builder.load_const(
@@ -107,10 +107,34 @@ impl Compiler<'_> {
                             builder
                                 .push_raw_opcode(Opcode::PlusEq { a: out_reg, b: s_r }, expr.span)
                         }
+                        if content.unindent {
+                            builder.push_raw_opcode(
+                                Opcode::ApplyStringFlag {
+                                    flag: RuntimeStringFlag::Unindent,
+                                    reg: out_reg,
+                                },
+                                expr.span,
+                            )
+                        }
+                        if content.base64 {
+                            builder.push_raw_opcode(
+                                Opcode::ApplyStringFlag {
+                                    flag: RuntimeStringFlag::Base64,
+                                    reg: out_reg,
+                                },
+                                expr.span,
+                            )
+                        }
                     },
                 }
-                if v.bytes {
-                    builder.push_raw_opcode(Opcode::MakeByteString { reg: out_reg }, expr.span)
+                if content.bytes {
+                    builder.push_raw_opcode(
+                        Opcode::ApplyStringFlag {
+                            flag: RuntimeStringFlag::ByteString,
+                            reg: out_reg,
+                        },
+                        expr.span,
+                    )
                 }
 
                 Ok(out_reg)
@@ -128,14 +152,13 @@ impl Compiler<'_> {
             Expression::Id(class, None) => {
                 let reg = builder.next_reg();
 
-                let opcode = match class {
-                    IDClass::Group => Opcode::LoadArbitraryGroup { to: reg },
-                    IDClass::Channel => Opcode::LoadArbitraryChannel { to: reg },
-                    IDClass::Block => Opcode::LoadArbitraryBlock { to: reg },
-                    IDClass::Item => Opcode::LoadArbitraryItem { to: reg },
-                };
-
-                builder.push_raw_opcode(opcode, expr.span);
+                builder.push_raw_opcode(
+                    Opcode::LoadArbitraryID {
+                        class: *class,
+                        dest: reg,
+                    },
+                    expr.span,
+                );
                 Ok(reg)
             },
             Expression::Op(left, op, right) => {

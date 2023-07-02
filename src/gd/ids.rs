@@ -1,22 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Serialize, Deserialize, Hash, delve::EnumDisplay)]
 pub enum IDClass {
+    #[delve(display = "g")]
     Group = 0,
+    #[delve(display = "c")]
     Channel = 1,
+    #[delve(display = "b")]
     Block = 2,
+    #[delve(display = "i")]
     Item = 3,
-}
-
-impl IDClass {
-    pub fn suffix(&self) -> &str {
-        match self {
-            IDClass::Group => "g",
-            IDClass::Channel => "c",
-            IDClass::Block => "b",
-            IDClass::Item => "i",
-        }
-    }
 }
 
 pub type ArbitraryId = u16;

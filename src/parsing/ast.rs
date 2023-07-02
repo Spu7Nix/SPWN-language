@@ -283,7 +283,7 @@ pub enum ObjectType {
 pub enum Statement {
     Expr(ExprNode),
     Assign(PatternNode, ExprNode),
-    AssignOp(ExprNode, AssignOp, ExprNode),
+    AssignOp(PatternNode, AssignOp, ExprNode),
 
     If {
         branches: Vec<(ExprNode, Statements)>,
@@ -330,7 +330,7 @@ pub enum Statement {
 
 pub type Statements = Vec<StmtNode>;
 
-// T = type, P = pattern, E = expression
+// T = type, P = pattern, E = expression, S = string
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Pattern<T, P, E, S: Hash + Eq> {
     Any, // _
@@ -349,7 +349,7 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
     In(E), // in <pattern>
 
     ArrayPattern(P, P), // <pattern>[...]
-    DictPattern(P),     // <pattern>{}
+    DictPattern(P),     // <pattern>{:}
 
     ArrayDestructure(Vec<P>),                // [ <pattern> ]
     DictDestructure(AHashMap<S, Option<P>>), // { key: <pattern> }
@@ -372,7 +372,7 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
     },
 }
 
-// T = type, P = pattern, E = expression
+// T = type, E = expression, S = string
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AssignPath<E, S: Hash + Eq> {
     Index(E),

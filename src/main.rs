@@ -14,8 +14,11 @@ use sources::BytecodeMap;
 
 use crate::cli::{Arguments, Command};
 use crate::compiling::builder::ProtoBytecode;
+use crate::compiling::bytecode::Register;
 use crate::compiling::compiler::Compiler;
 use crate::compiling::opcodes::{ConstID, OptOpcode};
+use crate::interpreting::context::{CallInfo, Context, ContextSplitMode};
+use crate::interpreting::vm::{FuncCoord, Program};
 use crate::parsing::parser::Parser;
 use crate::sources::SpwnSource;
 use crate::util::{BasicError, RandomState};
@@ -67,7 +70,31 @@ fn run_spwn(
         code.debug_str(&Rc::new(src.clone()))
     }
 
-    //let mut vm = Vm::new(&bytecode_map, cum.available_custom_types, is_doc_gen);
+    let mut vm = Vm::new(false);
+
+    let program = Program {
+        bytecode: bytecode_map.get(&src).unwrap().clone(),
+        src,
+    };
+    let start = FuncCoord {
+        program: Rc::new(program),
+        func: 0,
+    };
+
+    println!("\n{}", "════ Output ══════════════════════".dimmed().bold());
+
+    vm.run_function(
+        Context::new(),
+        CallInfo {
+            func: start,
+            return_dest: None,
+            call_area: None,
+        },
+        ContextSplitMode::Allow,
+    )
+    .map_err(|e| e.to_report(&vm))?;
+
+    println!("\n{}", "══════════════════════════════════".dimmed().bold());
 
     Ok(())
 }

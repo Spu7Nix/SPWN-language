@@ -214,9 +214,12 @@ impl<'a> Parser<'a> {
                         Pattern::ArrayPattern(node, pat)
                     }
                 },
-                Token::LBracket => {
+                Token::LBracket
+                    if self.next_are(&[Token::LBracket, Token::Colon, Token::RBracket])? =>
+                {
                     self.next()?;
-                    self.expect_tok(Token::RBracket)?;
+                    self.next()?;
+                    self.next()?;
                     Pattern::DictPattern(node)
                 },
                 h => {

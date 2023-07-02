@@ -32,7 +32,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Tried to modify an immutable variable",
-            Note: Some(format!("Use `{}` to define a variable as mutable: `let {var} = ...`", hyperlink("https://spu7nix.net/spwn/#/triggerlanguage/1variables?id=variables", Some("let"))));
+            Note: Some(format!("Use `{}` to define a variable as mutable: `mut {var} = ...`", hyperlink("https://spu7nix.net/spwn/#/triggerlanguage/1variables?id=variables", Some("mut"))));
             Labels: [
                 def_area => "Variable `{}` defined as immutable here": var;
                 area => "Tried to modify it here";
@@ -217,25 +217,13 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: "Illegal expression for augmented assigment", Note: None;
+            Message: "Illegal pattern for augmented assigment", Note: None;
             Labels: [
-                area => "This expression cannot be assigned to";
+                area => "This pattern cannot be assigned to";
             ]
         ]
-        IllegalExpressionForAugmentedAssignment {
+        IllegalPattern {
             area: CodeArea,
-        },
-
-        // ==================================================================
-        #[
-            Message: "Illegal expression in assigment", Note: if *is_let { Some("Try removing the `let`".into()) } else { None };
-            Labels: [
-                area => "This expression is illegal in this assignment";
-            ]
-        ]
-        IllegalExpressionInAssigment {
-            area: CodeArea,
-            is_let: bool,
         },
     }
 }

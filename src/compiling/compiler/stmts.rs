@@ -8,7 +8,7 @@ use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::Opcode;
 use crate::interpreting::value::ValueType;
-use crate::parsing::ast::{Expression, Statement, StmtNode, VisTrait};
+use crate::parsing::ast::{Expression, Pattern, Statement, StmtNode, VisTrait};
 use crate::parsing::operators::operators::AssignOp;
 use crate::sources::Spannable;
 
@@ -31,37 +31,27 @@ impl Compiler<'_> {
             Statement::AssignOp(left, op, right) => {
                 macro_rules! assign_op {
                     ($opcode_name:ident) => {{
-                        let var = match &*left.expr {
-                            Expression::Var(v) => *v,
+                        let var = match &*left.pat {
+                            Pattern::Path {
+                                var,
+                                path,
+                                is_ref: false,
+                            } => self.get_path_reg(*var, path, scope, builder, stmt.span)?,
                             _ => {
-                                return Err(CompileError::IllegalExpressionForAugmentedAssignment {
+                                return Err(CompileError::IllegalPattern {
                                     area: self.make_area(left.span),
                                 })
                             },
                         };
                         let right_reg = self.compile_expr(right, scope, builder)?;
-                        match self.get_var(var, scope) {
-                            Some(data) if data.mutable => builder.push_raw_opcode(
-                                Opcode::$opcode_name {
-                                    a: data.reg,
-                                    b: right_reg,
-                                },
-                                stmt.span,
-                            ),
-                            Some(data) => {
-                                return Err(CompileError::ImmutableAssign {
-                                    area: self.make_area(stmt.span),
-                                    def_area: self.make_area(data.def_span),
-                                    var: self.resolve(&var),
-                                })
+
+                        builder.push_raw_opcode(
+                            Opcode::$opcode_name {
+                                a: var,
+                                b: right_reg,
                             },
-                            None => {
-                                return Err(CompileError::NonexistentVariable {
-                                    area: self.make_area(left.span),
-                                    var: self.resolve(&var),
-                                })
-                            },
-                        }
+                            stmt.span,
+                        )
                     }};
                 }
 
@@ -356,6 +346,10 @@ impl Compiler<'_> {
                         let matches_reg =
                             self.compile_pattern_check(err_reg, catch_pat, derived, builder)?;
                         builder.mismatch_throw_if_false(matches_reg, catch_pat.span);
+                    }
+
+                    for s in catch_code {
+                        self.compile_stmt(s, derived, builder)?;
                     }
 
                     Ok(())

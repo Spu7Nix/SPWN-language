@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use lasso::Spur;
 
 use super::{CompileResult, Compiler, ScopeID, VarData};
 use crate::compiling::builder::{CodeBuilder, JumpType};
@@ -6,10 +7,68 @@ use crate::compiling::bytecode::UnoptRegister;
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::Opcode;
 use crate::interpreting::value::ValueType;
-use crate::parsing::ast::{AssignPath, Pattern, PatternNode};
-use crate::sources::Spannable;
+use crate::parsing::ast::{AssignPath, ExprNode, Pattern, PatternNode};
+use crate::sources::{CodeSpan, Spannable};
 
 impl Compiler<'_> {
+    pub fn get_path_reg(
+        &mut self,
+        var: Spur,
+        path: &Vec<AssignPath<ExprNode, Spur>>,
+        scope: ScopeID,
+        builder: &mut CodeBuilder,
+        span: CodeSpan,
+    ) -> CompileResult<UnoptRegister> {
+        let path_reg = match self.get_var(var, scope) {
+            Some(v) if v.mutable => v.reg,
+            Some(v) => {
+                return Err(CompileError::ImmutableAssign {
+                    area: self.make_area(span),
+                    def_area: self.make_area(v.def_span),
+                    var: self.resolve(&var),
+                })
+            },
+            None => {
+                let r = builder.next_reg();
+                if path.is_empty() {
+                    self.scopes[scope].vars.insert(
+                        var,
+                        VarData {
+                            mutable: false,
+                            def_span: span,
+                            reg: r,
+                        },
+                    );
+                    r
+                } else {
+                    todo!()
+                }
+            },
+        };
+
+        for i in path {
+            match i {
+                AssignPath::Index(v) => {
+                    let v = self.compile_expr(v, scope, builder)?;
+                    builder.index_mem(path_reg, path_reg, v, span);
+                },
+                AssignPath::Member(v) => {
+                    builder.member_mem(path_reg, path_reg, self.resolve_arr(v).spanned(span), span);
+                },
+                AssignPath::Associated(v) => {
+                    builder.associated_mem(
+                        path_reg,
+                        path_reg,
+                        self.resolve_arr(v).spanned(span),
+                        span,
+                    );
+                },
+            }
+        }
+
+        Ok(path_reg)
+    }
+
     pub fn compile_pattern_check(
         &mut self,
         expr_reg: UnoptRegister,
@@ -233,57 +292,7 @@ impl Compiler<'_> {
             Pattern::MaybeDestructure(_) => todo!(),
             Pattern::InstanceDestructure(..) => todo!(),
             Pattern::Path { var, path, is_ref } => {
-                let path_reg = match self.get_var(*var, scope) {
-                    Some(v) if v.mutable => v.reg,
-                    Some(v) => {
-                        return Err(CompileError::ImmutableAssign {
-                            area: self.make_area(pattern.span),
-                            def_area: self.make_area(v.def_span),
-                            var: self.resolve(var),
-                        })
-                    },
-                    None => {
-                        let r = builder.next_reg();
-                        if path.is_empty() {
-                            self.scopes[scope].vars.insert(
-                                *var,
-                                VarData {
-                                    mutable: false,
-                                    def_span: pattern.span,
-                                    reg: r,
-                                },
-                            );
-                            r
-                        } else {
-                            todo!()
-                        }
-                    },
-                };
-
-                for i in path {
-                    match i {
-                        AssignPath::Index(v) => {
-                            let v = self.compile_expr(v, scope, builder)?;
-                            builder.index_mem(path_reg, path_reg, v, pattern.span);
-                        },
-                        AssignPath::Member(v) => {
-                            builder.member_mem(
-                                path_reg,
-                                path_reg,
-                                self.resolve_arr(v).spanned(pattern.span),
-                                pattern.span,
-                            );
-                        },
-                        AssignPath::Associated(v) => {
-                            builder.associated_mem(
-                                path_reg,
-                                path_reg,
-                                self.resolve_arr(v).spanned(pattern.span),
-                                pattern.span,
-                            );
-                        },
-                    }
-                }
+                let path_reg = self.get_path_reg(*var, path, scope, builder, pattern.span)?;
 
                 if *is_ref {
                     builder.copy_mem(expr_reg, path_reg, pattern.span);
@@ -297,7 +306,7 @@ impl Compiler<'_> {
                 self.scopes[scope].vars.insert(
                     *name,
                     VarData {
-                        mutable: false,
+                        mutable: true,
                         def_span: pattern.span,
                         reg: var_reg,
                     },

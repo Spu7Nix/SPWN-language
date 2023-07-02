@@ -2,15 +2,16 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use ahash::AHashMap;
-use delve::{EnumFromStr, EnumToStr, EnumVariantNames};
+use delve::{EnumFromStr, EnumToStr, EnumVariantNames, VariantNames};
 use itertools::Itertools;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
+use super::error::ErrorDiscriminants;
 use super::vm::Vm;
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::{CustomTypeID, LocalTypeID};
-use crate::gd::ids::Id;
+use crate::gd::ids::{IDClass, Id};
 use crate::interpreting::vm::ValueRef;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{VisSource, VisTrait};
@@ -162,7 +163,12 @@ impl Value {
             Constant::Bool(v) => Value::Bool(*v),
             Constant::String(v) => Value::String(v.clone().into()),
             Constant::Type(v) => Value::Type(*v),
-            Constant::Id(..) => todo!(),
+            Constant::Id(class, id) => match class {
+                IDClass::Group => Value::Group(Id::Specific(*id)),
+                IDClass::Channel => Value::Channel(Id::Specific(*id)),
+                IDClass::Block => Value::Block(Id::Specific(*id)),
+                IDClass::Item => Value::Item(Id::Specific(*id)),
+            },
         }
     }
 
@@ -270,11 +276,9 @@ impl Value {
             // ),
             // Value::Iterator(_) => "<iterator>".into(),
             // Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
-            Value::Error(_) => todo!(),
-            Value::Dict { .. } => todo!(),
-            Value::Maybe { .. } => todo!(),
+            Value::Error(id) => format!("{} {{...}}", ErrorDiscriminants::VARIANT_NAMES[*id]),
+
             Value::Instance { .. } => todo!(),
-            Value::Module { .. } => todo!(),
             // todo: iterator, object
             _ => todo!(),
         }

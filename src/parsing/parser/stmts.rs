@@ -96,7 +96,9 @@ impl Parser<'_> {
                 self.expect_tok(Token::Catch)?;
 
                 let catch_pat = if !self.next_is(Token::LBracket)? {
-                    Some(self.parse_pattern()?)
+                    let v = Some(self.parse_pattern()?);
+                    println!("{:?}", v);
+                    v
                 } else {
                     None
                 };
@@ -216,17 +218,23 @@ impl Parser<'_> {
 
                 match check.parse_pattern() {
                     Ok(pat) => {
-                        if check.skip_tok(Token::Assign)? {
+                        let tok = check.peek()?;
+                        if tok == Token::Assign {
+                            check.next()?;
                             self.lexer = check.lexer;
                             let e = self.parse_expr(true)?;
                             Statement::Assign(pat, e)
+                        } else if let Some(op) = tok.to_assign_op() {
+                            check.next()?;
+                            self.lexer = check.lexer;
+                            let e = self.parse_expr(true)?;
+                            Statement::AssignOp(pat, op, e)
                         } else {
                             let e = self.parse_expr(true)?;
                             Statement::Expr(e)
                         }
                     },
                     Err(pattern_err) => {
-                        println!("{:?}", pattern_err);
                         let e = self.parse_expr(true)?;
                         if self.next_is(Token::Assign)? {
                             return Err(pattern_err);
