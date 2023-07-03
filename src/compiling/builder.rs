@@ -219,7 +219,7 @@ impl ProtoBytecode {
             constants: constants.into(),
             functions: funcs.into(),
             custom_types: compiler
-                .custom_type_defs
+                .local_type_defs
                 .iter()
                 .map(|(id, v)| {
                     (
@@ -227,7 +227,8 @@ impl ProtoBytecode {
                             local: id,
                             source_hash: src_hash,
                         },
-                        v.map(|def| compiler.resolve(&def.name).spanned(def.def_span)),
+                        v.as_ref()
+                            .map(|def| compiler.resolve(&def.name).spanned(def.def_span)),
                     )
                 })
                 .collect(),
@@ -470,9 +471,17 @@ impl CodeBuilder<'_> {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::TypeOf { src, dest }), span)
     }
 
-    pub fn mismatch_throw_if_false(&mut self, reg: UnoptRegister, span: CodeSpan) {
+    pub fn mismatch_throw_if_false(
+        &mut self,
+        check_reg: UnoptRegister,
+        value_reg: UnoptRegister,
+        span: CodeSpan,
+    ) {
         self.push_opcode(
-            ProtoOpcode::Raw(UnoptOpcode::MismatchThrowIfFalse { reg }),
+            ProtoOpcode::Raw(UnoptOpcode::MismatchThrowIfFalse {
+                check_reg,
+                value_reg,
+            }),
             span,
         )
     }

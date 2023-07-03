@@ -11,7 +11,9 @@ use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::{Opcode, RuntimeStringFlag};
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
-use crate::parsing::ast::{ExprNode, Expression, MatchBranch, StringType, VisTrait};
+use crate::parsing::ast::{
+    ExprNode, Expression, MatchBranch, MatchBranchCode, StringType, VisTrait,
+};
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::{CodeSpan, ZEROSPAN};
 use crate::util::{Either, ImmutVec};
@@ -282,7 +284,7 @@ impl Compiler<'_> {
             },
             Expression::Is(e, p) => {
                 let reg = self.compile_expr(e, scope, builder)?;
-                let matches = self.compile_pattern_check(reg, p, scope, builder)?;
+                let matches = self.compile_pattern_check(reg, p, true, scope, builder)?;
                 Ok(matches)
             },
             Expression::Index { base, index } => {
@@ -403,21 +405,30 @@ impl Compiler<'_> {
                 builder.new_block(|builder| {
                     let outer = builder.block;
 
-                    for (pattern, branch) in branches {
+                    for branch in branches {
                         builder.new_block(|builder| {
                             let derived = self.derive_scope(scope, None);
 
-                            let matches_reg =
-                                self.compile_pattern_check(value_reg, pattern, derived, builder)?;
-                            builder.jump(None, JumpType::EndIfFalse(matches_reg), pattern.span);
+                            let matches_reg = self.compile_pattern_check(
+                                value_reg,
+                                &branch.pattern,
+                                true,
+                                derived,
+                                builder,
+                            )?;
+                            builder.jump(
+                                None,
+                                JumpType::EndIfFalse(matches_reg),
+                                branch.pattern.span,
+                            );
 
-                            match branch {
-                                MatchBranch::Expr(e) => {
+                            match &branch.code {
+                                MatchBranchCode::Expr(e) => {
                                     let e = self.compile_expr(e, derived, builder)?;
                                     builder.copy(e, out_reg, expr.span);
                                     builder.jump(Some(outer), JumpType::End, expr.span);
                                 },
-                                MatchBranch::Block(stmts) => {
+                                MatchBranchCode::Block(stmts) => {
                                     builder.load_empty(out_reg, expr.span);
                                     for s in stmts {
                                         self.compile_stmt(s, derived, builder)?;
@@ -434,6 +445,13 @@ impl Compiler<'_> {
                 })?;
 
                 Ok(out_reg)
+            },
+            Expression::Dbg(v) => {
+                let out = builder.next_reg();
+                let v = self.compile_expr(v, scope, builder)?;
+                builder.dbg(v, expr.span);
+                builder.load_empty(out, expr.span);
+                Ok(out)
             },
         }
     }

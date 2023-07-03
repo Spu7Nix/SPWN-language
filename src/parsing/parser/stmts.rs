@@ -97,7 +97,6 @@ impl Parser<'_> {
 
                 let catch_pat = if !self.next_is(Token::LBracket)? {
                     let v = Some(self.parse_pattern()?);
-                    println!("{:?}", v);
                     v
                 } else {
                     None
@@ -202,11 +201,6 @@ impl Parser<'_> {
                 let import_type = self.parse_import()?;
 
                 Statement::ExtractImport(import_type)
-            },
-            Token::Dbg => {
-                self.next()?;
-
-                Statement::Dbg(self.parse_expr(true)?)
             },
             Token::Throw => {
                 self.next()?;

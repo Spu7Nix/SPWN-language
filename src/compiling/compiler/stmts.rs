@@ -25,8 +25,9 @@ impl Compiler<'_> {
             },
             Statement::Assign(left, right) => {
                 let right_reg = self.compile_expr(right, scope, builder)?;
-                let match_reg = self.compile_pattern_check(right_reg, left, scope, builder)?;
-                builder.mismatch_throw_if_false(match_reg, left.span);
+                let match_reg =
+                    self.compile_pattern_check(right_reg, left, false, scope, builder)?;
+                builder.mismatch_throw_if_false(match_reg, right_reg, left.span);
             },
             Statement::AssignOp(left, op, right) => {
                 macro_rules! assign_op {
@@ -36,9 +37,9 @@ impl Compiler<'_> {
                                 var,
                                 path,
                                 is_ref: false,
-                            } => self.get_path_reg(*var, path, scope, builder, stmt.span)?,
+                            } => self.get_path_reg(*var, false, path, scope, builder, stmt.span)?,
                             _ => {
-                                return Err(CompileError::IllegalPattern {
+                                return Err(CompileError::IllegalAugmentedAssign {
                                     area: self.make_area(left.span),
                                 })
                             },
@@ -77,10 +78,10 @@ impl Compiler<'_> {
 
                     for (cond, code) in branches {
                         b.new_block(|b| {
-                            let cond_reg = self.compile_expr(cond, scope, b)?;
-                            b.jump(None, JumpType::EndIfFalse(cond_reg), cond.span);
-
                             let derived = self.derive_scope(scope, None);
+
+                            let cond_reg = self.compile_expr(cond, derived, b)?;
+                            b.jump(None, JumpType::EndIfFalse(cond_reg), cond.span);
 
                             for s in code {
                                 self.compile_stmt(s, derived, b)?;
@@ -103,10 +104,10 @@ impl Compiler<'_> {
             },
             Statement::While { cond, code } => {
                 builder.new_block(|b| {
-                    let cond_reg = self.compile_expr(cond, scope, b)?;
-                    b.jump(None, JumpType::EndIfFalse(cond_reg), cond.span);
-
                     let derived = self.derive_scope(scope, Some(ScopeType::Loop(b.block)));
+
+                    let cond_reg = self.compile_expr(cond, derived, b)?;
+                    b.jump(None, JumpType::EndIfFalse(cond_reg), cond.span);
 
                     for s in code {
                         self.compile_stmt(s, derived, b)?;
@@ -139,8 +140,8 @@ impl Compiler<'_> {
 
                     let derived = self.derive_scope(scope, Some(ScopeType::Loop(b.block)));
 
-                    let match_reg = self.compile_pattern_check(next_reg, iter, derived, b)?;
-                    b.mismatch_throw_if_false(match_reg, iter.span);
+                    let match_reg = self.compile_pattern_check(next_reg, iter, true, derived, b)?;
+                    b.mismatch_throw_if_false(match_reg, next_reg, iter.span);
 
                     for s in code {
                         self.compile_stmt(s, derived, b)?;
@@ -249,7 +250,7 @@ impl Compiler<'_> {
                         area: self.make_area(stmt.span),
                     });
                 } else if let Some((_, def)) = self
-                    .custom_type_defs
+                    .local_type_defs
                     .iter()
                     .find(|(_, v)| v.value().name == *name.value())
                 {
@@ -264,18 +265,27 @@ impl Compiler<'_> {
                 };
 
                 let def = TypeDef {
+                    src: Rc::clone(&self.src),
                     def_span: stmt.span,
                     name: *name.value(),
                 };
 
-                let id = self.custom_type_defs.insert(name.map(|_| def));
-                self.available_custom_types.insert(
-                    *name.value(),
-                    CustomTypeID {
-                        local: id,
-                        source_hash: self.src_hash(),
+                let id = self.local_type_defs.insert(name.map(|_| def));
+
+                let custom_id = CustomTypeID {
+                    local: id,
+                    source_hash: self.src_hash(),
+                };
+                let name_str = self.resolve(name.value());
+                self.type_def_map.insert(
+                    custom_id,
+                    TypeDef {
+                        src: Rc::clone(&self.src),
+                        def_span: stmt.span,
+                        name: name_str,
                     },
                 );
+                self.available_custom_types.insert(*name.value(), custom_id);
             },
             Statement::ExtractImport(import) => {
                 let import_reg = builder.next_reg();
@@ -310,10 +320,6 @@ impl Compiler<'_> {
             },
             Statement::Impl { base, items } => todo!(),
             Statement::Overload { op, macros } => todo!(),
-            Statement::Dbg(v) => {
-                let v = self.compile_expr(v, scope, builder)?;
-                builder.dbg(v, stmt.span);
-            },
             Statement::Throw(v) => {
                 let v = self.compile_expr(v, scope, builder)?;
                 builder.throw(v, stmt.span);
@@ -344,8 +350,8 @@ impl Compiler<'_> {
 
                     if let Some(catch_pat) = catch_pat {
                         let matches_reg =
-                            self.compile_pattern_check(err_reg, catch_pat, derived, builder)?;
-                        builder.mismatch_throw_if_false(matches_reg, catch_pat.span);
+                            self.compile_pattern_check(err_reg, catch_pat, true, derived, builder)?;
+                        builder.mismatch_throw_if_false(matches_reg, err_reg, catch_pat.span);
                     }
 
                     for s in catch_code {

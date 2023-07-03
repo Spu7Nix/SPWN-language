@@ -416,48 +416,6 @@ pub fn lte(
     })
 }
 
-pub fn and(
-    a: &StoredValue,
-    b: &StoredValue,
-    span: CodeSpan,
-    vm: &Vm,
-    program: &Rc<Program>,
-) -> RuntimeResult<Value> {
-    Ok(match (&a.value, &b.value) {
-        (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a && *b),
-        _ => {
-            return Err(RuntimeError::InvalidOperands {
-                a: (a.value.get_type(), a.area.clone()),
-                b: (b.value.get_type(), b.area.clone()),
-                op: BinOp::And,
-                area: vm.make_area(span, program),
-                call_stack: vm.get_call_stack(),
-            })
-        },
-    })
-}
-
-pub fn or(
-    a: &StoredValue,
-    b: &StoredValue,
-    span: CodeSpan,
-    vm: &Vm,
-    program: &Rc<Program>,
-) -> RuntimeResult<Value> {
-    Ok(match (&a.value, &b.value) {
-        (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a || *b),
-        _ => {
-            return Err(RuntimeError::InvalidOperands {
-                a: (a.value.get_type(), a.area.clone()),
-                b: (b.value.get_type(), b.area.clone()),
-                op: BinOp::Or,
-                area: vm.make_area(span, program),
-                call_stack: vm.get_call_stack(),
-            })
-        },
-    })
-}
-
 pub fn range(
     a: &StoredValue,
     b: &StoredValue,

@@ -128,58 +128,57 @@ impl From<DictItem> for &'static str {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MacroArg<N, D, P> {
-    Single {
-        name: N,
-        pattern: Option<P>,
-        default: Option<D>,
-        is_ref: bool,
-    },
-    Spread {
-        name: N,
-        pattern: Option<P>,
-    },
+pub enum MacroArg<D, P> {
+    Single { pattern: P, default: Option<D> },
+    Spread { pattern: P },
 }
 
-impl<N, D, P> MacroArg<N, D, P> {
-    pub fn name(&self) -> &N {
-        match self {
-            MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
-        }
-    }
+// impl<N, D, P> MacroArg<N, D, P> {
+//     pub fn name(&self) -> &N {
+//         match self {
+//             MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
+//         }
+//     }
 
-    pub fn default(&self) -> &Option<D> {
-        match self {
-            MacroArg::Single { default, .. } => default,
-            _ => unreachable!(),
-        }
-    }
+//     pub fn default(&self) -> &Option<D> {
+//         match self {
+//             MacroArg::Single { default, .. } => default,
+//             _ => unreachable!(),
+//         }
+//     }
 
-    pub fn default_mut(&mut self) -> &mut Option<D> {
-        match self {
-            MacroArg::Single { default, .. } => default,
-            _ => unreachable!(),
-        }
-    }
+//     pub fn default_mut(&mut self) -> &mut Option<D> {
+//         match self {
+//             MacroArg::Single { default, .. } => default,
+//             _ => unreachable!(),
+//         }
+//     }
 
-    pub fn pattern(&self) -> &Option<P> {
-        match self {
-            MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
-        }
-    }
+//     pub fn pattern(&self) -> &Option<P> {
+//         match self {
+//             MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
+//         }
+//     }
 
-    pub fn pattern_mut(&mut self) -> &mut Option<P> {
-        match self {
-            MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
-        }
-    }
+//     pub fn pattern_mut(&mut self) -> &mut Option<P> {
+//         match self {
+//             MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
+//         }
+//     }
+// }
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub enum MatchBranchCode {
+    Expr(ExprNode),
+    Block(Statements),
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug, Clone, EnumToStr)]
-pub enum MatchBranch {
-    Expr(ExprNode),
-    Block(Statements),
+#[derive(Debug, Clone)]
+pub struct MatchBranch {
+    pub pattern: PatternNode,
+    pub code: MatchBranchCode,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -228,7 +227,7 @@ pub enum Expression {
     },
 
     Macro {
-        args: Vec<MacroArg<Spanned<Spur>, ExprNode, PatternNode>>,
+        args: Vec<MacroArg<ExprNode, PatternNode>>,
         ret_type: Option<ExprNode>,
         code: MacroCode,
     },
@@ -253,6 +252,8 @@ pub enum Expression {
 
     Import(Import),
 
+    Dbg(ExprNode),
+
     Instance {
         base: ExprNode,
         items: Vec<Vis<DictItem>>,
@@ -260,7 +261,7 @@ pub enum Expression {
     // Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
     Match {
         value: ExprNode,
-        branches: Vec<(PatternNode, MatchBranch)>,
+        branches: Vec<MatchBranch>,
     },
 }
 
@@ -323,8 +324,6 @@ pub enum Statement {
         macros: Vec<ExprNode>,
     },
 
-    Dbg(ExprNode),
-
     Throw(ExprNode),
 }
 
@@ -348,28 +347,54 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
 
     In(E), // in <pattern>
 
-    ArrayPattern(P, P), // <pattern>[...]
+    ArrayPattern(P, P), // <pattern>[<pattern>]
     DictPattern(P),     // <pattern>{:}
 
-    ArrayDestructure(Vec<P>),                // [ <pattern> ]
-    DictDestructure(AHashMap<S, Option<P>>), // { key: <pattern> }
-    MaybeDestructure(Option<P>),             // <pattern>? or ?
-    InstanceDestructure(T, AHashMap<S, Option<P>>),
+    ArrayDestructure(Vec<P>),                       // [ <pattern> ]
+    DictDestructure(AHashMap<S, Option<P>>),        // { key: <pattern> ETC }
+    MaybeDestructure(Option<P>),                    // <pattern>? or ?
+    InstanceDestructure(T, AHashMap<S, Option<P>>), // @typ::{ key: <pattern> ETC }
 
     Path {
+        // var[0].cock::binky[79] etc
         var: S,
         path: Vec<AssignPath<E, S>>,
         is_ref: bool,
     },
     Mut {
+        // mut var OR &mut var
         name: S,
         is_ref: bool,
     },
 
-    MacroPattern {
-        args: Vec<P>,
-        ret_type: P,
+    IfGuard {
+        // <pattern> if <expr>
+        pat: P,
+        cond: E,
     },
+
+    MacroPattern(Option<P>),
+}
+
+impl<T, E> Pattern<T, PatternNode, E, Spur> {
+    pub fn is_self(&self, interner: &Rc<RefCell<Interner>>) -> bool {
+        match self {
+            Pattern::Either(a, b) => a.pat.is_self(interner) || b.pat.is_self(interner),
+            Pattern::Both(a, b) => a.pat.is_self(interner) || b.pat.is_self(interner),
+            Pattern::ArrayPattern(a, b) => a.pat.is_self(interner) || b.pat.is_self(interner),
+            Pattern::DictPattern(a) => a.pat.is_self(interner),
+            Pattern::ArrayDestructure(v) => v.iter().any(|p| p.pat.is_self(interner)),
+            Pattern::DictDestructure(map) | Pattern::InstanceDestructure(_, map) => map
+                .iter()
+                .any(|(_, p)| p.as_ref().is_some_and(|p| p.pat.is_self(interner))),
+            Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.is_self(interner)),
+            Pattern::Path { var, .. } => interner.borrow().resolve(var) == "self",
+            Pattern::Mut { name, .. } => interner.borrow().resolve(name) == "self",
+            Pattern::IfGuard { pat, .. } => pat.pat.is_self(interner),
+            Pattern::MacroPattern { .. } => todo!(),
+            _ => false,
+        }
+    }
 }
 
 // T = type, E = expression, S = string
@@ -478,6 +503,13 @@ impl<T> VisSource<T> {
             VisSource::Private(v, s) => VisSource::Private(f(v), s),
         }
     }
+
+    pub fn as_ref(&self) -> VisSource<&T> {
+        match *self {
+            VisSource::Public(ref v) => VisSource::Public(v),
+            VisSource::Private(ref v, ref s) => VisSource::Private(v, Rc::clone(s)),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -513,6 +545,13 @@ impl<T> Vis<T> {
         match self {
             Vis::Public(v) => Vis::Public(f(v)),
             Vis::Private(v) => Vis::Private(f(v)),
+        }
+    }
+
+    pub const fn as_ref(&self) -> Vis<&T> {
+        match *self {
+            Vis::Public(ref v) => Vis::Public(v),
+            Vis::Private(ref v) => Vis::Private(v),
         }
     }
 }

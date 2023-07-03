@@ -12,6 +12,7 @@ use super::vm::Vm;
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::{CustomTypeID, LocalTypeID};
 use crate::gd::ids::{IDClass, Id};
+use crate::gd::object_keys::ObjectKey;
 use crate::interpreting::vm::ValueRef;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{VisSource, VisTrait};
@@ -127,7 +128,7 @@ value! {
     Error(usize),
 
     //Object(AHashMap<u8, ObjParam>, ObjectType),
-    //ObjectKey(ObjectKey),
+    ObjectKey(ObjectKey),
 
     Epsilon,
 
@@ -139,7 +140,7 @@ value! {
 
     => Instance {
         typ: CustomTypeID,
-        items: AHashMap<ImmutVec<char>, VisSource<ValueRef>>,
+        items: AHashMap<ImmutCloneVec<char>, VisSource<ValueRef>>,
     },
 }
 
@@ -148,7 +149,7 @@ impl ValueType {
         format!(
             "@{}",
             match self {
-                Self::Custom(t) => todo!(),
+                Self::Custom(t) => &*vm.type_def_map[&t].name,
                 _ => <ValueType as Into<&str>>::into(self),
             }
         )
@@ -279,8 +280,8 @@ impl Value {
             Value::Error(id) => format!("{} {{...}}", ErrorDiscriminants::VARIANT_NAMES[*id]),
 
             Value::Instance { .. } => todo!(),
+            Value::ObjectKey(_) => todo!(),
             // todo: iterator, object
-            _ => todo!(),
         }
     }
 }

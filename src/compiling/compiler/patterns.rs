@@ -14,65 +14,103 @@ impl Compiler<'_> {
     pub fn get_path_reg(
         &mut self,
         var: Spur,
+        try_new: bool,
         path: &Vec<AssignPath<ExprNode, Spur>>,
         scope: ScopeID,
         builder: &mut CodeBuilder,
         span: CodeSpan,
     ) -> CompileResult<UnoptRegister> {
-        let path_reg = match self.get_var(var, scope) {
-            Some(v) if v.mutable => v.reg,
-            Some(v) => {
-                return Err(CompileError::ImmutableAssign {
-                    area: self.make_area(span),
-                    def_area: self.make_area(v.def_span),
-                    var: self.resolve(&var),
-                })
-            },
-            None => {
-                let r = builder.next_reg();
-                if path.is_empty() {
-                    self.scopes[scope].vars.insert(
-                        var,
-                        VarData {
-                            mutable: false,
-                            def_span: span,
-                            reg: r,
-                        },
-                    );
-                    r
-                } else {
-                    todo!()
+        macro_rules! normal_access {
+            () => {
+                match self.get_var(var, scope) {
+                    Some(v) if v.mutable => v.reg,
+                    Some(v) => {
+                        return Err(CompileError::ImmutableAssign {
+                            area: self.make_area(span),
+                            def_area: self.make_area(v.def_span),
+                            var: self.resolve(&var),
+                        })
+                    },
+                    None => {
+                        let r = builder.next_reg();
+                        if path.is_empty() {
+                            self.scopes[scope].vars.insert(
+                                var,
+                                VarData {
+                                    mutable: false,
+                                    def_span: span,
+                                    reg: r,
+                                },
+                            );
+                            r
+                        } else {
+                            return Err(CompileError::NonexistentVariable {
+                                area: self.make_area(span),
+                                var: self.resolve(&var),
+                            });
+                        }
+                    },
                 }
-            },
-        };
-
-        for i in path {
-            match i {
-                AssignPath::Index(v) => {
-                    let v = self.compile_expr(v, scope, builder)?;
-                    builder.index_mem(path_reg, path_reg, v, span);
-                },
-                AssignPath::Member(v) => {
-                    builder.member_mem(path_reg, path_reg, self.resolve_arr(v).spanned(span), span);
-                },
-                AssignPath::Associated(v) => {
-                    builder.associated_mem(
-                        path_reg,
-                        path_reg,
-                        self.resolve_arr(v).spanned(span),
-                        span,
-                    );
-                },
-            }
+            };
         }
 
-        Ok(path_reg)
+        let var_reg = if !try_new {
+            normal_access!()
+        } else if path.is_empty() {
+            let r = builder.next_reg();
+            self.scopes[scope].vars.insert(
+                var,
+                VarData {
+                    mutable: false,
+                    def_span: span,
+                    reg: r,
+                },
+            );
+            r
+        } else {
+            normal_access!()
+        };
+
+        if !path.is_empty() {
+            let path_reg = builder.next_reg();
+            builder.copy_mem(var_reg, path_reg, span);
+            for i in path {
+                match i {
+                    AssignPath::Index(v) => {
+                        let v = self.compile_expr(v, scope, builder)?;
+                        builder.index_mem(path_reg, path_reg, v, span);
+                    },
+                    AssignPath::Member(v) => {
+                        builder.member_mem(
+                            path_reg,
+                            path_reg,
+                            self.resolve_arr(v).spanned(span),
+                            span,
+                        );
+                    },
+                    AssignPath::Associated(v) => {
+                        builder.associated_mem(
+                            path_reg,
+                            path_reg,
+                            self.resolve_arr(v).spanned(span),
+                            span,
+                        );
+                    },
+                }
+            }
+
+            Ok(path_reg)
+        } else {
+            Ok(var_reg)
+        }
+        // println!("{}", path_reg);
     }
 
     pub fn compile_pattern_check(
         &mut self,
         expr_reg: UnoptRegister,
         pattern: &PatternNode,
+        try_new_var: bool,
         scope: ScopeID,
         builder: &mut CodeBuilder,
     ) -> CompileResult<UnoptRegister> {
@@ -89,14 +127,33 @@ impl Compiler<'_> {
                 builder.type_of(expr_reg, b, pattern.span);
                 builder.eq(a, b, out_reg, pattern.span);
             },
+            Pattern::IfGuard { pat, cond } => {
+                self.and_op(
+                    &[
+                        &|compiler, builder| {
+                            compiler.compile_pattern_check(
+                                expr_reg,
+                                pat,
+                                try_new_var,
+                                scope,
+                                builder,
+                            )
+                        },
+                        &|compiler, builder| compiler.compile_expr(cond, scope, builder),
+                    ],
+                    out_reg,
+                    pattern.span,
+                    builder,
+                )?;
+            },
             Pattern::Either(a, b) => {
                 self.or_op(
                     &[
                         &|compiler, builder| {
-                            compiler.compile_pattern_check(expr_reg, a, scope, builder)
+                            compiler.compile_pattern_check(expr_reg, a, try_new_var, scope, builder)
                         },
                         &|compiler, builder| {
-                            compiler.compile_pattern_check(expr_reg, b, scope, builder)
+                            compiler.compile_pattern_check(expr_reg, b, try_new_var, scope, builder)
                         },
                     ],
                     out_reg,
@@ -108,10 +165,10 @@ impl Compiler<'_> {
                 self.and_op(
                     &[
                         &|compiler, builder| {
-                            compiler.compile_pattern_check(expr_reg, a, scope, builder)
+                            compiler.compile_pattern_check(expr_reg, a, try_new_var, scope, builder)
                         },
                         &|compiler, builder| {
-                            compiler.compile_pattern_check(expr_reg, b, scope, builder)
+                            compiler.compile_pattern_check(expr_reg, b, try_new_var, scope, builder)
                         },
                     ],
                     out_reg,
@@ -149,7 +206,6 @@ impl Compiler<'_> {
             },
             Pattern::ArrayPattern(elem_pat, len_pat) => {
                 let expr_len = builder.next_reg();
-                builder.len(expr_reg, expr_len, pattern.span);
 
                 self.and_op(
                     &[
@@ -166,8 +222,15 @@ impl Compiler<'_> {
                             Ok(eq_reg)
                         },
                         &|compiler, builder| {
-                            let len_match = compiler
-                                .compile_pattern_check(expr_len, len_pat, scope, builder)?;
+                            builder.len(expr_reg, expr_len, pattern.span);
+
+                            let len_match = compiler.compile_pattern_check(
+                                expr_len,
+                                len_pat,
+                                try_new_var,
+                                scope,
+                                builder,
+                            )?;
 
                             Ok(len_match)
                         },
@@ -189,8 +252,13 @@ impl Compiler<'_> {
 
                                     let elem = builder.next_reg();
                                     builder.index_mem(expr_reg, elem, i_reg, pattern.span);
-                                    let elem_match = compiler
-                                        .compile_pattern_check(elem, elem_pat, scope, builder)?;
+                                    let elem_match = compiler.compile_pattern_check(
+                                        elem,
+                                        elem_pat,
+                                        try_new_var,
+                                        scope,
+                                        builder,
+                                    )?;
                                     builder.copy(elem_match, out_reg, pattern.span);
                                     builder.jump(
                                         Some(outer),
@@ -243,7 +311,7 @@ impl Compiler<'_> {
                             builder.len(expr_reg, expr_len, pattern.span);
 
                             let gte_reg = builder.next_reg();
-                            builder.gte(expr_len, pat_len, gte_reg, pattern.span);
+                            builder.eq(expr_len, pat_len, gte_reg, pattern.span);
 
                             Ok(gte_reg)
                         },
@@ -266,7 +334,13 @@ impl Compiler<'_> {
                                     let elem_reg = builder.next_reg();
                                     builder.index_mem(expr_reg, elem_reg, idx, pattern.span);
 
-                                    compiler.compile_pattern_check(elem_reg, elem, scope, builder)
+                                    compiler.compile_pattern_check(
+                                        elem_reg,
+                                        elem,
+                                        try_new_var,
+                                        scope,
+                                        builder,
+                                    )
                                 });
                                 funcs.push(f);
                             }
@@ -292,7 +366,15 @@ impl Compiler<'_> {
             Pattern::MaybeDestructure(_) => todo!(),
             Pattern::InstanceDestructure(..) => todo!(),
             Pattern::Path { var, path, is_ref } => {
-                let path_reg = self.get_path_reg(*var, path, scope, builder, pattern.span)?;
+                if *is_ref && !path.is_empty() {
+                    return Err(CompileError::IllegalAssign {
+                        area: self.make_area(pattern.span),
+                    });
+                }
+                println!("{}", try_new_var);
+
+                let path_reg =
+                    self.get_path_reg(*var, try_new_var, path, scope, builder, pattern.span)?;
 
                 if *is_ref {
                     builder.copy_mem(expr_reg, path_reg, pattern.span);
@@ -318,7 +400,7 @@ impl Compiler<'_> {
                 }
                 builder.load_const(true, out_reg, pattern.span);
             },
-            Pattern::MacroPattern { args, ret_type } => todo!(),
+            Pattern::MacroPattern(_) => todo!(),
         }
 
         Ok(out_reg)

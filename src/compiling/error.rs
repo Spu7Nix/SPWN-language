@@ -212,9 +212,6 @@ error_maker! {
             type_name: String,
         },
 
-
-
-
         // ==================================================================
         #[
             Message: "Illegal pattern for augmented assigment", Note: None;
@@ -222,7 +219,18 @@ error_maker! {
                 area => "This pattern cannot be assigned to";
             ]
         ]
-        IllegalPattern {
+        IllegalAugmentedAssign {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Illegal pattern for assigment", Note: None;
+            Labels: [
+                area => "This pattern cannot be assigned to";
+            ]
+        ]
+        IllegalAssign {
             area: CodeArea,
         },
     }

@@ -249,8 +249,8 @@ opcodes! {
     AssociatedMem { [from], [dest], [member] },
 
 
-    #[delve(display = |r| format!("if not {r}, throw mismatch"))]
-    MismatchThrowIfFalse { [reg] },
+    #[delve(display = |r, v| format!("if not {r}, throw mismatch"))]
+    MismatchThrowIfFalse { [check_reg], [value_reg] },
 
     #[delve(display = |reg, to| format!("push try, catch -> {reg}, to {to}"))]
     PushTryCatch { [reg], to: OpcodePos },

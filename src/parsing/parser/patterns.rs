@@ -71,6 +71,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 t @ (Token::Ident | Token::BinAnd) => {
+                    // println!("amba {t:?}");
                     let (is_ref, name) = if t == Token::Ident {
                         (false, self.slice_interned())
                     } else {
@@ -169,9 +170,21 @@ impl<'a> Parser<'a> {
                     Pattern::In(e)
                 },
                 Token::LParen => {
-                    let p = self.parse_pattern()?;
-                    self.expect_tok(Token::RParen)?;
-                    *p.pat
+                    if self.skip_tok(Token::RParen)? {
+                        self.expect_tok(Token::FatArrow)?;
+                        self.expect_tok(Token::Spread)?;
+                        Pattern::MacroPattern(None)
+                    } else {
+                        let p = self.parse_pattern()?;
+                        self.expect_tok(Token::RParen)?;
+
+                        if self.skip_tok(Token::FatArrow)? {
+                            self.expect_tok(Token::Spread)?;
+                            Pattern::MacroPattern(Some(p))
+                        } else {
+                            *p.pat
+                        }
+                    }
                 },
                 Token::QMark => Pattern::MaybeDestructure(None),
                 Token::Any => Pattern::Any,
@@ -222,7 +235,7 @@ impl<'a> Parser<'a> {
                     self.next()?;
                     Pattern::DictPattern(node)
                 },
-                h => {
+                _ => {
                     break;
                 },
             };
@@ -259,6 +272,25 @@ impl<'a> Parser<'a> {
                 _ => break,
             }
         }
+
+        loop {
+            let start_span = left.span;
+            let pat = match self.peek_strict()? {
+                Token::If => {
+                    self.next()?;
+                    let cond = self.parse_expr(false)?;
+                    Pattern::IfGuard { pat: left, cond }
+                },
+                _ => {
+                    break;
+                },
+            };
+            left = PatternNode {
+                pat: Box::new(pat),
+                span: start_span.extend(self.span()),
+            };
+        }
+
         Ok(left)
     }
 }

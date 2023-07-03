@@ -252,5 +252,28 @@ error_maker! {
             expected: &'static str,
             area: CodeArea,
         },
+
+        // ==================================================================
+        #[
+            Message: "Invalid `self` argument position", Note: None;
+            Labels: [
+                area => "Argument is at position {}": pos;
+            ]
+        ]
+        SelfArgumentNotFirst {
+            pos: usize,
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "`self` argument cannot be spread", Note: None;
+            Labels: [
+                area => "Spread occurs on this `self`";
+            ]
+        ]
+        SelfArgumentCannotBeSpread {
+            area: CodeArea,
+        },
     }
 }

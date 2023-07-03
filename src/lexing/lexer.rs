@@ -474,7 +474,6 @@ impl<'a> Lexer<'a> {
                     "private" => Token::Private,
                     "extract" => Token::Extract,
                     "import" => Token::Import,
-                    "self" => Token::Slf,
                     "is" => Token::Is,
                     "as" => Token::As,
                     "_" => Token::Any,

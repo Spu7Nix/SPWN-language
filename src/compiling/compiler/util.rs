@@ -191,6 +191,7 @@ impl Compiler<'_> {
             self.doc_settings,
             self.is_doc_gen,
             self.bytecode_map,
+            self.type_def_map,
             Rc::clone(&self.interner),
         );
 

@@ -165,6 +165,21 @@ error_maker! {
         //     [call_stack]
         // },
 
+
+        // ==================================================================
+        #[
+            Message: "Pattern mismatch", Note: None;
+            Labels: [
+                pattern_area => "The `{}` doesn't match this pattern": v.0.runtime_display(vm);
+                v.1 => "Value defined as {} here": v.0.runtime_display(vm);
+            ]
+        ]
+        PatternMismatch {
+            v: (ValueType, CodeArea),
+            pattern_area: CodeArea,
+            [call_stack]
+        },
+
         // // ==================================================================
         // #[
         //     Message: "Argument pattern mismatch", Note: None;
@@ -197,18 +212,18 @@ error_maker! {
             [call_stack]
         },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Tried to access private member", Note: None;
-        //     Labels: [
-        //         area => "Member `{}` is private": member;
-        //     ]
-        // ]
-        // PrivateMemberAccess {
-        //     area: CodeArea,
-        //     member: String,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Tried to access private member", Note: None;
+            Labels: [
+                area => "Member `{}` is private": member;
+            ]
+        ]
+        PrivateMemberAccess {
+            area: CodeArea,
+            member: String,
+            [call_stack]
+        },
 
         // // ==================================================================
         // #[
@@ -224,38 +239,38 @@ error_maker! {
         //     [call_stack]
         // },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Associated function is not method", Note: None;
-        //     Labels: [
-        //         area => "Associated function `{}` is not a method, because it does not have a `self` argument": func_name;
-        //         def_area => "Associated function defined on type {} here": base_type.runtime_display(vm);
-        //     ]
-        // ]
-        // AssociatedNotAMethod {
-        //     area: CodeArea,
-        //     def_area: CodeArea,
-        //     func_name: String,
-        //     base_type: ValueType,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Associated member is not method", Note: None;
+            Labels: [
+                area => "Associated member `{}` is not a method, because it does not have a `self` argument": func_name;
+                def_area => "Associated member defined on type {} here": base_type.runtime_display(vm);
+            ]
+        ]
+        AssociatedMemberNotAMethod {
+            area: CodeArea,
+            def_area: CodeArea,
+            func_name: String,
+            base_type: ValueType,
+            [call_stack]
+        },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Associated member is not method", Note: None;
-        //     Labels: [
-        //         area => "Member `{}` implemented on type {} is not a method": member_name, base_type.runtime_display(vm);
-        //         def_area => "Member defined as {} here": member_type.runtime_display(vm);
-        //     ]
-        // ]
-        // NotAMethod {
-        //     area: CodeArea,
-        //     def_area: CodeArea,
-        //     member_name: String,
-        //     member_type: ValueType,
-        //     base_type: ValueType,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Associated member is not method", Note: None;
+            Labels: [
+                area => "Member `{}` implemented on type {} is not a method": member_name, base_type.runtime_display(vm);
+                def_area => "Member defined as {} here": member_type.runtime_display(vm);
+            ]
+        ]
+        NotAMethod {
+            area: CodeArea,
+            def_area: CodeArea,
+            member_name: String,
+            member_type: ValueType,
+            base_type: ValueType,
+            [call_stack]
+        },
 
         // // ==================================================================
         // #[

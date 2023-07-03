@@ -20,7 +20,7 @@ use crate::cli::{BuildSettings, DocSettings};
 use crate::compiling::builder::ProtoBytecode;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Ast, Vis};
-use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource};
+use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap};
 use crate::util::{ImmutStr, ImmutVec, Interner, SlabMap};
 
 pub type CompileResult<T> = Result<T, CompileError>;
@@ -59,25 +59,11 @@ pub struct Scope {
     typ: Option<ScopeType>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AssignType {
-    Normal { is_let: bool },
-    Match,
-}
-
-impl AssignType {
-    fn is_declare(&self) -> bool {
-        matches!(
-            self,
-            AssignType::Match | AssignType::Normal { is_let: true }
-        )
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TypeDef {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TypeDef<S> {
+    pub src: Rc<SpwnSource>,
     pub def_span: CodeSpan,
-    pub name: Spur,
+    pub name: S,
 }
 
 pub struct Compiler<'a> {
@@ -89,9 +75,11 @@ pub struct Compiler<'a> {
     build_settings: &'a BuildSettings,
     doc_settings: &'a DocSettings,
     is_doc_gen: bool,
-    bytecode_map: &'a mut BytecodeMap,
 
-    pub custom_type_defs: SlabMap<LocalTypeID, Vis<TypeDef>>,
+    bytecode_map: &'a mut BytecodeMap,
+    type_def_map: &'a mut TypeDefMap,
+
+    pub local_type_defs: SlabMap<LocalTypeID, Vis<TypeDef<Spur>>>,
     available_custom_types: AHashMap<Spur, CustomTypeID>,
 }
 
@@ -102,6 +90,7 @@ impl<'a> Compiler<'a> {
         doc_settings: &'a DocSettings,
         is_doc_gen: bool,
         bytecode_map: &'a mut BytecodeMap,
+        type_def_map: &'a mut TypeDefMap,
         interner: Rc<RefCell<Interner>>,
     ) -> Self {
         Self {
@@ -109,12 +98,13 @@ impl<'a> Compiler<'a> {
             interner,
             scopes: SlabMap::new(),
             global_return: None,
-            custom_type_defs: SlabMap::new(),
+            local_type_defs: SlabMap::new(),
             available_custom_types: AHashMap::new(),
             build_settings,
             doc_settings,
             is_doc_gen,
             bytecode_map,
+            type_def_map,
         }
     }
 }
@@ -169,6 +159,18 @@ impl Compiler<'_> {
             },
         }
     }
+
+    // pub fn get_accessible_vars<'a, T>(&'a self, scope: ScopeID) -> T
+    // where
+    //     T: Iterator<Item = &'a VarData>,
+    // {
+    //     let iter = self.scopes[scope].vars.iter();
+    //     if let Some(p) = self.scopes[scope].parent {
+    //         iter.chain(self.get_accessible_vars(p))
+    //     } else {
+    //         p
+    //     }
+    // }
 
     pub fn compile(&mut self, ast: &Ast, span: CodeSpan) -> CompileResult<()> {
         let mut code = ProtoBytecode::new();

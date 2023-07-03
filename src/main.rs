@@ -20,7 +20,7 @@ use crate::compiling::opcodes::{ConstID, OptOpcode};
 use crate::interpreting::context::{CallInfo, Context, ContextSplitMode};
 use crate::interpreting::vm::{FuncCoord, Program};
 use crate::parsing::parser::Parser;
-use crate::sources::SpwnSource;
+use crate::sources::{SpwnSource, TypeDefMap};
 use crate::util::{BasicError, RandomState};
 
 mod cli;
@@ -53,6 +53,7 @@ fn run_spwn(
     // todo!();
 
     let mut bytecode_map = BytecodeMap::default();
+    let mut type_def_map = TypeDefMap::default();
 
     let mut cum = Compiler::new(
         Rc::clone(&src),
@@ -60,6 +61,7 @@ fn run_spwn(
         &doc_settings,
         is_doc_gen,
         &mut bytecode_map,
+        &mut type_def_map,
         interner,
     );
 
@@ -70,7 +72,7 @@ fn run_spwn(
         code.debug_str(&Rc::new(src.clone()))
     }
 
-    let mut vm = Vm::new(false);
+    let mut vm = Vm::new(false, type_def_map);
 
     let program = Program {
         bytecode: bytecode_map.get(&src).unwrap().clone(),
@@ -103,9 +105,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<OptOpcode>());
 
     let args = Arguments::parse();
-
-    let id: ConstID = 6usize.into();
-    println!("{}", id);
 
     match args.command {
         Command::Build { file, settings } => {
