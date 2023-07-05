@@ -7,6 +7,7 @@ use ahash::AHashMap;
 use base64::Engine;
 use delve::{EnumDisplay, EnumToStr};
 use derive_more::Deref;
+use itertools::Either;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +16,7 @@ use super::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::Value;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
-use crate::util::{Either, ImmutStr, Interner};
+use crate::util::{ImmutStr, Interner};
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
@@ -228,7 +229,7 @@ pub enum Expression {
 
     Macro {
         args: Vec<MacroArg<ExprNode, PatternNode>>,
-        ret_type: Option<ExprNode>,
+        ret_pat: Option<PatternNode>,
         code: MacroCode,
     },
 

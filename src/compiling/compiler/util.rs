@@ -265,7 +265,7 @@ impl Compiler<'_> {
         builder.new_block(|builder| {
             for elem in elems {
                 let r = elem(self, builder)?;
-                builder.copy(r, dest, span);
+                builder.copy_deep(r, dest, span);
                 builder.jump(None, JumpType::EndIfFalse(dest), span);
             }
             Ok(())
@@ -287,7 +287,7 @@ impl Compiler<'_> {
         builder.new_block(|builder| {
             for elem in elems {
                 let r = elem(self, builder)?;
-                builder.copy(r, dest, span);
+                builder.copy_deep(r, dest, span);
                 builder.jump(None, JumpType::EndIfTrue(dest), span);
             }
             Ok(())

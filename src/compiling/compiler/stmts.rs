@@ -103,16 +103,16 @@ impl Compiler<'_> {
                 })?;
             },
             Statement::While { cond, code } => {
-                builder.new_block(|b| {
-                    let derived = self.derive_scope(scope, Some(ScopeType::Loop(b.block)));
+                let derived = self.derive_scope(scope, Some(ScopeType::Loop(builder.block)));
 
-                    let cond_reg = self.compile_expr(cond, derived, b)?;
-                    b.jump(None, JumpType::EndIfFalse(cond_reg), cond.span);
+                builder.new_block(|builder| {
+                    let cond_reg = self.compile_expr(cond, derived, builder)?;
+                    builder.jump(None, JumpType::EndIfFalse(cond_reg), cond.span);
 
                     for s in code {
-                        self.compile_stmt(s, derived, b)?;
+                        self.compile_stmt(s, derived, builder)?;
                     }
-                    b.jump(None, JumpType::Start, stmt.span);
+                    builder.jump(None, JumpType::Start, stmt.span);
 
                     Ok(())
                 })?;

@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use base64::Engine;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use super::{CompileResult, Compiler, ScopeID};
 use crate::compiling::builder::{CodeBuilder, JumpType};
@@ -16,7 +16,7 @@ use crate::parsing::ast::{
 };
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::{CodeSpan, ZEROSPAN};
-use crate::util::{Either, ImmutVec};
+use crate::util::ImmutVec;
 
 impl Compiler<'_> {
     pub fn compile_expr(
@@ -319,7 +319,7 @@ impl Compiler<'_> {
             } => todo!(),
             Expression::Macro {
                 args,
-                ret_type,
+                ret_pat,
                 code,
             } => todo!(),
             Expression::TriggerFunc { code } => todo!(),
@@ -338,12 +338,12 @@ impl Compiler<'_> {
                     builder.new_block(|builder| {
                         builder.jump(None, JumpType::EndIfFalse(cond_reg), ZEROSPAN);
                         let r = self.compile_expr(if_true, scope, builder)?;
-                        builder.copy(r, dest, if_true.span);
+                        builder.copy_deep(r, dest, if_true.span);
                         builder.jump(Some(outer), JumpType::End, ZEROSPAN);
                         Ok(())
                     })?;
                     let r = self.compile_expr(if_false, scope, builder)?;
-                    builder.copy(r, dest, if_false.span);
+                    builder.copy_deep(r, dest, if_false.span);
                     Ok(())
                 })?;
                 Ok(dest)
@@ -425,7 +425,7 @@ impl Compiler<'_> {
                             match &branch.code {
                                 MatchBranchCode::Expr(e) => {
                                     let e = self.compile_expr(e, derived, builder)?;
-                                    builder.copy(e, out_reg, expr.span);
+                                    builder.copy_deep(e, out_reg, expr.span);
                                     builder.jump(Some(outer), JumpType::End, expr.span);
                                 },
                                 MatchBranchCode::Block(stmts) => {

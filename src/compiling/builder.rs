@@ -62,14 +62,18 @@ pub struct Block {
     content: Vec<BlockContent>,
 }
 
-#[derive(Debug)]
+#[allow(clippy::type_complexity)]
 struct ProtoFunc {
     code: BlockID,
     regs_used: usize,
     span: CodeSpan,
+    queued_funcs: Vec<(
+        usize,
+        Box<dyn FnOnce(&mut CodeBuilder) -> CompileResult<()>>,
+    )>,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct ProtoBytecode {
     consts: UniqueRegister<Constant>,
     functions: Vec<ProtoFunc>,
@@ -99,12 +103,25 @@ impl ProtoBytecode {
             code: f_block,
             regs_used: 0,
             span,
+            queued_funcs: vec![],
         });
+        let func = self.functions.len() - 1;
         f(&mut CodeBuilder {
-            func: self.functions.len() - 1,
-            bytecode_builder: self,
+            func,
+            proto_bytecode: self,
             block: f_block,
-        })
+        })?;
+
+        while let Some((f, cb)) = self.functions[func].queued_funcs.pop() {
+            let block = self.functions[func].code;
+
+            cb(&mut CodeBuilder {
+                proto_bytecode: self,
+                func: f,
+                block,
+            })?;
+        }
+        Ok(())
     }
 
     pub fn build(mut self, src: &Rc<SpwnSource>, compiler: &Compiler) -> Result<Bytecode, ()> {
@@ -242,19 +259,29 @@ impl ProtoBytecode {
 }
 
 pub struct CodeBuilder<'a> {
-    bytecode_builder: &'a mut ProtoBytecode,
+    proto_bytecode: &'a mut ProtoBytecode,
     pub func: usize,
     pub block: BlockID,
 }
 
+impl<'a> CodeBuilder<'a> {
+    pub fn copy(&'a mut self) -> Self {
+        Self {
+            proto_bytecode: self.proto_bytecode,
+            func: self.func,
+            block: self.block,
+        }
+    }
+}
+
 impl CodeBuilder<'_> {
     fn current_block(&mut self) -> &mut Block {
-        &mut self.bytecode_builder.blocks[self.block]
+        &mut self.proto_bytecode.blocks[self.block]
     }
 
     pub fn next_reg(&mut self) -> UnoptRegister {
-        let r = Register(self.bytecode_builder.functions[self.func].regs_used);
-        self.bytecode_builder.functions[self.func].regs_used += 1;
+        let r = Register(self.proto_bytecode.functions[self.func].regs_used);
+        self.proto_bytecode.functions[self.func].regs_used += 1;
         r
     }
 
@@ -262,7 +289,7 @@ impl CodeBuilder<'_> {
         &mut self,
         f: F,
     ) -> CompileResult<()> {
-        let f_block = self.bytecode_builder.blocks.insert(Default::default());
+        let f_block = self.proto_bytecode.blocks.insert(Default::default());
 
         self.current_block()
             .content
@@ -271,8 +298,17 @@ impl CodeBuilder<'_> {
         f(&mut CodeBuilder {
             block: f_block,
             func: self.func,
-            bytecode_builder: self.bytecode_builder,
+            proto_bytecode: self.proto_bytecode,
         })
+    }
+
+    pub fn new_func<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(
+        &mut self,
+        f: F,
+        span: CodeSpan,
+    ) -> CompileResult<()> {
+        self.proto_bytecode.new_func(f, span)
+        Ok(())
     }
 
     fn push_opcode(&mut self, opcode: ProtoOpcode, span: CodeSpan) {
@@ -286,7 +322,7 @@ impl CodeBuilder<'_> {
     }
 
     pub fn load_const<T: Into<Constant>>(&mut self, v: T, reg: UnoptRegister, span: CodeSpan) {
-        let id = self.bytecode_builder.consts.insert(v.into()).into();
+        let id = self.proto_bytecode.consts.insert(v.into()).into();
         self.push_opcode(ProtoOpcode::Raw(Opcode::LoadConst { id, to: reg }), span)
     }
 
@@ -343,8 +379,8 @@ impl CodeBuilder<'_> {
         }
     }
 
-    pub fn copy(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
-        self.push_opcode(ProtoOpcode::Raw(Opcode::Copy { from, to }), span)
+    pub fn copy_deep(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::CopyDeep { from, to }), span)
     }
 
     pub fn copy_mem(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
@@ -389,7 +425,7 @@ impl CodeBuilder<'_> {
     // }
 
     pub fn import(&mut self, dest: UnoptRegister, src: SpwnSource, span: CodeSpan) {
-        let id = self.bytecode_builder.import_paths.insert(src).into();
+        let id = self.proto_bytecode.import_paths.insert(src).into();
         self.push_opcode(ProtoOpcode::Raw(Opcode::Import { id, dest }), span);
     }
 

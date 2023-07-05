@@ -303,12 +303,6 @@ pub fn clear_ansi(s: &str) -> Cow<'_, str> {
     ANSI_REGEX.replace_all(s, "")
 }
 
-#[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
-pub enum Either<L, R> {
-    Left(L),
-    Right(R),
-}
-
 pub fn remove_quotes<'a>(s: &'a str) -> &'a str {
     &s[1..(s.len() - 1)]
 }

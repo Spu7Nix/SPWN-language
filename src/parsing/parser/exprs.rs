@@ -130,7 +130,7 @@ impl Parser<'_> {
                     if matches!(self.peek_strict()?, Token::FatArrow | Token::Arrow) {
                         let ret_type = if self.next_is(Token::Arrow)? {
                             self.next()?;
-                            let r = Some(self.parse_expr(allow_macros)?);
+                            let r = Some(self.parse_pattern()?);
                             self.expect_tok(Token::FatArrow)?;
                             r
                         } else {
@@ -153,7 +153,7 @@ impl Parser<'_> {
                                 default: None,
                             }],
                             code,
-                            ret_type,
+                            ret_pat: ret_type,
                         }
                         .spanned(start.extend(self.span()))
                     } else {
@@ -264,7 +264,7 @@ impl Parser<'_> {
 
                     let ret_type = if self.next_is(Token::Arrow)? {
                         self.next()?;
-                        Some(self.parse_expr(allow_macros)?)
+                        Some(self.parse_pattern()?)
                     } else {
                         None
                     };
@@ -279,7 +279,7 @@ impl Parser<'_> {
                     Expression::Macro {
                         args,
                         code,
-                        ret_type,
+                        ret_pat: ret_type,
                     }
                     .spanned(start.extend(self.span()))
                 },

@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::str::Chars;
 
 use base64::Engine;
+use itertools::Either;
 use lasso::Spur;
 use unindent::unindent;
 
@@ -16,7 +17,7 @@ use crate::parsing::ast::{
 use crate::parsing::attributes::{Attributes, IsValidOn, ParseAttribute};
 use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable, Spanned};
-use crate::util::{remove_quotes, Either};
+use crate::util::remove_quotes;
 
 impl Parser<'_> {
     pub fn parse_int(&self, s: &str, base: u32) -> i64 {

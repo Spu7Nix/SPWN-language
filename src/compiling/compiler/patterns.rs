@@ -259,7 +259,7 @@ impl Compiler<'_> {
                                         scope,
                                         builder,
                                     )?;
-                                    builder.copy(elem_match, out_reg, pattern.span);
+                                    builder.copy_deep(elem_match, out_reg, pattern.span);
                                     builder.jump(
                                         Some(outer),
                                         JumpType::EndIfFalse(out_reg),
@@ -379,7 +379,7 @@ impl Compiler<'_> {
                 if *is_ref {
                     builder.copy_mem(expr_reg, path_reg, pattern.span);
                 } else {
-                    builder.copy(expr_reg, path_reg, pattern.span);
+                    builder.copy_deep(expr_reg, path_reg, pattern.span);
                 }
                 builder.load_const(true, out_reg, pattern.span);
             },
@@ -396,7 +396,7 @@ impl Compiler<'_> {
                 if *is_ref {
                     builder.copy_mem(expr_reg, var_reg, pattern.span);
                 } else {
-                    builder.copy(expr_reg, var_reg, pattern.span);
+                    builder.copy_deep(expr_reg, var_reg, pattern.span);
                 }
                 builder.load_const(true, out_reg, pattern.span);
             },

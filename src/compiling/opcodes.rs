@@ -81,7 +81,7 @@ opcodes! {
     #[delve(display = |id, to| format!("load {id} -> {to}"))]
     LoadConst { id: ConstID, [to] },
     #[delve(display = |from, to| format!("{from} -> {to}"))]
-    Copy { [from], [to] },
+    CopyDeep { [from], [to] },
 
     #[delve(display = |from, to| format!("{from} ~> {to}"))]
     CopyMem { [from], [to] },

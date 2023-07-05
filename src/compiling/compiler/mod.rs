@@ -9,7 +9,7 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use ahash::AHashMap;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
@@ -160,17 +160,17 @@ impl Compiler<'_> {
         }
     }
 
-    // pub fn get_accessible_vars<'a, T>(&'a self, scope: ScopeID) -> T
-    // where
-    //     T: Iterator<Item = &'a VarData>,
-    // {
-    //     let iter = self.scopes[scope].vars.iter();
-    //     if let Some(p) = self.scopes[scope].parent {
-    //         iter.chain(self.get_accessible_vars(p))
-    //     } else {
-    //         p
-    //     }
-    // }
+    pub fn get_accessible_vars(
+        &self,
+        scope: ScopeID,
+    ) -> Box<dyn Iterator<Item = (Spur, VarData)> + '_> {
+        let iter = self.scopes[scope].vars.iter().map(|(s, d)| (*s, *d));
+        if let Some(p) = self.scopes[scope].parent {
+            Box::new(iter.chain(self.get_accessible_vars(p)))
+        } else {
+            Box::new(iter)
+        }
+    }
 
     pub fn compile(&mut self, ast: &Ast, span: CodeSpan) -> CompileResult<()> {
         let mut code = ProtoBytecode::new();

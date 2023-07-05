@@ -219,7 +219,6 @@ impl Vm {
             };
 
             for i in 0..program.get_function(func).regs_used {
-                // println!("zz");
                 let v = ValueRef::new(StoredValue {
                     value: Value::Empty,
                     area: CodeArea {
@@ -246,10 +245,6 @@ impl Vm {
                 if ip >= opcodes.len() {
                     if !self.contexts.last().have_returned {
                         if has_implicitly_returned && split_mode == ContextSplitMode::Disallow {
-                            // println!(
-                            //     "africa asia europe antarctica north america south america {:?}",
-                            //     program.bytecode.functions[*func].span
-                            // );
                             return Err(RuntimeError::ContextSplitDisallowed {
                                 area: self.make_area(program.get_function(func).span, &program),
                                 call_stack: self.get_call_stack(),
@@ -296,10 +291,6 @@ impl Vm {
                 };
             }
 
-            macro_rules! index {
-                () => {};
-            }
-
             #[derive(Debug, Clone, Copy)]
             pub enum LoopFlow {
                 ContinueLoop,
@@ -308,17 +299,15 @@ impl Vm {
 
             // MaybeUninit
             let mut run_opcode = |opcode| -> RuntimeResult<LoopFlow> {
-                // println!("{}", ip);
                 match opcode {
                     Opcode::LoadConst { id, to } => {
                         let value = Value::from_const(self, program.get_constant(id));
                         self.set_reg(to, value.into_stored(self.make_area(opcode_span, &program)));
                     },
-                    Opcode::Copy { from, to } => self.set_reg(to, self.deep_clone(from)),
+                    Opcode::CopyDeep { from, to } => self.set_reg(to, self.deep_clone(from)),
                     Opcode::CopyMem { from, to } => {
                         let v = self.get_reg_ref(from).clone();
                         self.change_reg_ref(to, v);
-                        // self.set_reg(to, self.deep_clone(from))
                     },
 
                     Opcode::Plus { a, b, to } => {
@@ -611,7 +600,6 @@ impl Vm {
                         match (&base_ref.value, &index_ref.value) {
                             (Value::Array(v), Value::Int(index)) => {
                                 let v = &v[index_wrap(*index, v.len(), ValueType::Array)?];
-                                // println!("baba: {:?}", v);
 
                                 if !is_mem {
                                     let v = self.deep_clone(v);
@@ -956,7 +944,7 @@ impl Vm {
                                     },
                                     RuntimeStringFlag::Base64 => {
                                         let s = base64::engine::general_purpose::URL_SAFE
-                                            .encode(&s.iter().collect::<String>());
+                                            .encode(s.iter().collect::<String>());
 
                                         Value::String(s.chars().collect_vec().into())
                                     },
