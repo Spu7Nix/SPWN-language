@@ -25,6 +25,7 @@ use crate::util::{BasicError, RandomState};
 
 mod cli;
 mod compiling;
+mod doc;
 mod error;
 mod gd;
 mod interpreting;

@@ -186,7 +186,7 @@ impl Compiler<'_> {
                 }
                 Ok(())
             },
-            0,
+            Box::new([]),
             vec![],
             span,
         )?;

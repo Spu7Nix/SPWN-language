@@ -321,7 +321,7 @@ pub enum Statement {
     ExtractImport(Import),
 
     Impl {
-        base: ExprNode,
+        name: Spur,
         items: Vec<Vis<DictItem>>,
     },
     Overload {

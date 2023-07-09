@@ -150,11 +150,15 @@ impl Parser<'_> {
             },
             Token::Impl => {
                 self.next()?;
-                let base = self.parse_expr(true)?;
+                self.expect_tok(Token::TypeIndicator)?;
+                let name = self.slice()[1..].to_string();
                 self.expect_tok(Token::LBracket)?;
                 let items = self.parse_dictlike(true)?;
 
-                Statement::Impl { base, items }
+                Statement::Impl {
+                    name: self.intern_string(name),
+                    items,
+                }
             },
             Token::Overload => {
                 self.next()?;

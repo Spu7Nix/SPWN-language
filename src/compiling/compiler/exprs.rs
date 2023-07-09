@@ -14,6 +14,7 @@ use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{
     ExprNode, Expression, MatchBranch, MatchBranchCode, StringType, VisTrait,
 };
+use crate::parsing::attributes::Attributes;
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::{CodeSpan, ZEROSPAN};
 use crate::util::ImmutVec;
@@ -51,9 +52,7 @@ impl Compiler<'_> {
             };
         }
 
-        for (i, attr) in expr.attributes.iter().enumerate() {
-            builder.push_raw_opcode(Opcode::LoadAttribute { id: i.into() }, attr.span)
-        }
+        for (i, attr) in expr.attributes.iter().enumerate() {}
 
         match &*expr.expr {
             Expression::Int(v) => {
@@ -199,6 +198,7 @@ impl Compiler<'_> {
                     BinOp::Gte => bin_op!(Gte),
                     BinOp::Lt => bin_op!(Lt),
                     BinOp::Lte => bin_op!(Lte),
+
                     BinOp::BinOr => bin_op!(BinOr),
                     BinOp::BinAnd => bin_op!(BinAnd),
                     BinOp::Range => bin_op!(Range),
@@ -326,6 +326,15 @@ impl Compiler<'_> {
                 ret_pat,
                 code,
             } => {
+                for attr in &expr.attributes {
+                    match &**attr {
+                        Attributes::DebugBytecode => todo!(),
+                        _ => unreachable!(),
+                    }
+                }
+
+                // let store_args = args.iter().map(||)
+
                 todo!()
                 // let arg_amount = args.len();
                 // let captured = self

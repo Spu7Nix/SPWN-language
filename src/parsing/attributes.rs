@@ -335,27 +335,25 @@ attributes! {
     }
 }
 
-pub type SemVer = semver::Version;
+type SemVer = semver::Version;
 
 attributes! {
     pub enum Attributes {
         #[valid_on(Expression::TriggerFunc)]
         NoOptimize,
 
-        #[valid_on(Expression::TriggerFunc, Expression::Macro)]
+        #[valid_on(Expression::Macro)]
         DebugBytecode,
 
         #[valid_on(
             Statement::TypeDef,
             Statement::Assign,
-            Statement::AssignOp,
         )]
         Deprecated { since: SemVer, note: String, },
 
         #[valid_on(
             Statement::TypeDef,
             Statement::Assign,
-            Statement::AssignOp,
         )]
         Doc(String),
     }

@@ -13,7 +13,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 
 use super::compiler::{CustomTypeID, LocalTypeID};
-use super::opcodes::{Opcode, OptOpcode};
+use super::opcodes::{FuncID, Opcode, OptOpcode};
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
@@ -120,9 +120,11 @@ impl TryFrom<UnoptRegister> for OptRegister {
 pub struct Function {
     pub regs_used: u8,
     pub opcodes: ImmutVec<Spanned<OptOpcode>>,
+
     pub span: CodeSpan,
-    pub arg_amount: u8,
-    pub captured_regs: Vec<(OptRegister, OptRegister)>,
+
+    pub args: ImmutVec<Spanned<bool>>,
+    pub captured_regs: ImmutVec<(OptRegister, OptRegister)>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -139,7 +141,7 @@ pub struct Bytecode {
     pub export_names: ImmutVec<ImmutStr>,
     pub import_paths: ImmutVec<SpwnSource>,
 
-    pub attributes: ImmutVec<Attributes>,
+    pub debug_funcs: ImmutVec<FuncID>,
 }
 
 mod debug_bytecode {

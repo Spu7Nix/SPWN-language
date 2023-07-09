@@ -1,9 +1,16 @@
 
 
 
-gog = (a, ...[g, hh]) {
+#[depre]
+a = 5
 
+return {
+    a
 }
 
+//
 
-// spinky(a = 5, 6,) // ??  ?? ? ? ?
+gibi.a
+
+
+a = ()

@@ -20,10 +20,6 @@ impl<'a> Compiler<'a> {
         scope: ScopeID,
         builder: &mut CodeBuilder,
     ) -> CompileResult<()> {
-        for (i, attr) in stmt.attributes.iter().enumerate() {
-            builder.push_raw_opcode(Opcode::LoadAttribute { id: i.into() }, attr.span)
-        }
-
         match &*stmt.stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder)?;
@@ -332,7 +328,7 @@ impl<'a> Compiler<'a> {
                     self.available_custom_types.insert(*name, *id);
                 }
             },
-            Statement::Impl { base, items } => todo!(),
+            Statement::Impl { name: base, items } => todo!(),
             Statement::Overload { op, macros } => todo!(),
             Statement::Throw(v) => {
                 let v = self.compile_expr(v, scope, builder)?;

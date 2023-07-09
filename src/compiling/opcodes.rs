@@ -258,7 +258,4 @@ opcodes! {
 
     #[delve(display = || format!("pop try catch"))]
     PopTryCatch,
-
-    #[delve(display = |id| format!("load attribute {id}"))]
-    LoadAttribute { id: AttributeID },
 }

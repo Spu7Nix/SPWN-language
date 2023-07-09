@@ -27,7 +27,7 @@ impl Parser<'_> {
         let unary;
 
         let expr = 'out_expr: {
-            break 'out_expr match peek {
+            match peek {
                 Token::Int => {
                     self.next()?;
                     Expression::Int(self.parse_int(self.slice(), 10)).spanned(start)
@@ -411,7 +411,7 @@ impl Parser<'_> {
                         area: self.make_area(start),
                     })
                 },
-            };
+            }
         };
 
         attrs.is_valid_on(&expr, &self.src)?;
