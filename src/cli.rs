@@ -37,35 +37,27 @@ pub enum Command {
 
 #[derive(Args, Debug, Default)]
 pub struct BuildSettings {
-    // #[arg(group = "build")]
     #[arg(short = 'l', long)]
     pub level_name: Option<String>,
 
-    // #[arg(group = "build")]
     #[arg(short = 'c', long)]
     pub console_output: bool,
 
-    // #[arg(group = "build")]
     #[arg(short = 'n', long)]
     pub no_level: bool,
 
-    // #[arg(group = "build")]
     #[arg(short = 'b', long)]
     pub no_bytecode_cache: bool,
 
-    // #[arg(group = "build")]
     #[arg(short = 'd', long)]
     pub debug_bytecode: bool,
 
-    // #[arg(group = "build")]
     #[arg(short = 'o', long)]
     pub no_optimize: bool,
 
-    // #[arg(group = "build")]
     #[arg(short = 'y', long)]
     pub no_optimize_bytecode: bool,
 
-    // #[arg(group = "build")]
     #[arg(short = 'f', long)]
     pub save_file: Option<PathBuf>,
 }
@@ -80,9 +72,4 @@ pub struct DocSettings {
 
     #[arg(short = 't', long)]
     pub target_dir: Option<String>,
-}
-
-pub enum Settings {
-    Docs(DocSettings),
-    Build(BuildSettings),
 }

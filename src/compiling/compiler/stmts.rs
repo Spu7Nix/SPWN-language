@@ -12,7 +12,7 @@ use crate::parsing::ast::{Expression, Pattern, Statement, StmtNode, VisTrait};
 use crate::parsing::operators::operators::AssignOp;
 use crate::sources::Spannable;
 
-impl Compiler<'_> {
+impl<'a> Compiler<'a> {
     pub fn compile_stmt(
         &mut self,
         stmt: &StmtNode,
@@ -24,9 +24,18 @@ impl Compiler<'_> {
                 self.compile_expr(e, scope, builder)?;
             },
             Statement::Assign(left, right) => {
-                let right_reg = self.compile_expr(right, scope, builder)?;
+                let temp_reg = builder.next_reg();
+
+                let marker = builder.mark_insert();
+
                 let match_reg =
-                    self.compile_pattern_check(right_reg, left, false, scope, builder)?;
+                    self.compile_pattern_check(temp_reg, left, false, scope, builder)?;
+
+                let right_reg = self.compile_expr(right, scope, &mut marker.with(builder))?;
+                marker
+                    .with(builder)
+                    .copy_deep(right_reg, temp_reg, right.span);
+
                 builder.mismatch_throw_if_false(match_reg, right_reg, left.span);
             },
             Statement::AssignOp(left, op, right) => {

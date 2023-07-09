@@ -416,9 +416,7 @@ impl Parser<'_> {
 
         attrs.is_valid_on(&expr, &self.src)?;
 
-        Ok(expr
-            .value
-            .into_node(attrs.into_iter().map(|a| a.value).collect(), expr.span))
+        Ok(expr.value.into_node(attrs, expr.span))
     }
 
     pub fn parse_value(&mut self, allow_macros: bool) -> ParseResult<ExprNode> {

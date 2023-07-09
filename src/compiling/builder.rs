@@ -2,12 +2,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use itertools::Itertools;
 use semver::Version;
 use slab::Slab;
 
 use super::bytecode::{Bytecode, Constant, Register, UnoptRegister};
 use super::compiler::{CompileResult, Compiler};
-use super::opcodes::{Opcode, UnoptOpcode};
+use super::opcodes::{FuncID, Opcode, UnoptOpcode};
 use crate::compiling::bytecode::Function;
 use crate::compiling::compiler::CustomTypeID;
 use crate::compiling::opcodes::OptOpcode;
@@ -67,10 +68,8 @@ struct ProtoFunc {
     code: BlockID,
     regs_used: usize,
     span: CodeSpan,
-    queued_funcs: Vec<(
-        usize,
-        Box<dyn FnOnce(&mut CodeBuilder) -> CompileResult<()>>,
-    )>,
+    arg_amount: usize,
+    captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
 }
 
 // #[derive(Debug)]
@@ -96,14 +95,17 @@ impl ProtoBytecode {
     pub fn new_func<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(
         &mut self,
         f: F,
+        arg_amount: usize,
+        captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
         span: CodeSpan,
-    ) -> CompileResult<()> {
+    ) -> CompileResult<FuncID> {
         let f_block = self.blocks.insert(Default::default());
         self.functions.push(ProtoFunc {
             code: f_block,
-            regs_used: 0,
+            regs_used: arg_amount + captured_regs.len(),
             span,
-            queued_funcs: vec![],
+            arg_amount,
+            captured_regs,
         });
         let func = self.functions.len() - 1;
         f(&mut CodeBuilder {
@@ -111,17 +113,7 @@ impl ProtoBytecode {
             proto_bytecode: self,
             block: f_block,
         })?;
-
-        while let Some((f, cb)) = self.functions[func].queued_funcs.pop() {
-            let block = self.functions[func].code;
-
-            cb(&mut CodeBuilder {
-                proto_bytecode: self,
-                func: f,
-                block,
-            })?;
-        }
-        Ok(())
+        Ok(func.into())
     }
 
     pub fn build(mut self, src: &Rc<SpwnSource>, compiler: &Compiler) -> Result<Bytecode, ()> {
@@ -220,6 +212,13 @@ impl ProtoBytecode {
                 regs_used: func.regs_used.try_into().unwrap(),
                 opcodes: opcodes.into(),
                 span: func.span,
+                arg_amount: func.arg_amount.try_into().unwrap(),
+                captured_regs: func
+                    .captured_regs
+                    .iter()
+                    .copied()
+                    .map(|(a, b)| (a.try_into().unwrap(), b.try_into().unwrap()))
+                    .collect_vec(),
             })
         }
 
@@ -273,8 +272,23 @@ impl<'a> CodeBuilder<'a> {
         }
     }
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InsertMarker {
+    pub func: usize,
+    pub block: BlockID,
+}
 
-impl CodeBuilder<'_> {
+impl InsertMarker {
+    pub fn with<'a>(self, builder: &'a mut CodeBuilder) -> CodeBuilder<'a> {
+        CodeBuilder {
+            proto_bytecode: builder.proto_bytecode,
+            func: self.func,
+            block: self.block,
+        }
+    }
+}
+
+impl<'a> CodeBuilder<'a> {
     fn current_block(&mut self) -> &mut Block {
         &mut self.proto_bytecode.blocks[self.block]
     }
@@ -305,16 +319,31 @@ impl CodeBuilder<'_> {
     pub fn new_func<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(
         &mut self,
         f: F,
+        arg_amount: usize,
+        captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
         span: CodeSpan,
-    ) -> CompileResult<()> {
-        self.proto_bytecode.new_func(f, span)
-        Ok(())
+    ) -> CompileResult<FuncID> {
+        self.proto_bytecode
+            .new_func(f, arg_amount, captured_regs, span)
     }
 
     fn push_opcode(&mut self, opcode: ProtoOpcode, span: CodeSpan) {
         self.current_block()
             .content
             .push(BlockContent::Opcode(opcode.spanned(span)))
+    }
+
+    pub fn mark_insert(&mut self) -> InsertMarker {
+        let f_block = self.proto_bytecode.blocks.insert(Default::default());
+
+        self.current_block()
+            .content
+            .push(BlockContent::Block(f_block));
+
+        InsertMarker {
+            block: f_block,
+            func: self.func,
+        }
     }
 
     pub fn push_raw_opcode(&mut self, opcode: UnoptOpcode, span: CodeSpan) {

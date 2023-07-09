@@ -120,6 +120,8 @@ pub struct Function {
     pub regs_used: u8,
     pub opcodes: ImmutVec<Spanned<OptOpcode>>,
     pub span: CodeSpan,
+    pub arg_amount: u8,
+    pub captured_regs: Vec<(OptRegister, OptRegister)>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

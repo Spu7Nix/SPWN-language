@@ -186,6 +186,8 @@ impl Compiler<'_> {
                 }
                 Ok(())
             },
+            0,
+            vec![],
             span,
         )?;
         let code = code.build(&self.src, self).unwrap();

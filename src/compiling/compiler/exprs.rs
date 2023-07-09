@@ -6,7 +6,7 @@ use itertools::{Either, Itertools};
 
 use super::{CompileResult, Compiler, ScopeID};
 use crate::compiling::builder::{CodeBuilder, JumpType};
-use crate::compiling::bytecode::{Constant, UnoptRegister};
+use crate::compiling::bytecode::{Constant, Register, UnoptRegister};
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::{Opcode, RuntimeStringFlag};
 use crate::gd::ids::IDClass;
@@ -321,7 +321,31 @@ impl Compiler<'_> {
                 args,
                 ret_pat,
                 code,
-            } => todo!(),
+            } => {
+                todo!()
+                // let arg_amount = args.len();
+                // let captured = self
+                //     .get_accessible_vars(scope)
+                //     .enumerate()
+                //     .map(|(i, (_, v))| (v.reg, Register(i + arg_amount)))
+                //     .collect_vec();
+
+                // builder.new_func(
+                //     |builder| {
+
+                //         for (i, g) in args.iter().enumerate() {
+
+                //         }
+
+                //         //
+                //         Ok(())
+                //     },
+                //     arg_amount,
+                //     captured,
+                //     expr.span,
+                // )?;
+                // todo!()
+            },
             Expression::TriggerFunc { code } => todo!(),
             Expression::TriggerFuncCall(_) => todo!(),
             Expression::Ternary {

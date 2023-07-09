@@ -65,6 +65,7 @@ new_id_wrapper! {
     OpcodePos: u16;
     ImportID: u16;
     TryCatchID: u16;
+    FuncID: u16;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, delve::EnumDisplay, Serialize, Deserialize)]

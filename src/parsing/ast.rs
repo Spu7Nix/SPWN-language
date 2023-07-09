@@ -95,7 +95,7 @@ pub enum MacroCode {
 #[derive(Debug, Clone)]
 pub struct ExprNode {
     pub expr: Box<Expression>,
-    pub attributes: Vec<Attributes>,
+    pub attributes: Vec<Spanned<Attributes>>,
     pub span: CodeSpan,
 }
 
@@ -407,7 +407,7 @@ pub enum AssignPath<E, S: Hash + Eq> {
 }
 
 impl Expression {
-    pub fn into_node(self, attributes: Vec<Attributes>, span: CodeSpan) -> ExprNode {
+    pub fn into_node(self, attributes: Vec<Spanned<Attributes>>, span: CodeSpan) -> ExprNode {
         ExprNode {
             expr: Box::new(self),
             attributes,
