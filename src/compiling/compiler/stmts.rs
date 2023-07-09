@@ -9,6 +9,7 @@ use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::Opcode;
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{Expression, Pattern, Statement, StmtNode, VisTrait};
+use crate::parsing::attributes::Attributes;
 use crate::parsing::operators::operators::AssignOp;
 use crate::sources::Spannable;
 
@@ -19,6 +20,10 @@ impl<'a> Compiler<'a> {
         scope: ScopeID,
         builder: &mut CodeBuilder,
     ) -> CompileResult<()> {
+        for (i, attr) in stmt.attributes.iter().enumerate() {
+            builder.push_raw_opcode(Opcode::LoadAttribute { id: i.into() }, attr.span)
+        }
+
         match &*stmt.stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder)?;

@@ -316,7 +316,7 @@ macro_rules! attributes {
             }
         }
 
-        #[derive(Debug, Clone, PartialEq, Eq, delve::EnumToStr)]
+        #[derive(Debug, Clone, PartialEq, Eq, Hash, delve::EnumToStr, serde::Serialize, serde::Deserialize)]
         #[delve(rename_variants = "snakecase")]
         $vis enum $enum {
             $(

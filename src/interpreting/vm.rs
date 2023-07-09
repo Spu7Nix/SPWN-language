@@ -974,6 +974,7 @@ impl Vm {
                     Opcode::PopTryCatch => {
                         self.contexts.current_mut().try_catches.pop();
                     },
+                    Opcode::LoadAttribute { id } => todo!(),
                 }
                 Ok(LoopFlow::Normal)
             };

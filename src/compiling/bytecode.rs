@@ -18,6 +18,7 @@ use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Vis, VisTrait};
+use crate::parsing::attributes::Attributes;
 use crate::sources::{CodeSpan, Spanned, SpwnSource};
 use crate::util::{remove_quotes, Digest, ImmutStr, ImmutVec, SlabMap};
 
@@ -137,6 +138,8 @@ pub struct Bytecode {
 
     pub export_names: ImmutVec<ImmutStr>,
     pub import_paths: ImmutVec<SpwnSource>,
+
+    pub attributes: ImmutVec<Attributes>,
 }
 
 mod debug_bytecode {

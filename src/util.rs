@@ -171,6 +171,17 @@ impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
     }
 }
 
+impl<T: std::hash::Hash + Eq + Clone> UniqueRegister<T> {
+    pub fn make_vec(&mut self) -> Vec<T> {
+        let mut ve = vec![unsafe { std::mem::zeroed() }; self.len()];
+        for (v, k) in self.drain() {
+            ve[v] = k
+        }
+
+        ve
+    }
+}
+
 #[cfg(debug_assertions)]
 lazy_static! {
     pub static ref BUILTIN_DIR: PathBuf = std::env::current_dir().unwrap().join("libraries");

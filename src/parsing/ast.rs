@@ -29,6 +29,12 @@ pub enum StringType {
 #[derive(Debug, Clone)]
 pub struct StringContent {
     pub s: StringType,
+    pub flags: StringFlags,
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone, Default)]
+pub struct StringFlags {
     pub bytes: bool,
     pub base64: bool,
     pub unindent: bool,
@@ -38,24 +44,22 @@ impl StringContent {
     pub fn normal(s: Spur) -> Self {
         StringContent {
             s: StringType::Normal(s),
-            bytes: false,
-            base64: false,
-            unindent: false,
+            flags: StringFlags::default(),
         }
     }
 
     pub fn get_compile_time(&self, interner: &Rc<RefCell<Interner>>) -> Option<String> {
-        if self.bytes {
+        if self.flags.bytes {
             return None;
         }
         let mut s = match self.s {
             StringType::Normal(k) => interner.borrow().resolve(&k).to_string(),
             _ => return None,
         };
-        if self.unindent {
+        if self.flags.unindent {
             s = unindent::unindent(&s)
         }
-        if self.base64 {
+        if self.flags.base64 {
             s = base64::engine::general_purpose::URL_SAFE.encode(s)
         }
         Some(s)

@@ -11,8 +11,8 @@ use crate::gd::ids::IDClass;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{
-    DictItem, ExprNode, Expression, Import, ImportSettings, ImportType, StringContent, StringType,
-    Vis,
+    DictItem, ExprNode, Expression, Import, ImportSettings, ImportType, StringContent, StringFlags,
+    StringType, Vis,
 };
 use crate::parsing::attributes::{Attributes, IsValidOn, ParseAttribute};
 use crate::parsing::error::SyntaxError;
@@ -48,9 +48,7 @@ impl Parser<'_> {
                 let s = self.parse_plain_string(start_slice)?;
                 StringContent {
                     s: StringType::Normal(self.intern_string(s)),
-                    bytes: false,
-                    base64: false,
-                    unindent: false,
+                    flags: StringFlags::default(),
                 }
             },
             Token::RawString => {
@@ -67,24 +65,19 @@ impl Parser<'_> {
 
                 StringContent {
                     s: StringType::Normal(self.intern_string(&s[(i + 1)..(s.len() - 1 - i)])),
-
-                    bytes: false,
-                    base64: false,
-                    unindent: false,
+                    flags: StringFlags::default(),
                 }
             },
             Token::StringFlags => {
-                let mut is_bytes = false;
-                let mut is_unindent = false;
-                let mut is_base64 = false;
+                let mut flags = StringFlags::default();
 
                 let mut is_f_string = false;
 
                 for i in start_slice.bytes() {
                     let flag = match i {
-                        b'b' => &mut is_bytes,
-                        b'B' => &mut is_base64,
-                        b'u' => &mut is_unindent,
+                        b'b' => &mut flags.bytes,
+                        b'B' => &mut flags.base64,
+                        b'u' => &mut flags.unindent,
                         b'f' => &mut is_f_string,
                         f => {
                             return Err(SyntaxError::UnexpectedFlag {
@@ -103,16 +96,12 @@ impl Parser<'_> {
                     let v = self.parse_f_string(remove_quotes(s), start)?;
                     StringContent {
                         s: StringType::FString(v),
-                        bytes: is_bytes,
-                        base64: is_base64,
-                        unindent: is_unindent,
+                        flags,
                     }
                 } else {
                     let t = self.next()?;
                     let mut content = self.parse_string(t)?;
-                    content.bytes = is_bytes;
-                    content.base64 = is_base64;
-                    content.unindent = is_unindent;
+                    content.flags = flags;
                     content
                 }
             },

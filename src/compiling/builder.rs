@@ -14,6 +14,7 @@ use crate::compiling::compiler::CustomTypeID;
 use crate::compiling::opcodes::OptOpcode;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
+use crate::parsing::attributes::Attributes;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
 use crate::util::{ImmutStr, ImmutVec, SlabMap, UniqueRegister};
 
@@ -79,7 +80,8 @@ pub struct ProtoBytecode {
     blocks: SlabMap<BlockID, Block>,
 
     import_paths: UniqueRegister<SpwnSource>,
-    // custom_types:
+
+    attributes: UniqueRegister<Attributes>, // custom_types:
 }
 
 impl ProtoBytecode {
@@ -89,6 +91,7 @@ impl ProtoBytecode {
             functions: vec![],
             blocks: SlabMap::new(),
             import_paths: UniqueRegister::new(),
+            attributes: UniqueRegister::new(),
         }
     }
 
@@ -119,10 +122,8 @@ impl ProtoBytecode {
     pub fn build(mut self, src: &Rc<SpwnSource>, compiler: &Compiler) -> Result<Bytecode, ()> {
         type BlockPos = (u16, u16);
 
-        let mut constants = vec![unsafe { std::mem::zeroed() }; self.consts.len()];
-        for (v, k) in self.consts.drain() {
-            constants[v] = k
-        }
+        let constants: Vec<Constant> = self.consts.make_vec();
+        let attributes: Vec<Attributes> = self.attributes.make_vec();
 
         let mut funcs = vec![];
 
@@ -253,6 +254,7 @@ impl ProtoBytecode {
                 None => Box::new([]),
             },
             import_paths: import_paths.into(),
+            attributes: attributes.into(),
         })
     }
 }

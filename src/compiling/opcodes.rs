@@ -64,8 +64,8 @@ new_id_wrapper! {
     ConstID: u16;
     OpcodePos: u16;
     ImportID: u16;
-    TryCatchID: u16;
     FuncID: u16;
+    AttributeID: u16;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, delve::EnumDisplay, Serialize, Deserialize)]
@@ -258,4 +258,7 @@ opcodes! {
 
     #[delve(display = || format!("pop try catch"))]
     PopTryCatch,
+
+    #[delve(display = |id| format!("load attribute {id}"))]
+    LoadAttribute { id: AttributeID },
 }

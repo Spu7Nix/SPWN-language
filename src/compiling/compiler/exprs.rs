@@ -51,6 +51,10 @@ impl Compiler<'_> {
             };
         }
 
+        for (i, attr) in expr.attributes.iter().enumerate() {
+            builder.push_raw_opcode(Opcode::LoadAttribute { id: i.into() }, attr.span)
+        }
+
         match &*expr.expr {
             Expression::Int(v) => {
                 let reg = builder.next_reg();
@@ -68,10 +72,10 @@ impl Compiler<'_> {
                 match &content.s {
                     StringType::Normal(s) => {
                         let mut s = self.resolve(s).to_string();
-                        if content.unindent {
+                        if content.flags.unindent {
                             s = unindent::unindent(&s)
                         }
-                        if content.base64 {
+                        if content.flags.base64 {
                             s = base64::engine::general_purpose::URL_SAFE.encode(s)
                         }
                         builder.load_const(
@@ -109,7 +113,7 @@ impl Compiler<'_> {
                             builder
                                 .push_raw_opcode(Opcode::PlusEq { a: out_reg, b: s_r }, expr.span)
                         }
-                        if content.unindent {
+                        if content.flags.unindent {
                             builder.push_raw_opcode(
                                 Opcode::ApplyStringFlag {
                                     flag: RuntimeStringFlag::Unindent,
@@ -118,7 +122,7 @@ impl Compiler<'_> {
                                 expr.span,
                             )
                         }
-                        if content.base64 {
+                        if content.flags.base64 {
                             builder.push_raw_opcode(
                                 Opcode::ApplyStringFlag {
                                     flag: RuntimeStringFlag::Base64,
@@ -129,7 +133,7 @@ impl Compiler<'_> {
                         }
                     },
                 }
-                if content.bytes {
+                if content.flags.bytes {
                     builder.push_raw_opcode(
                         Opcode::ApplyStringFlag {
                             flag: RuntimeStringFlag::ByteString,
