@@ -7,16 +7,17 @@ use itertools::{Either, Itertools};
 use super::{CompileResult, Compiler, ScopeID};
 use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::bytecode::{Constant, Register, UnoptRegister};
+use crate::compiling::compiler::{Scope, ScopeType, VarData};
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::{Opcode, RuntimeStringFlag};
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{
-    ExprNode, Expression, MatchBranch, MatchBranchCode, StringType, VisTrait,
+    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, StringType, VisTrait,
 };
 use crate::parsing::attributes::Attributes;
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
-use crate::sources::{CodeSpan, ZEROSPAN};
+use crate::sources::{CodeSpan, Spannable, ZEROSPAN};
 use crate::util::ImmutVec;
 
 impl Compiler<'_> {
@@ -333,31 +334,80 @@ impl Compiler<'_> {
                     }
                 }
 
-                // let store_args = args.iter().map(||)
+                let store_args = args
+                    .iter()
+                    .map(|a| match a {
+                        MacroArg::Single { pattern, default } => false.spanned({
+                            let mut s = pattern.span;
+                            if let Some(e) = default {
+                                s = s.extend(e.span)
+                            }
+                            s
+                        }),
+                        MacroArg::Spread { pattern } => true.spanned(pattern.span),
+                    })
+                    .collect_vec();
 
+                let captured = self
+                    .get_accessible_vars(scope)
+                    .enumerate()
+                    .map(|(i, (_, v))| (v.reg, Register(i + args.len())))
+                    .collect_vec();
+
+                builder.new_func(
+                    |builder| {
+                        let base_scope = self.scopes.insert(Scope {
+                            vars: Default::default(),
+                            parent: None,
+                            typ: Some(ScopeType::MacroBody),
+                        });
+
+                        for (i, (name, data)) in
+                            self.get_accessible_vars(scope).enumerate().collect_vec()
+                        {
+                            self.scopes[base_scope].vars.insert(
+                                name,
+                                VarData {
+                                    reg: Register(i + args.len()),
+                                    ..data
+                                },
+                            );
+                        }
+
+                        for (i, g) in args.iter().enumerate() {
+                            let arg_reg = Register(i);
+
+                            let pat = match g {
+                                MacroArg::Single { pattern, .. } => pattern,
+                                MacroArg::Spread { pattern } => pattern,
+                            };
+
+                            let matches_reg = self
+                                .compile_pattern_check(arg_reg, pat, true, base_scope, builder)?;
+                            builder.mismatch_throw_if_false(matches_reg, arg_reg, pat.span);
+                        }
+
+                        let ret_reg = builder.next_reg();
+
+                        match code {
+                            MacroCode::Normal(stmts) => {
+                                for stmt in stmts {
+                                    self.compile_stmt(stmt, base_scope, builder)?;
+                                }
+                            },
+                            MacroCode::Lambda(expr) => {
+                                let ret_reg = self.compile_expr(expr, base_scope, builder)?;
+                                builder.ret(ret_reg, false, expr.span);
+                            },
+                        }
+
+                        Ok(())
+                    },
+                    store_args.into(),
+                    captured,
+                    expr.span,
+                )?;
                 todo!()
-                // let arg_amount = args.len();
-                // let captured = self
-                //     .get_accessible_vars(scope)
-                //     .enumerate()
-                //     .map(|(i, (_, v))| (v.reg, Register(i + arg_amount)))
-                //     .collect_vec();
-
-                // builder.new_func(
-                //     |builder| {
-
-                //         for (i, g) in args.iter().enumerate() {
-
-                //         }
-
-                //         //
-                //         Ok(())
-                //     },
-                //     arg_amount,
-                //     captured,
-                //     expr.span,
-                // )?;
-                // todo!()
             },
             Expression::TriggerFunc { code } => todo!(),
             Expression::TriggerFuncCall(_) => todo!(),

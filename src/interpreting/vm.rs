@@ -974,6 +974,8 @@ impl Vm {
                     Opcode::PopTryCatch => {
                         self.contexts.current_mut().try_catches.pop();
                     },
+                    Opcode::CreateMacro { func, dest } => todo!(),
+                    Opcode::PushMacroDefault { to, from, arg } => todo!(),
                 }
                 Ok(LoopFlow::Normal)
             };

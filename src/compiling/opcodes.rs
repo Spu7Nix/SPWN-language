@@ -258,4 +258,9 @@ opcodes! {
 
     #[delve(display = || format!("pop try catch"))]
     PopTryCatch,
+
+    #[delve(display = |i, r| format!("{i}: (...) {{...}} -> {r}"))]
+    CreateMacro { func: FuncID, [dest]},
+    #[delve(display = |to, f, arg| format!("{f} -> {to} default arg {arg}"))]
+    PushMacroDefault { [to], [from], arg: u8},
 }
