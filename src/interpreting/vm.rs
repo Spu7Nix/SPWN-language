@@ -292,7 +292,6 @@ impl Vm {
                                 for i in 0..program.get_function(func).regs_used {
                                     unsafe { ManuallyDrop::drop(&mut regs.registers[i as usize]) }
                                 }
-                                // std::mem::forget(regs);
                             }
                         }
 
@@ -789,14 +788,9 @@ impl Vm {
                             };
                         }
 
-                        macro_rules! drop {
-                            () => {
-                                mem::drop(value);
-                            };
-                        }
-
                         if let Some(v) = special {
-                            drop!();
+                            mem::drop(value);
+
                             self.set_reg(
                                 dest,
                                 v.into_stored(self.make_area(opcode_span, &program)),
@@ -804,110 +798,121 @@ impl Vm {
                         } else {
                             let base_type = value.value.get_type();
 
-                            let mut found = false;
+                            'out: {
+                                match &value.value {
+                                    Value::Dict(v) => {
+                                        if let Some(v) = v.get(&key) {
+                                            let v = v.value();
 
-                            match &value.value {
-                                Value::Dict(v) => {
-                                    if let Some(v) = v.get(&key) {
-                                        let v = v.value();
+                                            if !is_mem {
+                                                let v = self.deep_clone(v);
 
-                                        if !is_mem {
-                                            let v = self.deep_clone(v);
-                                            drop!();
-                                            self.set_reg(dest, v);
-                                        } else {
-                                            let v = v.clone();
-                                            drop!();
-                                            self.change_reg_ref(dest, v);
-                                        }
+                                                mem::drop(value);
 
-                                        found = true;
-                                    }
-                                },
-                                Value::Instance { items, .. } => {
-                                    if let Some(v) = items.get(&key) {
-                                        if let VisSource::Private(v, src) = v {
-                                            if src != &program.src {
-                                                return Err(RuntimeError::PrivateMemberAccess {
-                                                    area: self.make_area(opcode_span, &program),
-                                                    member: key.iter().collect(),
-                                                    call_stack: self.get_call_stack(),
-                                                });
+                                                self.set_reg(dest, v);
+                                            } else {
+                                                let v = v.clone();
+
+                                                mem::drop(value);
+
+                                                self.change_reg_ref(dest, v);
                                             }
+                                            break 'out;
                                         }
+                                    },
+                                    Value::Instance { items, .. } => {
+                                        if let Some(v) = items.get(&key) {
+                                            if let VisSource::Private(v, src) = v {
+                                                if src != &program.src {
+                                                    return Err(
+                                                        RuntimeError::PrivateMemberAccess {
+                                                            area: self
+                                                                .make_area(opcode_span, &program),
+                                                            member: key.iter().collect(),
+                                                            call_stack: self.get_call_stack(),
+                                                        },
+                                                    );
+                                                }
+                                            }
 
-                                        let v = v.value();
+                                            let v = v.value();
 
-                                        if !is_mem {
-                                            let v = self.deep_clone(v);
-                                            drop!();
-                                            self.set_reg(dest, v);
-                                        } else {
-                                            let v = v.clone();
-                                            drop!();
-                                            self.change_reg_ref(dest, v);
+                                            if !is_mem {
+                                                let v = self.deep_clone(v);
+
+                                                mem::drop(value);
+
+                                                self.set_reg(dest, v);
+                                            } else {
+                                                let v = v.clone();
+
+                                                mem::drop(value);
+
+                                                self.change_reg_ref(dest, v);
+                                            }
+                                            break 'out;
                                         }
+                                    },
+                                    Value::Module { exports, .. } => {
+                                        if let Some(v) = exports.get(&key) {
+                                            if !is_mem {
+                                                let v = self.deep_clone(v);
 
-                                        found = true;
+                                                mem::drop(value);
+
+                                                self.set_reg(dest, v);
+                                            } else {
+                                                let v = v.clone();
+
+                                                mem::drop(value);
+
+                                                self.change_reg_ref(dest, v);
+                                            }
+                                            break 'out;
+                                        }
+                                    },
+                                    _ => (),
+                                }
+
+                                let Some(members) = self.impls.get(&base_type) else { error!(base_type) };
+                                let Some(r) = members.get(&key) else { error!(base_type) };
+
+                                let mut v = self.deep_clone(r.value());
+
+                                if let Value::Macro(MacroData {
+                                    self_arg,
+
+                                    is_method,
+                                    ..
+                                }) = &mut v.value
+                                {
+                                    if *is_method {
+                                        *self_arg = Some(self.get_reg_ref(from).clone())
+                                    } else {
+                                        return Err(RuntimeError::AssociatedMemberNotAMethod {
+                                            area: self.make_area(opcode_span, &program),
+                                            def_area: v.area.clone(),
+                                            member_name: key.iter().collect(),
+                                            member_type: v.value.get_type(),
+                                            base_type,
+                                            call_stack: self.get_call_stack(),
+                                        });
                                     }
-                                },
-                                Value::Module { exports, .. } => {
-                                    if let Some(v) = exports.get(&key) {
-                                        if !is_mem {
-                                            let v = self.deep_clone(v);
-                                            drop!();
-                                            self.set_reg(dest, v);
-                                        } else {
-                                            let v = v.clone();
-                                            drop!();
-                                            self.change_reg_ref(dest, v);
-                                        }
+                                } else {
+                                    return Err(RuntimeError::AssociatedMemberNotAMethod {
+                                        area: self.make_area(opcode_span, &program),
+                                        def_area: v.area.clone(),
+                                        member_name: key.iter().collect(),
+                                        member_type: v.value.get_type(),
+                                        base_type,
+                                        call_stack: self.get_call_stack(),
+                                    });
+                                }
 
-                                        found = true;
-                                    }
-                                },
-                                _ => (),
+                                mem::drop(value);
+
+                                self.set_reg(dest, v);
                             }
-
-                            if !found {
-                                error!(base_type)
-                            }
-
-                            // if !found {
-                            //     let Some(members) = self.impls.get(&base_type) else { error!(base_type) };
-                            //     let Some((k, _)) = members.get(&self.intern(&key)) else { error!(base_type) };
-
-                            //     let mut v = self.deep_clone_key(*k);
-
-                            //     if let Value::Macro(MacroData { self_arg, args, .. }) = &mut v.value
-                            //     {
-                            //         match args.get(0) {
-                            //             Some(arg) if arg.name().value == self.intern("self") => {
-                            //                 *self_arg = Some(self.get_reg_key(*from))
-                            //             },
-                            //             _ => {
-                            //                 return Err(RuntimeError::AssociatedMemberNotAMethod {
-                            //                     area: self.make_area(span, func.code),
-                            //                     def_area: v.area.clone(),
-                            //                     func_name: key,
-                            //                     base_type,
-                            //                     call_stack: self.get_call_stack(),
-                            //                 });
-                            //             },
-                            //         }
-                            //     } else {
-                            //         return Err(RuntimeError::NotAMethod {
-                            //             area: self.make_area(span, func.code),
-                            //             def_area: v.area.clone(),
-                            //             member_name: key,
-                            //             member_type: v.value.get_type(),
-                            //             base_type,
-                            //             call_stack: self.get_call_stack(),
-                            //         });
-                            //     }
-
-                            //     self.set_reg(*dest, v);
-                            // }
                         }
                     },
                     Opcode::Associated { from, dest, member }
@@ -938,11 +943,15 @@ impl Vm {
                                         Some(elem) => {
                                             if !is_mem {
                                                 let v = self.deep_clone(elem.value());
+
                                                 mem::drop(value);
+
                                                 self.set_reg(dest, v);
                                             } else {
                                                 let v = elem.value().clone();
+
                                                 mem::drop(value);
+
                                                 self.change_reg_ref(dest, v);
                                             }
                                         },
@@ -1211,6 +1220,8 @@ impl Vm {
                             args: args.into(),
                             self_arg: None,
                             captured: captured.into(),
+                            is_method: false,
+                            is_builtin: None,
                         });
 
                         self.set_reg(
@@ -1227,6 +1238,12 @@ impl Vm {
                                     *default = Some(self.get_reg_ref(from).clone())
                                 }
                             },
+                            _ => unreachable!(),
+                        }
+                    },
+                    Opcode::MarkMacroMethod { reg } => {
+                        match &mut self.get_reg_ref(reg).borrow_mut().value {
+                            Value::Macro(data) => data.is_method = true,
                             _ => unreachable!(),
                         }
                     },
@@ -1277,9 +1294,19 @@ impl Vm {
 
                         let mut next_arg_idx = 0;
 
+                        if data.is_method {
+                            match fill.get_mut(next_arg_idx) {
+                                Some(ArgFill::Single(v, _)) => {
+                                    *v = data.self_arg.clone();
+                                    next_arg_idx += 1;
+                                },
+                                _ => unreachable!(),
+                            }
+                        }
+
                         for arg in &*call_expr.positional {
                             let r = self.get_reg_ref(*arg).clone();
-                            match &mut fill.get_mut(next_arg_idx) {
+                            match fill.get_mut(next_arg_idx) {
                                 Some(ArgFill::Single(opt, ..)) => {
                                     *opt = Some(r);
                                     next_arg_idx += 1;
@@ -1397,10 +1424,16 @@ impl Vm {
                             },
                         }
 
-                        let map = match &self.get_reg_ref(dict).borrow().value {
+                        let mut map = match &self.get_reg_ref(dict).borrow().value {
                             Value::Dict(t) => t.clone(),
                             _ => unreachable!(),
                         };
+
+                        for (k, v) in &map {
+                            if let Value::Macro(data) = &mut v.value().borrow_mut().value {
+                                todo!()
+                            }
+                        }
 
                         self.impls.insert(t, map);
                     },

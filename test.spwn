@@ -1,23 +1,25 @@
 
 
-gaga = import "test2.spwn"
 
 
-dbg gaga.@bingy;
+type @cobra
+
+impl @cobra {
+    gag: (&mut self, n) {
+        self.fuck += n;
+    }
+}
 
 
-// type @giggla
+jick = @cobra::{
+    fuck: 5,
+    sex: false,
+}
 
-// impl @giggla {
-//     new: () {
-//         return @giggla::{
-//             biby: 5,
-//             lol: "sex"
-//         }
-//     },
-// }
-
-
-// dbg @giggla::new()
+dbg jick;
+jick.gag(1);
+dbg jick;
+jick.gag(2);
+dbg jick;
 
 

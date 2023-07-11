@@ -381,10 +381,7 @@ impl Compiler<'_> {
                         for (i, g) in args.iter().enumerate() {
                             let arg_reg = Register(i);
 
-                            let pat = match g {
-                                MacroArg::Single { pattern, .. } => pattern,
-                                MacroArg::Spread { pattern } => pattern,
-                            };
+                            let pat = g.pattern();
 
                             let matches_reg = self
                                 .compile_pattern_check(arg_reg, pat, true, base_scope, builder)?;
@@ -459,6 +456,13 @@ impl Compiler<'_> {
                             expr.span,
                         );
                     }
+                }
+
+                if args
+                    .get(0)
+                    .is_some_and(|v| v.pattern().pat.is_self(&self.interner))
+                {
+                    builder.push_raw_opcode(Opcode::MarkMacroMethod { reg: macro_reg }, expr.span);
                 }
 
                 Ok(macro_reg)

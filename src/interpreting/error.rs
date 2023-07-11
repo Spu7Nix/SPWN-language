@@ -261,29 +261,17 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: "Associated member is not method", Note: None;
-            Labels: [
-                area => "Associated member `{}` is not a method, because it does not have a `self` argument": func_name;
-                def_area => "Associated member defined on type {} here": base_type.runtime_display(vm);
-            ]
-        ]
-        AssociatedMemberNotAMethod {
-            area: CodeArea,
-            def_area: CodeArea,
-            func_name: String,
-            base_type: ValueType,
-            [call_stack]
-        },
-
-        // ==================================================================
-        #[
-            Message: "Associated member is not method", Note: None;
+            Message: "Associated member is not method", Note: if *member_type == ValueType::Macro {
+                Some("Methods require a `self` argument".to_string())
+            } else {
+                None
+            };
             Labels: [
                 area => "Member `{}` implemented on type {} is not a method": member_name, base_type.runtime_display(vm);
                 def_area => "Member defined as {} here": member_type.runtime_display(vm);
             ]
         ]
-        NotAMethod {
+        AssociatedMemberNotAMethod {
             area: CodeArea,
             def_area: CodeArea,
             member_name: String,

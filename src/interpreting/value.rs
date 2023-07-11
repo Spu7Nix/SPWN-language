@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt::Debug;
 use std::rc::Rc;
 
 use ahash::AHashMap;
@@ -8,7 +9,7 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::error::ErrorDiscriminants;
-use super::vm::{FuncCoord, Vm};
+use super::vm::{FuncCoord, RuntimeResult, Vm};
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::{CustomTypeID, LocalTypeID};
 use crate::gd::ids::{IDClass, Id};
@@ -18,6 +19,9 @@ use crate::new_id_wrapper;
 use crate::parsing::ast::{MacroArg, Vis, VisSource, VisTrait};
 use crate::sources::{CodeArea, Spanned};
 use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec};
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct BuiltinFn(pub &'static fn(Vec<ValueRef>, &mut Vm, CodeArea) -> RuntimeResult<Value>);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -85,6 +89,10 @@ pub struct MacroData {
     pub self_arg: Option<ValueRef>,
 
     pub captured: ImmutCloneVec<ValueRef>,
+
+    pub is_method: bool,
+
+    pub is_builtin: Option<BuiltinFn>,
 }
 
 value! {

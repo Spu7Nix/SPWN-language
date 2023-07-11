@@ -138,6 +138,15 @@ pub enum MacroArg<D, P> {
     Spread { pattern: P },
 }
 
+impl<D, P> MacroArg<D, P> {
+    pub fn pattern(&self) -> &P {
+        match self {
+            MacroArg::Single { pattern, .. } => pattern,
+            MacroArg::Spread { pattern } => pattern,
+        }
+    }
+}
+
 // impl<N, D, P> MacroArg<N, D, P> {
 //     pub fn name(&self) -> &N {
 //         match self {
