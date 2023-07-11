@@ -1,3 +1,5 @@
+use lasso::Spur;
+
 use super::{ParseResult, Parser};
 use crate::gd::ids::IDClass;
 use crate::lexing::tokens::Token;
@@ -9,7 +11,7 @@ use crate::parsing::ast::{
 use crate::parsing::attributes::{Attributes, IsValidOn};
 use crate::parsing::error::SyntaxError;
 use crate::parsing::operators::operators::{self, unary_prec};
-use crate::sources::Spannable;
+use crate::sources::{Spannable, Spanned};
 
 impl Parser<'_> {
     pub fn parse_unit(&mut self, allow_macros: bool) -> ParseResult<ExprNode> {
@@ -469,7 +471,7 @@ impl Parser<'_> {
                     self.next()?;
 
                     let mut params = vec![];
-                    let mut named_params = vec![];
+                    let mut named_params: Vec<(Spanned<Spur>, ExprNode)> = vec![];
 
                     let mut parsing_named = None;
 
@@ -478,6 +480,11 @@ impl Parser<'_> {
                             self.next()?;
                             let start = self.span();
                             let name = self.slice_interned();
+                            
+                            if let Some((prev, _)) = named_params.iter().find(|(s, _)| s.value == name) {
+                                return Err(SyntaxError::DuplicateKeywordArg { name: self.resolve(&name).to_string(), prev_area: self.make_area(prev.span), area: self.make_area(self.span()) })
+                            }
+
                             self.next()?;
 
                             let value = self.parse_expr(true)?;

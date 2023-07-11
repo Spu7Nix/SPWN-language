@@ -522,7 +522,7 @@ impl<'a> Lexer<'a> {
                                     hash += 1;
                                     self.bump(1)
                                 }
-                                // println!("glabba {} {:?}", hash, self.read().map(|b| b as char));
+
                                 if !is!(0, b'"' | b'\'') {
                                     return Some(Err(LexerError::InvalidCharacterForRawString));
                                 }

@@ -133,6 +133,20 @@ error_maker! {
 
         // ==================================================================
         #[
+            Message: "Duplicate keyword argument", Note: None;
+            Labels: [
+                area => "Keyword argument `{}` was provided twice": name;
+                prev_area => "Argument previously provided here";
+            ]
+        ]
+        DuplicateKeywordArg {
+            name: String,
+            area: CodeArea,
+            prev_area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
             Message: "Mismatched attribute", Note: None;
             Labels: [
                 area => "Attribute `{}` cannot be added to this element": attr;
@@ -203,18 +217,6 @@ error_maker! {
         ]
         InvalidAttributeArgType {
             expected: &'static str,
-            area: CodeArea,
-        },
-
-        // ==================================================================
-        #[
-            Message: "Invalid string type", Note: None;
-            Labels: [
-                area => "Expected {} string": typ;
-            ]
-        ]
-        InvalidStringType {
-            typ: &'static str,
             area: CodeArea,
         },
 

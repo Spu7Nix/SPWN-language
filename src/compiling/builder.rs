@@ -6,7 +6,7 @@ use itertools::Itertools;
 use semver::Version;
 use slab::Slab;
 
-use super::bytecode::{Bytecode, Constant, Register, UnoptRegister};
+use super::bytecode::{Bytecode, CallExpr, Constant, Register, UnoptRegister};
 use super::compiler::{CompileResult, Compiler};
 use super::opcodes::{FuncID, Opcode, UnoptOpcode};
 use crate::compiling::bytecode::Function;
@@ -69,7 +69,8 @@ struct ProtoFunc {
     code: BlockID,
     regs_used: usize,
     span: CodeSpan,
-    args: ImmutVec<Spanned<bool>>,
+    args: ImmutVec<Spanned<Option<ImmutStr>>>,
+    spread_arg: Option<u8>,
     captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
 }
 
@@ -81,6 +82,7 @@ pub struct ProtoBytecode {
 
     import_paths: UniqueRegister<SpwnSource>,
 
+    call_exprs: UniqueRegister<CallExpr<UnoptRegister, ImmutStr>>,
     debug_funcs: Vec<FuncID>,
 }
 
@@ -92,22 +94,24 @@ impl ProtoBytecode {
             blocks: SlabMap::new(),
             import_paths: UniqueRegister::new(),
             debug_funcs: vec![],
+            call_exprs: UniqueRegister::new(),
         }
     }
 
     pub fn new_func<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(
         &mut self,
         f: F,
-        args: ImmutVec<Spanned<bool>>,
+        args: (ImmutVec<Spanned<Option<ImmutStr>>>, Option<u8>),
         captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
         span: CodeSpan,
     ) -> CompileResult<FuncID> {
         let f_block = self.blocks.insert(Default::default());
         self.functions.push(ProtoFunc {
             code: f_block,
-            regs_used: args.len() + captured_regs.len(),
+            regs_used: args.0.len() + captured_regs.len(),
             span,
-            args,
+            args: args.0,
+            spread_arg: args.1,
             captured_regs,
         });
         let func = self.functions.len() - 1;
@@ -122,7 +126,8 @@ impl ProtoBytecode {
     pub fn build(mut self, src: &Rc<SpwnSource>, compiler: &Compiler) -> Result<Bytecode, ()> {
         type BlockPos = (u16, u16);
 
-        let constants: Vec<Constant> = self.consts.make_vec();
+        let constants = self.consts.make_vec();
+        let call_exprs = self.call_exprs.make_vec();
 
         let mut funcs = vec![];
 
@@ -213,6 +218,7 @@ impl ProtoBytecode {
                 opcodes: opcodes.into(),
                 span: func.span,
                 args: func.args.clone(),
+                spread_arg: func.spread_arg,
                 captured_regs: func
                     .captured_regs
                     .iter()
@@ -223,10 +229,7 @@ impl ProtoBytecode {
             })
         }
 
-        let mut import_paths = vec![unsafe { std::mem::zeroed() }; self.import_paths.len()];
-        for (v, k) in self.import_paths.drain() {
-            import_paths[v] = k
-        }
+        let import_paths = self.import_paths.make_vec();
 
         let src_hash = compiler.src_hash();
 
@@ -255,6 +258,28 @@ impl ProtoBytecode {
             },
             import_paths: import_paths.into(),
             debug_funcs: self.debug_funcs.into(),
+            call_exprs: call_exprs
+                .into_iter()
+                .map(|ce| CallExpr {
+                    positional: ce
+                        .positional
+                        .iter()
+                        .cloned()
+                        .map(|r| r.try_into().unwrap())
+                        .collect_vec()
+                        .into(),
+                    named: ce
+                        .named
+                        .iter()
+                        .cloned()
+                        .map(|(s, r)| (s, r.try_into().unwrap()))
+                        .collect_vec()
+                        .into(),
+                    base: ce.base.try_into().unwrap(),
+                    dest: ce.dest.try_into().unwrap(),
+                })
+                .collect_vec()
+                .into(),
         })
     }
 }
@@ -321,7 +346,7 @@ impl<'a> CodeBuilder<'a> {
     pub fn new_func<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(
         &mut self,
         f: F,
-        args: ImmutVec<Spanned<bool>>,
+        args: (ImmutVec<Spanned<Option<ImmutStr>>>, Option<u8>),
         captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
         span: CodeSpan,
     ) -> CompileResult<FuncID> {
@@ -332,6 +357,10 @@ impl<'a> CodeBuilder<'a> {
         self.current_block()
             .content
             .push(BlockContent::Opcode(opcode.spanned(span)))
+    }
+
+    pub fn mark_func_debug(&mut self, f: FuncID) {
+        self.proto_bytecode.debug_funcs.push(f)
     }
 
     pub fn mark_insert(&mut self) -> InsertMarker {
@@ -411,6 +440,10 @@ impl<'a> CodeBuilder<'a> {
 
     pub fn copy_deep(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
         self.push_opcode(ProtoOpcode::Raw(Opcode::CopyDeep { from, to }), span)
+    }
+
+    pub fn copy_shallow(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::CopyShallow { from, to }), span)
     }
 
     pub fn copy_mem(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
@@ -690,5 +723,10 @@ impl<'a> CodeBuilder<'a> {
             }),
             span,
         )
+    }
+
+    pub fn call(&mut self, v: CallExpr<UnoptRegister, ImmutStr>, span: CodeSpan) {
+        let id = self.proto_bytecode.call_exprs.insert(v).into();
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Call { call: id }), span)
     }
 }

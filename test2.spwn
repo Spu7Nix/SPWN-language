@@ -1,11 +1,8 @@
 
+type @bingy
 
-private type @cum;
-type @blub;
-
-
-
+cunt = "fuck"
 return {
-    penis: 69,
-    fuck: [false, 3],
+    blib: 5,
+    cunt,
 }

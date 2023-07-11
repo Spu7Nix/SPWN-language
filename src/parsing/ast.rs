@@ -321,7 +321,7 @@ pub enum Statement {
     ExtractImport(Import),
 
     Impl {
-        name: Spur,
+        name: Spanned<Spur>,
         items: Vec<Vis<DictItem>>,
     },
     Overload {
@@ -398,6 +398,15 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
             Pattern::IfGuard { pat, .. } => pat.pat.is_self(interner),
             Pattern::MacroPattern { .. } => todo!(),
             _ => false,
+        }
+    }
+
+    pub fn get_name(&self) -> Option<Spur> {
+        match self {
+            Pattern::Mut { name, .. } => Some(*name),
+            Pattern::Path { var, path, .. } if path.is_empty() => Some(*var),
+            Pattern::Both(a, ..) => a.pat.get_name(),
+            _ => None,
         }
     }
 }

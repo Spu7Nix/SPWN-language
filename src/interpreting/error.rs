@@ -1,5 +1,7 @@
 use std::string::ToString;
 
+use itertools::Either;
+
 use super::context::CallInfo;
 use super::value::{StoredValue, Value, ValueType};
 use super::vm::Vm;
@@ -92,18 +94,18 @@ error_maker! {
         //     [call_stack]
         // },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Cannot instance builtin type", Note: None;
-        //     Labels: [
-        //         area => "Cannot instance builtin type {}": typ.runtime_display(vm);
-        //     ]
-        // ]
-        // CannotInstanceBuiltinType {
-        //     area: CodeArea,
-        //     typ: ValueType,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Cannot instance builtin type", Note: None;
+            Labels: [
+                area => "Cannot instance builtin type {}": typ.runtime_display(vm);
+            ]
+        ]
+        CannotInstanceBuiltinType {
+            area: CodeArea,
+            typ: ValueType,
+            [call_stack]
+        },
 
         // // ==================================================================
         // #[
@@ -119,21 +121,36 @@ error_maker! {
         //     [call_stack]
         // },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Too many arguments", Note: None;
-        //     Labels: [
-        //         call_area => "Received {} arguments, expected {}": call_arg_amount, macro_arg_amount;
-        //         macro_def_area => "Macro defined to take {} arguments here": macro_arg_amount;
-        //     ]
-        // ]
-        // TooManyArguments {
-        //     call_area: CodeArea,
-        //     macro_def_area: CodeArea,
-        //     macro_arg_amount: usize,
-        //     call_arg_amount: usize,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Too many arguments", Note: None;
+            Labels: [
+                call_area => "Received {} arguments, expected {}": call_arg_amount, macro_arg_amount;
+                macro_def_area => "Macro defined to take {} arguments here": macro_arg_amount;
+            ]
+        ]
+        TooManyArguments {
+            call_area: CodeArea,
+            macro_def_area: CodeArea,
+            macro_arg_amount: usize,
+            call_arg_amount: usize,
+            [call_stack]
+        },
+
+        // ==================================================================
+        #[
+            Message: "Unknown keyword argument", Note: None;
+            Labels: [
+                macro_def_area => "Macro defined to take these arguments";
+                call_area => "Keyword argument `{}` received here": name;
+            ]
+        ]
+        UnknownKeywordArgument {
+            name: String,
+            macro_def_area: CodeArea,
+            call_area: CodeArea,
+            [call_stack]
+        },
 
         // // ==================================================================
         // #[
@@ -150,27 +167,30 @@ error_maker! {
         //     [call_stack]
         // },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Argument not satisfied", Note: None;
-        //     Labels: [
-        //         call_area => "Argument `{}` not satisfied": arg_name;
-        //         macro_def_area => "Macro defined here";
-        //     ]
-        // ]
-        // ArgumentNotSatisfied {
-        //     call_area: CodeArea,
-        //     macro_def_area: CodeArea,
-        //     arg_name: String,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Argument not satisfied", Note: None;
+            Labels: [
+                macro_def_area => "Macro defined to take these arguments";
+                call_area => "Argument {} not satisfied": match arg {
+                    Either::Left(name) => format!("`{}`", name),
+                    Either::Right(idx) => format!("at pos {}", idx),
+                };
+            ]
+        ]
+        ArgumentNotSatisfied {
+            call_area: CodeArea,
+            macro_def_area: CodeArea,
+            arg: Either<String, usize>,
+            [call_stack]
+        },
 
 
         // ==================================================================
         #[
             Message: "Pattern mismatch", Note: None;
             Labels: [
-                pattern_area => "The `{}` doesn't match this pattern": v.0.runtime_display(vm);
+                pattern_area => "The {} doesn't match this pattern": v.0.runtime_display(vm);
                 v.1 => "Value defined as {} here": v.0.runtime_display(vm);
             ]
         ]
@@ -225,19 +245,19 @@ error_maker! {
             [call_stack]
         },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Nonexistent associated member", Note: None;
-        //     Labels: [
-        //         area => "Associated member `{}` does not exist on {}": member, base_type.runtime_display(vm);
-        //     ]
-        // ]
-        // NonexistentAssociatedMember {
-        //     area: CodeArea,
-        //     member: String,
-        //     base_type: ValueType,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Nonexistent associated member", Note: None;
+            Labels: [
+                area => "Associated member `{}` does not exist on {}": member, base_type.runtime_display(vm);
+            ]
+        ]
+        NonexistentAssociatedMember {
+            area: CodeArea,
+            member: String,
+            base_type: ValueType,
+            [call_stack]
+        },
 
         // ==================================================================
         #[
@@ -272,31 +292,31 @@ error_maker! {
             [call_stack]
         },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Nonexistent type member", Note: None;
-        //     Labels: [
-        //         area => "Type {} does not exist in this module": format!("@{type_name}");
-        //     ]
-        // ]
-        // NonexistentTypeMember {
-        //     area: CodeArea,
-        //     type_name: String,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Nonexistent type member", Note: None;
+            Labels: [
+                area => "Type {} does not exist in this module": format!("@{type_name}");
+            ]
+        ]
+        NonexistentTypeMember {
+            area: CodeArea,
+            type_name: String,
+            [call_stack]
+        },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Tried to access private type", Note: None;
-        //     Labels: [
-        //         area => "Type {} is private": format!("@{type_name}");
-        //     ]
-        // ]
-        // PrivateType {
-        //     area: CodeArea,
-        //     type_name: String,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Tried to access private type", Note: None;
+            Labels: [
+                area => "Type {} is private": format!("@{type_name}");
+            ]
+        ]
+        PrivateType {
+            area: CodeArea,
+            type_name: String,
+            [call_stack]
+        },
 
         // ==================================================================
         #[
@@ -380,17 +400,17 @@ error_maker! {
             [call_stack]
         },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Cannot implement on a builtin type", Note: None;
-        //     Labels: [
-        //         area => "Implementation happens here";
-        //     ]
-        // ]
-        // ImplOnBuiltin {
-        //     area: CodeArea,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Cannot implement on a builtin type", Note: None;
+            Labels: [
+                area => "Implementation happens here";
+            ]
+        ]
+        ImplOnBuiltin {
+            area: CodeArea,
+            [call_stack]
+        },
 
         // ==================================================================
         #[

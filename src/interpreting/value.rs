@@ -8,15 +8,15 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::error::ErrorDiscriminants;
-use super::vm::Vm;
+use super::vm::{FuncCoord, Vm};
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::{CustomTypeID, LocalTypeID};
 use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::ObjectKey;
 use crate::interpreting::vm::ValueRef;
 use crate::new_id_wrapper;
-use crate::parsing::ast::{VisSource, VisTrait};
-use crate::sources::CodeArea;
+use crate::parsing::ast::{MacroArg, Vis, VisSource, VisTrait};
+use crate::sources::{CodeArea, Spanned};
 use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -77,17 +77,15 @@ macro_rules! value {
     };
 }
 
-// impl ValueType {
-//     pub fn runtime_display(self, vm: &Vm) -> String {
-//         format!(
-//             "@{}",
-//             match self {
-//                 Self::Custom(t) => vm.resolve(&vm.types[t].value.name),
-//                 _ => <ValueType as Into<&str>>::into(self).into(),
-//             }
-//         )
-//     }
-// }
+#[derive(Clone, Debug, PartialEq)]
+pub struct MacroData {
+    pub func: FuncCoord,
+
+    pub args: ImmutVec<Spanned<MacroArg<ValueRef, ()>>>,
+    pub self_arg: Option<ValueRef>,
+
+    pub captured: ImmutCloneVec<ValueRef>,
+}
 
 value! {
     Int(i64),
@@ -111,13 +109,14 @@ value! {
 
     #[default]
     Empty,
-    // Macro(MacroData),
+
+    Macro(MacroData),
 
     Type(ValueType),
 
     Module {
         exports: AHashMap<ImmutCloneVec<char>, ValueRef>,
-        types: Vec<(LocalTypeID, bool)>,
+        types: Vec<Vis<CustomTypeID>>,
     },
 
     TriggerFunction {
@@ -149,8 +148,8 @@ impl ValueType {
         format!(
             "@{}",
             match self {
-                Self::Custom(t) => &*vm.type_def_map[&t].name,
-                _ => <ValueType as Into<&str>>::into(self),
+                Self::Custom(t) => vm.type_def_map[&t].name.iter().collect::<String>(),
+                _ => <ValueType as Into<&str>>::into(self).into(),
             }
         )
     }
@@ -218,13 +217,9 @@ impl Value {
             },
             Value::Empty => "()".into(),
 
-            // Value::Macro(MacroData { args, .. }) => format!(
-            //     "({}) {{...}}",
-            //     args.iter()
-            //         .map(|a| vm.resolve(&a.name().value))
-            //         .collect::<Vec<_>>()
-            //         .join(", ")
-            // ),
+            Value::Macro(MacroData { args, .. }) => {
+                format!("<{}-arg macro at {:?}>", args.len(), (self as *const _))
+            },
             Value::TriggerFunction { .. } => "!{...}".to_string(),
             Value::Type(t) => t.runtime_display(vm),
             // Value::Object(map, typ) => format!(
@@ -249,37 +244,36 @@ impl Value {
                         k.borrow().value.runtime_display(vm)
                     ))
                     .join(", "),
-                if !types.iter().any(|(_, p)| *p) {
+                if types.iter().any(|p| p.is_pub()) {
                     format!(
                         "; {}",
                         types
                             .iter()
-                            .filter(|(_, p)| !*p)
-                            .map(|(t, _)| "todo")
+                            .filter(|p| p.is_pub())
+                            .map(|p| ValueType::Custom(*p.value()).runtime_display(vm))
                             .join(", ")
                     )
                 } else {
                     "".into()
                 }
             ),
-            // Value::Instance { typ, items } => format!(
-            //     "@{}::{{ {} }}",
-            //     vm.resolve(&vm.types[*typ].value.name),
-            //     items
-            //         .iter()
-            //         .map(|(s, (k, _))| format!(
-            //             "{}: {}",
-            //             vm.interner.borrow().resolve(s),
-            //             vm.memory[*k].val.value.runtime_display(vm)
-            //         ))
-            //         .collect::<Vec<_>>()
-            //         .join(", "),
-            // ),
+
             // Value::Iterator(_) => "<iterator>".into(),
             // Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
             Value::Error(id) => format!("{} {{...}}", ErrorDiscriminants::VARIANT_NAMES[*id]),
 
-            Value::Instance { .. } => todo!(),
+            Value::Instance { typ, items } => format!(
+                "@{}::{{ {} }}",
+                vm.type_def_map[&typ].name.iter().collect::<String>(),
+                items
+                    .iter()
+                    .map(|(s, v)| format!(
+                        "{}: {}",
+                        s.iter().collect::<String>(),
+                        v.value().borrow().value.runtime_display(vm)
+                    ))
+                    .join(", ")
+            ),
             Value::ObjectKey(_) => todo!(),
             // todo: iterator, object
         }

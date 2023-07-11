@@ -6,7 +6,7 @@ use itertools::{Either, Itertools};
 
 use super::{CompileResult, Compiler, ScopeID};
 use crate::compiling::builder::{CodeBuilder, JumpType};
-use crate::compiling::bytecode::{Constant, Register, UnoptRegister};
+use crate::compiling::bytecode::{CallExpr, Constant, Register, UnoptRegister};
 use crate::compiling::compiler::{Scope, ScopeType, VarData};
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::{Opcode, RuntimeStringFlag};
@@ -27,34 +27,6 @@ impl Compiler<'_> {
         scope: ScopeID,
         builder: &mut CodeBuilder,
     ) -> CompileResult<UnoptRegister> {
-        macro_rules! dict_compile {
-            ($dest:expr, $items:expr) => {
-                builder.alloc_dict($dest, $items.len() as u16, expr.span);
-                for item in $items {
-                    let r = match &item.value().value {
-                        Some(e) => self.compile_expr(e, scope, builder)?,
-                        None => match self.get_var(item.value().name.value, scope) {
-                            Some(v) => v.reg,
-                            None => {
-                                return Err(CompileError::NonexistentVariable {
-                                    area: self.make_area(expr.span),
-                                    var: self.resolve(&item.value().name),
-                                })
-                            },
-                        },
-                    };
-                    let k = builder.next_reg();
-
-                    let chars = self.resolve_arr(&item.value().name.value);
-                    builder.load_const::<ImmutVec<char>>(chars, k, item.value().name.span);
-
-                    builder.insert_dict_elem(r, $dest, k, expr.span, item.is_priv())
-                }
-            };
-        }
-
-        for (i, attr) in expr.attributes.iter().enumerate() {}
-
         match &*expr.expr {
             Expression::Int(v) => {
                 let reg = builder.next_reg();
@@ -270,9 +242,7 @@ impl Compiler<'_> {
                 Ok(dest)
             },
             Expression::Dict(v) => {
-                let dest = builder.next_reg();
-
-                dict_compile!(dest, v);
+                let dest = self.compile_dictlike(v, scope, expr.span, builder)?;
 
                 Ok(dest)
             },
@@ -321,30 +291,62 @@ impl Compiler<'_> {
                 base,
                 params,
                 named_params,
-            } => todo!(),
+            } => {
+                let base_reg = self.compile_expr(base, scope, builder)?;
+
+                let positional = params
+                    .iter()
+                    .map(|p| self.compile_expr(p, scope, builder))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_boxed_slice();
+
+                let named = named_params
+                    .iter()
+                    .map(|(s, p)| {
+                        self.compile_expr(p, scope, builder)
+                            .map(|v| (self.resolve(&s.value), v))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_boxed_slice();
+                let out_reg = builder.next_reg();
+
+                let call_expr = CallExpr {
+                    positional,
+                    named,
+                    base: base_reg,
+                    dest: out_reg,
+                };
+
+                builder.call(call_expr, expr.span);
+
+                Ok(out_reg)
+            },
             Expression::Macro {
                 args,
                 ret_pat,
                 code,
             } => {
-                for attr in &expr.attributes {
-                    match &**attr {
-                        Attributes::DebugBytecode => todo!(),
-                        _ => unreachable!(),
-                    }
-                }
+                let mut spread_arg = None;
 
                 let store_args = args
                     .iter()
-                    .map(|a| match a {
-                        MacroArg::Single { pattern, default } => false.spanned({
+                    .enumerate()
+                    .map(|(i, a)| match a {
+                        MacroArg::Single { pattern, default } => {
                             let mut s = pattern.span;
                             if let Some(e) = default {
                                 s = s.extend(e.span)
                             }
-                            s
-                        }),
-                        MacroArg::Spread { pattern } => true.spanned(pattern.span),
+                            pattern.pat.get_name().map(|s| self.resolve(&s)).spanned(s)
+                        },
+                        MacroArg::Spread { pattern } => {
+                            spread_arg = Some(i as u8);
+                            pattern
+                                .pat
+                                .get_name()
+                                .map(|s| self.resolve(&s))
+                                .spanned(pattern.span)
+                        },
                     })
                     .collect_vec();
 
@@ -354,12 +356,14 @@ impl Compiler<'_> {
                     .map(|(i, (_, v))| (v.reg, Register(i + args.len())))
                     .collect_vec();
 
-                builder.new_func(
+                let func_id = builder.new_func(
                     |builder| {
                         let base_scope = self.scopes.insert(Scope {
                             vars: Default::default(),
                             parent: None,
-                            typ: Some(ScopeType::MacroBody),
+                            typ: Some(ScopeType::MacroBody(
+                                ret_pat.as_ref().map(|p| Rc::new(p.clone())),
+                            )),
                         });
 
                         for (i, (name, data)) in
@@ -387,27 +391,77 @@ impl Compiler<'_> {
                             builder.mismatch_throw_if_false(matches_reg, arg_reg, pat.span);
                         }
 
-                        let ret_reg = builder.next_reg();
-
                         match code {
                             MacroCode::Normal(stmts) => {
                                 for stmt in stmts {
                                     self.compile_stmt(stmt, base_scope, builder)?;
                                 }
+                                let ret_reg = builder.next_reg();
+                                builder.load_empty(ret_reg, expr.span);
+                                self.compile_return(
+                                    ret_reg,
+                                    ret_pat.as_ref(),
+                                    false,
+                                    base_scope,
+                                    expr.span,
+                                    builder,
+                                )?;
                             },
                             MacroCode::Lambda(expr) => {
                                 let ret_reg = self.compile_expr(expr, base_scope, builder)?;
-                                builder.ret(ret_reg, false, expr.span);
+                                self.compile_return(
+                                    ret_reg,
+                                    ret_pat.as_ref(),
+                                    false,
+                                    base_scope,
+                                    expr.span,
+                                    builder,
+                                )?;
                             },
                         }
 
                         Ok(())
                     },
-                    store_args.into(),
+                    (store_args.into(), spread_arg),
                     captured,
                     expr.span,
                 )?;
-                todo!()
+
+                for attr in &expr.attributes {
+                    match &**attr {
+                        Attributes::DebugBytecode => builder.mark_func_debug(func_id),
+                        _ => unreachable!(),
+                    }
+                }
+
+                let macro_reg = builder.next_reg();
+                builder.push_raw_opcode(
+                    Opcode::CreateMacro {
+                        func: func_id,
+                        dest: macro_reg,
+                    },
+                    expr.span,
+                );
+
+                for (i, arg) in args.iter().enumerate() {
+                    if let MacroArg::Single {
+                        default: Some(d), ..
+                    } = arg
+                    {
+                        let r = self.compile_expr(d, scope, builder)?;
+
+                        builder.push_raw_opcode(
+                            Opcode::PushMacroDefault {
+                                to: macro_reg,
+                                from: r,
+                                arg: i as u8,
+                            },
+                            expr.span,
+                        );
+                    }
+                }
+
+                Ok(macro_reg)
             },
             Expression::TriggerFunc { code } => todo!(),
             Expression::TriggerFuncCall(_) => todo!(),
@@ -468,9 +522,7 @@ impl Compiler<'_> {
 
                 let base = self.compile_expr(base, scope, builder)?;
 
-                let items_reg = builder.next_reg();
-
-                dict_compile!(items_reg, items);
+                let items_reg = self.compile_dictlike(items, scope, expr.span, builder)?;
 
                 builder.push_raw_opcode(
                     Opcode::MakeInstance {

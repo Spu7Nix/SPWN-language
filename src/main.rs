@@ -68,15 +68,18 @@ fn run_spwn(
 
     cum.compile(&ast, (0..code.len()).into())
         .map_err(|e| e.to_report())?;
+    println!("ccc");
 
-    for (src, code) in &*bytecode_map {
-        code.debug_str(&Rc::new(src.clone()))
+    if build_settings.debug_bytecode {
+        for (src, code) in &*bytecode_map {
+            code.debug_str(&Rc::new(src.clone()), None)
+        }
     }
 
-    let mut vm = Vm::new(false, type_def_map);
+    let mut vm = Vm::new(false, type_def_map, bytecode_map);
 
     let program = Program {
-        bytecode: bytecode_map.get(&src).unwrap().clone(),
+        bytecode: vm.bytecode_map.get(&src).unwrap().clone(),
         src,
     };
     let start = FuncCoord {
@@ -93,6 +96,7 @@ fn run_spwn(
             return_dest: None,
             call_area: None,
         },
+        Box::new(|_| Ok(())),
         ContextSplitMode::Allow,
     )
     .map_err(|e| e.to_report(&vm))?;

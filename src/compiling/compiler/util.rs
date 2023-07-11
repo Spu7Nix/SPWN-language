@@ -8,25 +8,25 @@ use crate::compiling::builder::{BlockID, CodeBuilder, JumpType};
 use crate::compiling::bytecode::UnoptRegister;
 use crate::compiling::error::CompileError;
 use crate::interpreting::value::ValueType;
-use crate::parsing::ast::{Import, ImportType, VisTrait};
+use crate::parsing::ast::{DictItem, Import, ImportType, PatternNode, Vis, VisTrait};
 use crate::parsing::parser::Parser;
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::{ImmutStr, ImmutVec};
 
 impl Compiler<'_> {
-    pub fn is_inside_macro(&self, scope: ScopeID) -> bool {
+    pub fn is_inside_macro(&self, scope: ScopeID) -> Option<Option<Rc<PatternNode>>> {
         let scope = &self.scopes[scope];
         match &scope.typ {
             Some(t) => match t {
-                ScopeType::MacroBody => return true,
-                ScopeType::Global => return false,
+                ScopeType::MacroBody(p) => return Some(p.clone()),
+                ScopeType::Global => return None,
                 _ => (),
             },
             None => (),
         }
         match scope.parent {
             Some(k) => self.is_inside_macro(k),
-            None => false,
+            None => None,
         }
     }
 
@@ -50,7 +50,7 @@ impl Compiler<'_> {
         fn can_return_d(slf: &Compiler, scope: ScopeID, span: CodeSpan) -> CompileResult<()> {
             let scope = &slf.scopes[scope];
             match &scope.typ {
-                Some(ScopeType::MacroBody) => return Ok(()),
+                Some(ScopeType::MacroBody(_)) => return Ok(()),
                 Some(ScopeType::TriggerFunc(def)) => {
                     return Err(CompileError::BreakInTriggerFuncScope {
                         area: slf.make_area(span),
@@ -205,7 +205,7 @@ impl Compiler<'_> {
             .map(|(id, s)| (*id, compiler.intern(&s.value().value)))
             .collect();
 
-        let bytes = bincode::serialize(&self.bytecode_map[&new_src]).unwrap();
+        let bytes = bincode::serialize(&*self.bytecode_map[&new_src]).unwrap();
 
         // dont write bytecode if caching is disabled
         if !self.build_settings.no_bytecode_cache || !self.is_doc_gen {
@@ -293,5 +293,56 @@ impl Compiler<'_> {
             Ok(())
         })?;
         Ok(())
+    }
+
+    pub fn compile_return(
+        &mut self,
+        reg: UnoptRegister,
+        pat: Option<&PatternNode>,
+        module_ret: bool,
+        scope: ScopeID,
+        span: CodeSpan,
+        builder: &mut CodeBuilder<'_>,
+    ) -> CompileResult<()> {
+        if let Some(pat) = pat {
+            let matches_reg = self.compile_pattern_check(reg, pat, true, scope, builder)?;
+            builder.mismatch_throw_if_false(matches_reg, reg, span);
+        }
+
+        builder.ret(reg, module_ret, span);
+
+        Ok(())
+    }
+
+    pub fn compile_dictlike(
+        &mut self,
+        items: &Vec<Vis<DictItem>>,
+        scope: ScopeID,
+        span: CodeSpan,
+        builder: &mut CodeBuilder<'_>,
+    ) -> CompileResult<UnoptRegister> {
+        let out = builder.next_reg();
+        builder.alloc_dict(out, items.len() as u16, span);
+        for item in items {
+            let r = match &item.value().value {
+                Some(e) => self.compile_expr(e, scope, builder)?,
+                None => match self.get_var(item.value().name.value, scope) {
+                    Some(v) => v.reg,
+                    None => {
+                        return Err(CompileError::NonexistentVariable {
+                            area: self.make_area(span),
+                            var: self.resolve(&item.value().name),
+                        })
+                    },
+                },
+            };
+            let k = builder.next_reg();
+
+            let chars = self.resolve_arr(&item.value().name.value);
+            builder.load_const::<ImmutVec<char>>(chars, k, item.value().name.span);
+
+            builder.insert_dict_elem(r, out, k, span, item.is_priv())
+        }
+        Ok(out)
     }
 }

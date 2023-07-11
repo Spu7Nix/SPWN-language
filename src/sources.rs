@@ -12,7 +12,7 @@ use crate::compiling::bytecode::Bytecode;
 use crate::compiling::compiler::{CustomTypeID, TypeDef};
 use crate::new_id_wrapper;
 use crate::parsing::ast::ImportSettings;
-use crate::util::{hyperlink, ImmutStr, SlabMap};
+use crate::util::{hyperlink, ImmutStr, ImmutVec, SlabMap};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpwnSource {
@@ -189,7 +189,7 @@ impl Debug for CodeArea {
 }
 
 #[derive(Default, Deref, DerefMut)]
-pub struct BytecodeMap(AHashMap<SpwnSource, Bytecode>);
+pub struct BytecodeMap(AHashMap<SpwnSource, Rc<Bytecode>>);
 
 #[derive(Default, Deref, DerefMut, Index, IndexMut)]
-pub struct TypeDefMap(AHashMap<CustomTypeID, TypeDef<ImmutStr>>);
+pub struct TypeDefMap(AHashMap<CustomTypeID, TypeDef<ImmutVec<char>>>);

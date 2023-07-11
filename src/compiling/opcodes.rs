@@ -66,6 +66,7 @@ new_id_wrapper! {
     ImportID: u16;
     FuncID: u16;
     AttributeID: u16;
+    CallExprID: u16;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, delve::EnumDisplay, Serialize, Deserialize)]
@@ -81,8 +82,11 @@ pub enum RuntimeStringFlag {
 opcodes! {
     #[delve(display = |id, to| format!("load {id} -> {to}"))]
     LoadConst { id: ConstID, [to] },
-    #[delve(display = |from, to| format!("{from} -> {to}"))]
+
+    #[delve(display = |from, to| format!("{from} deep -> {to}"))]
     CopyDeep { [from], [to] },
+    #[delve(display = |from, to| format!("{from} shallow -> {to}"))]
+    CopyShallow { [from], [to] },
 
     #[delve(display = |from, to| format!("{from} ~> {to}"))]
     CopyMem { [from], [to] },
@@ -263,4 +267,10 @@ opcodes! {
     CreateMacro { func: FuncID, [dest]},
     #[delve(display = |to, f, arg| format!("{f} -> {to} default arg {arg}"))]
     PushMacroDefault { [to], [from], arg: u8},
+
+    #[delve(display = |id| format!("{id}"))]
+    Call { call: CallExprID },
+
+    #[delve(display = |b, d| format!("impl @{b} {{{d}}}"))]
+    Impl { [base], [dict] },
 }

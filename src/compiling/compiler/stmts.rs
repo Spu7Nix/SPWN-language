@@ -206,17 +206,31 @@ impl<'a> Compiler<'a> {
                     },
                 },
                 _ => {
-                    if self.is_inside_macro(scope) {
+                    if let Some(ret_pat) = self.is_inside_macro(scope) {
                         self.assert_can_return(scope, stmt.span)?;
                         match v {
                             None => {
                                 let out_reg = builder.next_reg();
                                 builder.load_empty(out_reg, stmt.span);
-                                builder.ret(out_reg, false, stmt.span)
+                                self.compile_return(
+                                    out_reg,
+                                    ret_pat.as_deref(),
+                                    false,
+                                    scope,
+                                    stmt.span,
+                                    builder,
+                                )?;
                             },
                             Some(expr) => {
                                 let ret_reg = self.compile_expr(expr, scope, builder)?;
-                                builder.ret(ret_reg, false, stmt.span)
+                                self.compile_return(
+                                    ret_reg,
+                                    ret_pat.as_deref(),
+                                    false,
+                                    scope,
+                                    stmt.span,
+                                    builder,
+                                )?;
                             },
                         }
                     } else {
@@ -286,7 +300,7 @@ impl<'a> Compiler<'a> {
                     local: id,
                     source_hash: self.src_hash(),
                 };
-                let name_str = self.resolve(name.value());
+                let name_str = self.resolve_arr(name.value());
                 self.type_def_map.insert(
                     custom_id,
                     TypeDef {
@@ -328,7 +342,18 @@ impl<'a> Compiler<'a> {
                     self.available_custom_types.insert(*name, *id);
                 }
             },
-            Statement::Impl { name: base, items } => todo!(),
+            Statement::Impl { name, items } => {
+                let dict_reg = self.compile_dictlike(items, scope, stmt.span, builder)?;
+                let typ_reg = builder.next_reg();
+                self.load_type(&name.value, typ_reg, name.span, builder)?;
+                builder.push_raw_opcode(
+                    Opcode::Impl {
+                        base: typ_reg,
+                        dict: dict_reg,
+                    },
+                    stmt.span,
+                );
+            },
             Statement::Overload { op, macros } => todo!(),
             Statement::Throw(v) => {
                 let v = self.compile_expr(v, scope, builder)?;

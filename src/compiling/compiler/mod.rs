@@ -16,10 +16,11 @@ use serde::{Deserialize, Serialize};
 use super::builder::BlockID;
 use super::bytecode::UnoptRegister;
 use super::error::CompileError;
+use super::opcodes::FuncID;
 use crate::cli::{BuildSettings, DocSettings};
 use crate::compiling::builder::ProtoBytecode;
 use crate::new_id_wrapper;
-use crate::parsing::ast::{Ast, Vis};
+use crate::parsing::ast::{Ast, PatternNode, Vis};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap};
 use crate::util::{ImmutStr, ImmutVec, Interner, SlabMap};
 
@@ -43,11 +44,11 @@ pub struct VarData {
     reg: UnoptRegister,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum ScopeType {
     Global,
     Loop(BlockID),
-    MacroBody,
+    MacroBody(Option<Rc<PatternNode>>), // return pattern
     TriggerFunc(CodeSpan),
     ArrowStmt(CodeSpan),
 }
@@ -186,13 +187,17 @@ impl Compiler<'_> {
                 }
                 Ok(())
             },
-            Box::new([]),
+            (Box::new([]), None),
             vec![],
             span,
         )?;
         let code = code.build(&self.src, self).unwrap();
 
-        self.bytecode_map.insert((*self.src).clone(), code);
+        if !self.build_settings.debug_bytecode && !code.debug_funcs.is_empty() {
+            code.debug_str(&self.src, Some(&code.debug_funcs))
+        }
+
+        self.bytecode_map.insert((*self.src).clone(), Rc::new(code));
 
         Ok(())
     }

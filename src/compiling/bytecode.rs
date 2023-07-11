@@ -46,16 +46,13 @@ pub enum Constant {
     Id(IDClass, u16),
 }
 
-// pub enum DestructurePattern<R: Copy + std::fmt::Display> {
-//     Read(R),
-//     Write(R),
-//     Array(ImmutVec<Self>),
-//     Dict(AHashMap<ImmutStr, Self>),
-//     Instance {
-//         typ: CustomTypeID,
-//         items: AHashMap<ImmutStr, Self>,
-//     },
-// }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct CallExpr<R: Copy + std::fmt::Display, S> {
+    pub base: R,
+    pub dest: R,
+    pub positional: ImmutVec<R>,
+    pub named: ImmutVec<(S, R)>,
+}
 
 impl Hash for Constant {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -123,7 +120,8 @@ pub struct Function {
 
     pub span: CodeSpan,
 
-    pub args: ImmutVec<Spanned<bool>>,
+    pub args: ImmutVec<Spanned<Option<ImmutStr>>>,
+    pub spread_arg: Option<u8>,
     pub captured_regs: ImmutVec<(OptRegister, OptRegister)>,
 }
 
@@ -142,6 +140,8 @@ pub struct Bytecode {
     pub import_paths: ImmutVec<SpwnSource>,
 
     pub debug_funcs: ImmutVec<FuncID>,
+
+    pub call_exprs: ImmutVec<CallExpr<OptRegister, ImmutStr>>,
 }
 
 mod debug_bytecode {
@@ -186,7 +186,7 @@ mod debug_bytecode {
     }
 
     impl Bytecode {
-        pub fn debug_str(&self, src: &Rc<SpwnSource>) {
+        pub fn debug_str(&self, src: &Rc<SpwnSource>, debug_funcs: Option<&[FuncID]>) {
             println!(
                 "{}\n",
                 format!(
@@ -231,12 +231,19 @@ mod debug_bytecode {
             let code = src.read().unwrap();
 
             let const_regex = Regex::new(r"ConstID\((\d+)\)").unwrap();
+            let func_regex = Regex::new(r"FuncID\((\d+)\)").unwrap();
+            let call_expr_regex = Regex::new(r"CallExprID\((\d+)\)").unwrap();
             let opcode_pos_regex = Regex::new(r"OpcodePos\((\d+)\)").unwrap();
             let import_regex = Regex::new(r"ImportID\((\d+)\)").unwrap();
             let reg_regex = Regex::new(r"(R\d+|R:mem)").unwrap();
             let mem_arrow_regex = Regex::new(r"~>").unwrap();
 
             for (func_id, func) in self.functions.iter().enumerate() {
+                if let Some(v) = debug_funcs {
+                    if !v.contains(&func_id.into()) {
+                        continue;
+                    }
+                }
                 let mut max = TableRowMax::default();
                 let mut rows = vec![];
                 for (
@@ -257,9 +264,32 @@ mod debug_bytecode {
                             let c = reg_regex.replace_all(&c, "$1".bright_red().to_string());
                             let c =
                                 opcode_pos_regex.replace_all(&c, "$1".bright_blue().to_string());
+                            let c = func_regex
+                                .replace_all(&c, "F$1".bright_magenta().bold().to_string());
                             let c = const_regex.replace_all(&c, |c: &Captures| {
                                 let id = c.get(1).unwrap().as_str().parse::<usize>().unwrap();
                                 format!("{}", self.constants[id]).bright_green().to_string()
+                            });
+                            let c = call_expr_regex.replace_all(&c, |c: &Captures| {
+                                let id = c.get(1).unwrap().as_str().parse::<usize>().unwrap();
+
+                                let call_expr = &self.call_exprs[id];
+
+                                format!(
+                                    "{}({}) -> {}",
+                                    call_expr.base.to_string().bright_red(),
+                                    call_expr
+                                        .positional
+                                        .iter()
+                                        .map(|r| r.to_string().bright_red().to_string())
+                                        .chain(call_expr.named.iter().map(|(name, r)| format!(
+                                            "{} = {}",
+                                            name,
+                                            r.to_string().bright_red()
+                                        )))
+                                        .join(", "),
+                                    call_expr.dest.to_string().bright_red()
+                                )
                             });
                             let c = import_regex.replace_all(&c, |c: &Captures| {
                                 let id = c.get(1).unwrap().as_str().parse::<usize>().unwrap();
@@ -351,7 +381,57 @@ mod debug_bytecode {
                     .bright_yellow()
                 );
 
-                let extra = &[("regs used", func.regs_used.to_string())];
+                let extra = &[
+                    ("regs used", func.regs_used.to_string()),
+                    ("args", {
+                        format!(
+                            "{}, ({})",
+                            func.args.len(),
+                            func.args
+                                .iter()
+                                .enumerate()
+                                .map(|(i, f)| {
+                                    let s = f
+                                        .value
+                                        .as_ref()
+                                        .map(|s| s.to_string())
+                                        .unwrap_or("\\".bright_red().to_string());
+                                    if func.spread_arg == Some(i as u8) {
+                                        format!("...{}", s)
+                                    } else {
+                                        s
+                                    }
+                                })
+                                .join(", ")
+                        )
+                    }),
+                    (
+                        "arg regs",
+                        (0..func.args.len())
+                            .map(|i| {
+                                format!(
+                                    "{} {}",
+                                    "~>".bright_green(),
+                                    Register(i as u8).to_string().bright_red()
+                                )
+                            })
+                            .join(", "),
+                    ),
+                    (
+                        "capture regs",
+                        func.captured_regs
+                            .iter()
+                            .map(|(from, to)| {
+                                format!(
+                                    "{} {} {}",
+                                    from.to_string().bright_red().to_string(),
+                                    "~>".bright_green(),
+                                    to.to_string().bright_red().to_string(),
+                                )
+                            })
+                            .join(", "),
+                    ),
+                ];
 
                 for (k, v) in extra {
                     println!("{} {}", format!("│ {}:", k).bright_yellow(), v);

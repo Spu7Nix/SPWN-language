@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::hash_map::Drain;
 use std::iter::Map;
 use std::marker::PhantomData;
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::{Index, IndexMut};
 use std::path::PathBuf;
 use std::process::Output;
@@ -40,7 +41,7 @@ pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Digest(#[serde(with = "hex_serde")] [u8; 16]);
 
 impl From<md5::Digest> for Digest {
@@ -173,12 +174,16 @@ impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
 
 impl<T: std::hash::Hash + Eq + Clone> UniqueRegister<T> {
     pub fn make_vec(&mut self) -> Vec<T> {
-        let mut ve = vec![unsafe { std::mem::zeroed() }; self.len()];
-        for (v, k) in self.drain() {
-            ve[v] = k
-        }
+        unsafe {
+            let mut ve: Vec<MaybeUninit<T>> =
+                (0..self.len()).map(|_| MaybeUninit::uninit()).collect();
 
-        ve
+            for (v, k) in self.drain() {
+                ve[v].write(k);
+            }
+
+            std::mem::transmute::<_, Vec<T>>(ve)
+        }
     }
 }
 
@@ -314,6 +319,6 @@ pub fn clear_ansi(s: &str) -> Cow<'_, str> {
     ANSI_REGEX.replace_all(s, "")
 }
 
-pub fn remove_quotes<'a>(s: &'a str) -> &'a str {
+pub fn remove_quotes(s: &str) -> &str {
     &s[1..(s.len() - 1)]
 }

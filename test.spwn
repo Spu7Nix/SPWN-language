@@ -1,4 +1,23 @@
 
 
+gaga = import "test2.spwn"
 
-gog
+
+dbg gaga.@bingy;
+
+
+// type @giggla
+
+// impl @giggla {
+//     new: () {
+//         return @giggla::{
+//             biby: 5,
+//             lol: "sex"
+//         }
+//     },
+// }
+
+
+// dbg @giggla::new()
+
+
