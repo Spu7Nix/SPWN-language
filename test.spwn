@@ -1,25 +1,2 @@
-
-
-
-
-type @cobra
-
-impl @cobra {
-    gag: (&mut self, n) {
-        self.fuck += n;
-    }
-}
-
-
-jick = @cobra::{
-    fuck: 5,
-    sex: false,
-}
-
-dbg jick;
-jick.gag(1);
-dbg jick;
-jick.gag(2);
-dbg jick;
-
-
+#[spwn::ignore(a = 3, b = B"d")]
+#[test]

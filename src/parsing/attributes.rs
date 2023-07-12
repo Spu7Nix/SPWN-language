@@ -1,9 +1,10 @@
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use lasso::Spur;
 use paste::paste;
 
-use super::ast::{DictItem, Expression};
+use super::ast::{DictItem, ExprNode, Expression};
 use crate::lexing::tokens::Token;
 use crate::parsing::ast::Statement;
 use crate::parsing::error::SyntaxError;
@@ -378,4 +379,46 @@ impl IsValidOn<DictItem> for Vec<Spanned<Attributes>> {
 
         Ok(())
     }
+}
+
+//======================
+
+#[derive(Debug)]
+pub struct Path {
+    pub segments: Vec<Spanned<Spur>>,
+}
+
+#[derive(Debug)]
+pub enum AttrStyle {
+    /// `#[...]`
+    Outer,
+    /// `#![...]`
+    Inner,
+}
+
+#[derive(Debug)]
+pub enum AttrArgs {
+    Empty,
+
+    Delimited(Vec<DelimArg>),
+
+    Eq(Spanned<ExprNode>),
+}
+
+#[derive(Debug)]
+pub struct DelimArg {
+    pub name: Spanned<Spur>,
+    pub expr: Spanned<ExprNode>,
+}
+
+#[derive(Debug)]
+pub struct AttrItem {
+    pub path: Path,
+    pub args: AttrArgs,
+}
+
+#[derive(Debug)]
+pub struct Attribute {
+    pub style: AttrStyle,
+    pub item: AttrItem,
 }

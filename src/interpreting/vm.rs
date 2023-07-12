@@ -874,8 +874,12 @@ impl Vm {
                                     _ => (),
                                 }
 
-                                let Some(members) = self.impls.get(&base_type) else { error!(base_type) };
-                                let Some(r) = members.get(&key) else { error!(base_type) };
+                                let Some(members) = self.impls.get(&base_type) else {
+                                    error!(base_type)
+                                };
+                                let Some(r) = members.get(&key) else {
+                                    error!(base_type)
+                                };
 
                                 let mut v = self.deep_clone(r.value());
 
@@ -1333,7 +1337,7 @@ impl Vm {
                                     macro_def_area: macro_area,
                                     call_area: opcode_area,
                                     call_stack: self.get_call_stack(),
-                                })
+                                });
                             };
                             match &mut fill[*idx] {
                                 ArgFill::Single(opt, ..) => {

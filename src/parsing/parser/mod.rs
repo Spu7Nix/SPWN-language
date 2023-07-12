@@ -185,21 +185,16 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> ParseResult<Ast> {
-        let file_attributes = if self.next_are(&[Token::Hashtag, Token::ExclMark])? {
-            self.next()?;
-            self.next()?;
+        let file_attributes = self.parse_attributes()?;
 
-            self.parse_attributes::<FileAttribute>()?
-        } else {
-            vec![]
-        };
+        dbg!(file_attributes);
 
         let statements = self.parse_statements()?;
         self.expect_tok(Token::Eof)?;
 
         Ok(Ast {
             statements,
-            file_attributes: file_attributes.into_iter().map(|a| a.value).collect(),
+            file_attributes: vec![], //file_attributes.into_iter().map(|a| a.value).collect(),
         })
     }
 }

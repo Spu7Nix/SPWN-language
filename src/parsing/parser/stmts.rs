@@ -19,13 +19,9 @@ impl Parser<'_> {
     pub fn parse_statement(&mut self) -> ParseResult<StmtNode> {
         let start = self.peek_span()?;
 
-        let attrs = if self.skip_tok(Token::Hashtag)? {
-            self.parse_attributes::<Attributes>()?
-        } else {
-            vec![]
-        };
+        let attrs = self.parse_attributes()?;
 
-        let attrs = vec![];
+        dbg!(attrs);
 
         let is_arrow = if self.next_is(Token::Arrow)? {
             self.next()?;
@@ -267,9 +263,9 @@ impl Parser<'_> {
         }
         .spanned(start.extend(self.span()));
 
-        attrs.is_valid_on(&stmt, &self.src)?;
+        // attrs.is_valid_on(&stmt, &self.src)?;
 
-        Ok(stmt.value.into_node(attrs, stmt.span))
+        Ok(stmt.value.into_node(vec![], stmt.span))
     }
 
     pub fn parse_statements(&mut self) -> ParseResult<Statements> {

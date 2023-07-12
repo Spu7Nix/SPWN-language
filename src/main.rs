@@ -68,7 +68,6 @@ fn run_spwn(
 
     cum.compile(&ast, (0..code.len()).into())
         .map_err(|e| e.to_report())?;
-    println!("ccc");
 
     if build_settings.debug_bytecode {
         for (src, code) in &*bytecode_map {
