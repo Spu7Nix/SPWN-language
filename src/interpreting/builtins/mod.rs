@@ -1,30 +1,73 @@
+use super::vm::ValueRef;
+use crate::gd::ids::Id;
+
 #[rustfmt::skip]
 macro_rules! impl_type {
     (
         $(#[doc = $impl_doc:expr])*
         // temporary until 1.0
         $(#[raw($($impl_raw:tt)*)])?
-        impl $typ:ident {
+        impl $value_typ:ident {
             $(
                 $(#[doc = $const_doc:expr])*
                 // temporary until 1.0
                 $(#[raw($($const_raw:tt)*)])?
                 fn $func_name:ident($(
-                    $spwn_var:literal:
+                    $(
+                        ...$var_spread:ident :
+                    )?
 
                     $(
-                        $bind:ident
-                        $( ( $($tuple_var:ident),* $(,)? ) )?
-                        $( { $($struct_var:ident),* $(,)? } )?
-                    )|*
+                        $(
+                            &$ident_ref:ident
+                        )?
+                        $(
+                            $ident:ident
+                        )?
 
-                )*) $(-> $ret_type:ident)? {
+                        $(
+                            ( $( $tuple_field:ident $(,)? ),* )
+                        )?
+                        $(
+                            { $(
+                                $struct_field:ident $(:$struct_bind:ident)? $(,)?
+                            ),* }
+                        )?
+                        $(
+                            : $($var_typ:ident)|+
+                        )?
+                        as $spwn_name:literal
+                    )?
+
+                    $(where ( $($pat:tt)* ) )?
+
+                    $(
+                        = { $($default:tt)* }
+                    )?
+                    
+                    $(,)?
+
+
+                ),*) $(-> $ret_type:ident)? {
                     $($code:tt)*
                 }
             )*
         }
     ) => {
-
+        impl $crate::interpreting::value::type_aliases::$value_typ {
+            pub fn get_override_fn(self, name: &str) -> Option<$crate::interpreting::value::BuiltinFn> {
+                $(
+                    fn $func_name(
+                        args: Vec<$crate::interpreting::vm::ValueRef>,
+                        vm: &mut $crate::Vm,
+                        area: $crate::sources::CodeArea,
+                    ) -> $crate::interpreting::vm::RuntimeResult<$crate::interpreting::value::Value> {
+                        todo!()
+                    }
+                )*
+                todo!()
+            }
+        }
 
 
     };
@@ -32,56 +75,18 @@ macro_rules! impl_type {
 
 impl_type! {
     impl Array {
+        fn push(String(s) as "drfgdf") {
 
-        fn join("self": String(s)) {
 
+            sex.value_area()
+
+            slf.group.borrow()
+
+            // match gug.borrow().value {
+            //     String::
+            //     _ => unreachable!(),
+            // }
         }
-
 
     }
 }
-
-// enum ValueType {
-//     Int,
-//     Float,
-//     String,
-//     Array,
-
-//     A(bool),
-// }
-
-// impl ValueType {
-//     pub fn get_override_fn(&self) {
-//         match self {
-//             ValueType::Int => <ValueType as Foo<
-//                 { unsafe { std::mem::transmute::<_, u8>(ValueType::Int) } },
-//             >>::builtin_fns(self),
-//             ValueType::Float => <ValueType as Foo<
-//                 { unsafe { std::mem::transmute::<_, u8>(ValueType::Float) } },
-//             >>::builtin_fns(self),
-//             ValueType::String => <ValueType as Foo<
-//                 { unsafe { std::mem::transmute::<_, u8>(ValueType::String) } },
-//             >>::builtin_fns(self),
-//             ValueType::Array => <ValueType as Foo<
-//                 { unsafe { std::mem::transmute::<_, u8>(ValueType::Array) } },
-//             >>::builtin_fns(self),
-//             _ => todo!(),
-//         }
-//     }
-// }
-
-// trait Foo<const A: u8> {
-//     fn builtin_fns(&self);
-// }
-
-// impl Foo<{ unsafe { std::mem::transmute::<_, u8>(ValueType::Int) } }> for ValueType {
-//     fn builtin_fns(&self) {
-//         //
-//     }
-// }
-
-// impl Foo<{ unsafe { std::mem::transmute::<_, u8>(ValueType::Float) } }> for ValueType {
-//     fn builtin_fns(&self) {
-//         //
-//     }
-// }

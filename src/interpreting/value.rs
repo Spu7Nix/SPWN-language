@@ -78,6 +78,118 @@ macro_rules! value {
             }
         }
 
+        pub mod value_structs {
+            use super::*;
+            
+            #[derive(Debug, PartialEq)]
+            pub struct FieldGetter<'a, T> {
+                value_ref: &'a ValueRef,
+                getter: fn(&ValueRef) -> std::cell::Ref<'a, T>,
+                getter_mut: fn(&ValueRef) -> std::cell::RefMut<'a, T>,
+            }
+
+            impl<'a, T> FieldGetter<'a, T> {
+                pub fn borrow(&'a self) -> std::cell::Ref<'a, T> {
+                    (self.getter)(self.value_ref)
+                }
+                pub fn borrow_mut(&'a self) -> std::cell::RefMut<'a, T> {
+                    (self.getter_mut)(self.value_ref)
+                }
+                pub fn parent_area(&'a self) -> CodeArea {
+                    self.value_ref.borrow().area.clone()
+                }
+            } 
+
+
+            paste::paste! {
+                $(
+                    value! { 
+                        @struct [<$name Getter>]<'a> 
+                        $( 
+                            ( 
+                                $( FieldGetter<'a, $t0>, )* 
+                            )
+                        )? 
+                        $( 
+                            { 
+                                $( $n: FieldGetter<'a, $t1>, )* 
+                            } 
+                        )? 
+                    }
+                )*
+            }
+        }
+        
+
+        pub mod type_aliases {
+            use super::*;
+
+            pub trait TypeAliasDefaultThisIsNecessaryLOLItsSoThatItHasADefaultAndThenTheDirectImplInBuiltinUtilsOverwritesIt {
+                fn get_override_fn(&self, _: &str) -> Option<BuiltinFn> {
+                    None
+                }
+            }
+
+            $(
+                pub struct $name;
+                impl TypeAliasDefaultThisIsNecessaryLOLItsSoThatItHasADefaultAndThenTheDirectImplInBuiltinUtilsOverwritesIt for $name {}
+            )*
+
+            impl ValueType {
+                pub fn get_override_fn(self, name: &str) -> Option<BuiltinFn> {
+                    match self {
+                        $(
+                            Self::$name => type_aliases::$name.get_override_fn(name),
+                        )*
+                        _ => unreachable!(),
+                    }
+                }
+            }
+        }
+    };
+
+    // required cause structs with curly braces cant have semicolons
+    (@struct $name:ident $(<$lt:lifetime>)?) => {
+        #[derive(Clone, Debug, PartialEq)]
+        pub struct $name $(<$lt> (std::marker::PhantomData<&$lt ()>) )?;
+    };
+    (@struct $name:ident $(<$lt:lifetime>)? ( $( $t0:ty, )* )) => {
+        #[derive(Debug, PartialEq)]
+        pub struct $name $(<$lt>)? ( $( pub $t0, )* );
+
+   
+        impl<'a> $name<'a> {
+            pub fn area(&self) -> CodeArea {
+                self.0.parent_area()
+                
+                // const VALUE_REF_SIZE: usize = std::mem::size_of::<ValueRef>();
+                // const STRUCT_SIZE: usize = std::mem::size_of::<$name>();
+
+                // type Equiv = [u8; STRUCT_SIZE];
+                // let ptr = self as *const $name as *const Equiv;
+                // unsafe {
+                //     let read =
+                //         &std::ptr::read(ptr)[(STRUCT_SIZE - VALUE_REF_SIZE)..]
+                //             as *const [u8]
+                //             // as *const [u8; VALUE_REF_SIZE]
+                //             as *const ValueRef;
+
+                //     (*read).borrow().area.clone()
+                // }
+            }
+        }
+    };
+    (@struct $name:ident $(<$lt:lifetime>)? { $( $n:ident: $t1:ty, )* }) => {
+        #[derive(Debug, PartialEq)]
+        pub struct $name $(<$lt>)? { $( pub $n: $t1, )* }
+
+        impl<'a> $name<'a> {
+            pub fn area(&self) -> CodeArea {
+                $(
+                    return self.$n.parent_area();
+                )*
+            }
+        }
     };
 }
 
