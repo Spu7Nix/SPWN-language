@@ -424,10 +424,18 @@ pub fn range(
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
-        (Value::Int(a), Value::Int(b)) => Value::Range(*a, *b, 1),
-        (Value::Range(start, end, step), Value::Int(b)) => {
+        (Value::Int(a), Value::Int(b)) => Value::Range {
+            start: *a,
+            end: *b,
+            step: 1,
+        },
+        (Value::Range { start, end, step }, Value::Int(b)) => {
             if *step == 1 {
-                Value::Range(*start, *b, *end as usize)
+                Value::Range {
+                    start: *start,
+                    end: *b,
+                    step: *end as usize,
+                }
             } else {
                 todo!()
             }

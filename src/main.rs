@@ -34,6 +34,8 @@ mod parsing;
 mod sources;
 mod util;
 
+const CORE_PATH: &str = "./libraries/core/";
+
 fn run_spwn(
     build_settings: BuildSettings,
     doc_settings: DocSettings,

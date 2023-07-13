@@ -35,23 +35,21 @@ macro_rules! value {
         $(
             $(#[$($meta:meta)*] )?
             $name:ident
-                $( ( $( $t0:ty ),* ) )?
+                $( ( $tuple_typ:ty ) )?
                 $( { $( $n:ident: $t1:ty ,)* } )?
             ,
         )*
 
-        => $i_name:ident
-            $( ( $( $it0:ty ),* ) )?
-            $( { $( $in:ident: $it1:ty ,)* } )?
+        => $i_name:ident { $( $i_field:ident: $i_typ:ty ,)* }
         ,
     ) => {
         #[derive(Debug, Clone, PartialEq, Default)]
         pub enum Value {
             $(
                 $(#[$($meta)*])?
-                $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?,
+                $name $( ( $tuple_typ ) )? $( { $( $n: $t1 ,)* } )?,
             )*
-            $i_name $( ( $( $it0 ),* ) )? $( { $( $in: $it1 ,)* } )?,
+            $i_name { $( $i_field: $i_typ ,)* },
         }
 
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, Default, EnumFromStr, EnumVariantNames, EnumToStr)]
@@ -84,8 +82,8 @@ macro_rules! value {
             #[derive(Debug, PartialEq)]
             pub struct FieldGetter<'a, T> {
                 value_ref: &'a ValueRef,
-                getter: fn(&ValueRef) -> std::cell::Ref<'a, T>,
-                getter_mut: fn(&ValueRef) -> std::cell::RefMut<'a, T>,
+                getter: fn(&'a ValueRef) -> std::cell::Ref<'a, T>,
+                getter_mut: fn(&'a ValueRef) -> std::cell::RefMut<'a, T>,
             }
 
             impl<'a, T> FieldGetter<'a, T> {
@@ -103,24 +101,115 @@ macro_rules! value {
 
             paste::paste! {
                 $(
-                    value! { 
-                        @struct [<$name Getter>]<'a> 
-                        $( 
-                            ( 
-                                $( FieldGetter<'a, $t0>, )* 
+                    value! {
+                        @struct [<$name Getter>]<'a>
+                        $(
+                            (
+                                FieldGetter<'a, $tuple_typ>,
                             )
-                        )? 
-                        $( 
-                            { 
-                                $( $n: FieldGetter<'a, $t1>, )* 
-                            } 
-                        )? 
+                        )?
+                        $(
+                            {
+                                $( $n: FieldGetter<'a, $t1>, )*
+                            }
+                        )?
+                    }
+
+                    $(
+                        impl<'a> [<$name Getter>]<'a> {
+                            pub fn area(&'a self) -> CodeArea {
+                                stringify!($tuple_typ);
+                                self.0.parent_area()
+                                
+                                // const VALUE_REF_SIZE: usize = std::mem::size_of::<ValueRef>();
+                                // const STRUCT_SIZE: usize = std::mem::size_of::<$name>();
+
+                                // type Equiv = [u8; STRUCT_SIZE];
+                                // let ptr = self as *const $name as *const Equiv;
+                                // unsafe {
+                                //     let read =
+                                //         &std::ptr::read(ptr)[(STRUCT_SIZE - VALUE_REF_SIZE)..]
+                                //             as *const [u8]
+                                //             // as *const [u8; VALUE_REF_SIZE]
+                                //             as *const ValueRef;
+
+                                //     (*read).borrow().area.clone()
+                                // }
+                            }
+                        }
+                    )?
+
+                    $(
+                        impl<'a> [<$name Getter>]<'a> {
+                            #[allow(unreachable_code)]
+                            pub fn area(&'a self) -> CodeArea {
+                                $(
+                                    return self.$n.parent_area();
+                                )*
+                            }
+                        }
+                    )?
+
+                    impl<'a> [<$name Getter>]<'a> {
+                        pub const fn make_from(vref: &'a ValueRef) -> Self {
+                            value! { @make
+                                Self 
+                                $( 
+                                    ( 
+                                        FieldGetter::<'a, $tuple_typ> {
+                                            value_ref: vref,
+                                            getter: |vr: &ValueRef| {
+                                                std::cell::Ref::map(vr.borrow(), |v| {
+                                                    match &v.value {
+                                                        Value::$name(field) => field,
+                                                        _ => panic!("wrong GUNGLY TYPE DUM BASS")
+                                                    }
+                                                })
+                                            },
+                                            getter_mut: |vr: &ValueRef| {
+                                                std::cell::RefMut::map(vr.borrow_mut(), |v| {
+                                                    match &mut v.value {
+                                                        Value::$name(field) => field,
+                                                        _ => panic!("wrong GUNGLY TYPE DUM BASS")
+                                                    }
+                                                })
+                                            }
+                                        }
+                                    ) 
+                                )?
+                                $( 
+                                    { 
+                                        $(
+                                            $n: FieldGetter::<'a, $t1> {
+                                                value_ref: vref,
+                                                getter: |vr: &ValueRef| {
+                                                    std::cell::Ref::map(vr.borrow(), |v| {
+                                                        match &v.value {
+                                                            Value::$name { $n, .. } => $n,
+                                                            _ => panic!("wrong GUNGLY TYPE DUM BASS")
+                                                        }
+                                                    })
+                                                },
+                                                getter_mut: |vr: &ValueRef| {
+                                                    std::cell::RefMut::map(vr.borrow_mut(), |v| {
+                                                        match &mut v.value {
+                                                            Value::$name { $n, .. } => $n,
+                                                            _ => panic!("wrong GUNGLY TYPE DUM BASS")
+                                                        }
+                                                    })
+                                                }
+                                            },
+                                        )*
+                                    } 
+                                )?
+                            }
+                            
+                        }
                     }
                 )*
             }
         }
         
-
         pub mod type_aliases {
             use super::*;
 
@@ -149,47 +238,24 @@ macro_rules! value {
     };
 
     // required cause structs with curly braces cant have semicolons
-    (@struct $name:ident $(<$lt:lifetime>)?) => {
+    (@struct $name:ident <$lt:lifetime>) => {
         #[derive(Clone, Debug, PartialEq)]
-        pub struct $name $(<$lt> (std::marker::PhantomData<&$lt ()>) )?;
+        pub struct $name <$lt> (std::marker::PhantomData<&$lt ()>);
     };
-    (@struct $name:ident $(<$lt:lifetime>)? ( $( $t0:ty, )* )) => {
+    (@struct $name:ident <$lt:lifetime> ( $( $t0:ty, )* )) => {
         #[derive(Debug, PartialEq)]
-        pub struct $name $(<$lt>)? ( $( pub $t0, )* );
-
-   
-        impl<'a> $name<'a> {
-            pub fn area(&self) -> CodeArea {
-                self.0.parent_area()
-                
-                // const VALUE_REF_SIZE: usize = std::mem::size_of::<ValueRef>();
-                // const STRUCT_SIZE: usize = std::mem::size_of::<$name>();
-
-                // type Equiv = [u8; STRUCT_SIZE];
-                // let ptr = self as *const $name as *const Equiv;
-                // unsafe {
-                //     let read =
-                //         &std::ptr::read(ptr)[(STRUCT_SIZE - VALUE_REF_SIZE)..]
-                //             as *const [u8]
-                //             // as *const [u8; VALUE_REF_SIZE]
-                //             as *const ValueRef;
-
-                //     (*read).borrow().area.clone()
-                // }
-            }
-        }
+        pub struct $name <$lt> ( $( pub $t0, )* );
     };
-    (@struct $name:ident $(<$lt:lifetime>)? { $( $n:ident: $t1:ty, )* }) => {
+    (@struct $name:ident <$lt:lifetime> { $( $n:ident: $t1:ty, )* }) => {
         #[derive(Debug, PartialEq)]
-        pub struct $name $(<$lt>)? { $( pub $n: $t1, )* }
+        pub struct $name <$lt> { $( pub $n: $t1, )* }
+    };
 
-        impl<'a> $name<'a> {
-            pub fn area(&self) -> CodeArea {
-                $(
-                    return self.$n.parent_area();
-                )*
-            }
-        }
+    (@make $name:ident) => {
+        $name(std::marker::PhantomData)
+    };
+    (@make $name:ident $($t:tt)*) => {
+        $name $($t)*
     };
 }
 
@@ -223,7 +289,11 @@ value! {
 
     Builtins,
 
-    Range(i64, i64, usize), //start, end, step
+    Range {
+        start: i64,
+        end: i64,
+        step: usize,
+    }, //start, end, step
 
     Maybe(Option<ValueRef>),
 
@@ -324,11 +394,11 @@ impl Value {
             Value::Item(id) => id.fmt("i"),
             Value::Builtins => "$".to_string(),
             Value::Chroma { r, g, b, a } => format!("@chroma::rgb8({r}, {g}, {b}, {a})"),
-            Value::Range(n1, n2, s) => {
-                if *s == 1 {
-                    format!("{n1}..{n2}")
+            Value::Range { start, end, step } => {
+                if *step == 1 {
+                    format!("{start}..{end}")
                 } else {
-                    format!("{n1}..{s}..{n2}")
+                    format!("{start}..{step}..{end}")
                 }
             },
             Value::Maybe(o) => match o {
@@ -399,3 +469,15 @@ impl Value {
         }
     }
 }
+
+// const fn glump<const N: usize>(arr: [usize; N]) -> usize {
+//     const I: usize = 0;
+//     const I: usize = 1;
+
+//     todo!()
+//     // let mut glub = 0;
+//     // for i in 0..N {
+//     //     glub += i
+//     // }
+//     // glub
+// }

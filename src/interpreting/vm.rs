@@ -35,7 +35,7 @@ use crate::util::{ImmutCloneVec, ImmutStr, ImmutVec, Interner};
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
-trait DeepClone<I> {
+pub trait DeepClone<I> {
     fn deep_clone(&self, input: I) -> StoredValue;
     fn deep_clone_ref(&self, input: I) -> ValueRef {
         let v: StoredValue = self.deep_clone(input);
@@ -742,11 +742,11 @@ impl Vm {
                                 Some(Value::Int(s.len() as i64))
                             },
 
-                            (Value::Range(start, ..), ['s', 't', 'a', 'r', 't']) => {
+                            (Value::Range { start, .. }, ['s', 't', 'a', 'r', 't']) => {
                                 Some(Value::Int(*start))
                             },
-                            (Value::Range(_, end, _), ['e', 'n', 'd']) => Some(Value::Int(*end)),
-                            (Value::Range(_, _, step), ['s', 't', 'e', 'p']) => {
+                            (Value::Range { end, .. }, ['e', 'n', 'd']) => Some(Value::Int(*end)),
+                            (Value::Range { step, .. }, ['s', 't', 'e', 'p']) => {
                                 Some(Value::Int(*step as i64))
                             },
 
@@ -1530,7 +1530,7 @@ impl Vm {
             Value::Block(a) => a.hash(state),
             Value::Item(a) => a.hash(state),
             Value::Builtins => (),
-            Value::Range(a, b, c) => (a, b, c).hash(state),
+            Value::Range { start, end, step } => (start, end, step).hash(state),
             Value::Maybe(a) => {
                 if let Some(v) = a {
                     self.hash_value(v, state)

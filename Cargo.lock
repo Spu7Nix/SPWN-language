@@ -238,21 +238,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "defile"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4362749ff7c9a178a405cde5e93c1f5de0cb66403313460e1e10f09632592513"
-dependencies = [
- "defile-proc_macros",
-]
-
-[[package]]
-name = "defile-proc_macros"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f86f4483ac4efccc7a82314a40a7234a352181aa8aa8369a7c5bebfdd94a9b46"
-
-[[package]]
 name = "deluxe"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -664,6 +649,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "randsym"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efe45e8923a4ed86215e5622887f189ee9492b93e5823eff5129cd9b326bf4b0"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "regex"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -770,7 +764,6 @@ dependencies = [
  "colored",
  "concolor",
  "crc32fast",
- "defile",
  "delve",
  "derive_more",
  "heuristic-graph-coloring",
@@ -785,6 +778,7 @@ dependencies = [
  "paste",
  "quick-xml",
  "rand",
+ "randsym",
  "regex",
  "semver",
  "serde",
@@ -894,6 +888,16 @@ name = "unindent"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1766d682d402817b5ac4490b3c3002d91dfa0d22812f341609f97b08757359c"
+
+[[package]]
+name = "uuid"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d023da39d1fde5a8a3fe1f3e01ca9632ada0a63e9797de55a879d6e2236277be"
+dependencies = [
+ "getrandom",
+ "rand",
+]
 
 [[package]]
 name = "version_check"
