@@ -1,4 +1,7 @@
+pub mod core;
+
 #[rustfmt::skip]
+#[macro_export]
 macro_rules! impl_type {
     (
         $(#[doc = $impl_doc:expr])*
@@ -25,12 +28,10 @@ macro_rules! impl_type {
                         vm: &mut $crate::Vm,
                         area: $crate::sources::CodeArea,
                     ) -> $crate::interpreting::vm::RuntimeResult<$crate::interpreting::value::Value> {
-
                         use $crate::interpreting::value::value_structs::*;
                         
                         impl_type! { @ArgsA[0](args, vm, area) $($args)* }
 
-                        // let arg_refs = args.iter().map(|v| )
                         Ok({$($code)*})
                     }
                 )*
@@ -61,7 +62,7 @@ macro_rules! impl_type {
                                 macro_name = stringify!($func_name),
                                 macro_args = {
                                     let mut out = String::new();
-                                    impl_type! { @SpwnArgsGenA(out) $($args)* }
+                                    $crate::interpreting::builtins::impl_type! { @SpwnArgsGenA(out) $($args)* }
                                     out
                                 },
                                 macro_ret = {
@@ -102,6 +103,25 @@ macro_rules! impl_type {
     // any kind of argument
     (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) $(&)? $ident:ident $($t:tt)+) => {
         impl_type! { @ArgsB[$ __ $idx]($args, $vm, $area) $ident $($t)+ }
+    };
+
+    // spread arguments single type
+    (
+        @ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident)
+
+        ...$var:ident : $typ:ident $(if $pattern:literal)? $(as $spwn_name:literal)?
+
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
+        paste::paste! {
+            let $var = match &$args[$idx].borrow().value {
+                $crate::interpreting::value::Value::Array(v) => itertools::Itertools::collect_vec(v.iter().map(|v| [< $typ Getter >]::make_from(v))),
+                _ => panic!("scock"),
+            };
+        }
+        
+        impl_type! { @ArgsA[$idx + 1]($args, $vm, $area) $($($t)*)? }
     };
 
     // tuple variant destructure argument
@@ -228,12 +248,43 @@ macro_rules! impl_type {
     };
     (@SpwnArgsGenA($out:ident) $ident:ident $($t:tt)+) => {
         $out += "\n\t\t";
-        impl_type! { @SpwnArgsGenB($out) $ident $($t)+ }
+        $crate::interpreting::builtins::impl_type! { @SpwnArgsGenB($out) $ident $($t)+ }
+    };
+    
+    (
+        @SpwnArgsGenA($out:ident)
+
+        ...$var:ident : $typ:ident $(if $pattern:literal)? $(as $spwn_name:literal)?
+
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
+        paste::paste! {
+            let arg_name = {
+                stringify!($var)
+                $(;
+                    $spwn_name
+                )?
+            };
+
+            $out += " ...";
+            $out += arg_name;
+            $out += ": [@";
+            $out += stringify!([< $typ:snake >]);
+        }
+
+        $(
+            $out += &format!(" & ({})", $pattern);
+        )?
+        $out += "]";
+
+        $out += ",";
+        $crate::interpreting::builtins::impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
     };
 
     (
         @SpwnArgsGenB($out:ident)
-
+        
         $variant:ident $( ( $($t1:tt)* ) )? $( { $($t2:tt)* } )? $(if $pattern:literal)? as $spwn_name:literal $( = $default:literal )?
         
         // rest
@@ -246,7 +297,7 @@ macro_rules! impl_type {
         }
 
         $(
-            $out += &format!(" & ({})", stringify!($pattern));
+            $out += &format!(" & ({})", $pattern);
         )?
 
         $(
@@ -254,7 +305,7 @@ macro_rules! impl_type {
             $out += $default;
         )?
         $out += ",";
-        impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
+        $crate::interpreting::builtins::impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
     };
     (
         @SpwnArgsGenB($out:ident)
@@ -265,7 +316,6 @@ macro_rules! impl_type {
         $(, $($t:tt)*)?
     ) => {
         paste::paste! {
-
             let arg_name = {
                 stringify!($var)
                 $(;
@@ -279,7 +329,7 @@ macro_rules! impl_type {
         }
 
         $(
-            $out += &format!(" & ({})", stringify!($pattern));
+            $out += &format!(" & ({})", $pattern);
         )?
         
         $(
@@ -330,28 +380,7 @@ macro_rules! impl_type {
     
 }
 
-impl_type! {
-    impl Array {
-        /// dsf "fuck"
-        fn push(Array(v) if ">4" as "drfgdf" = "[1, 2]", &glaggle: String if "==69", doinky: String | Array = r#""guny""#) {
-
-
-            // bitch! {
-            //     Range {start, step: balls} => {
-
-            //         // start
-            //     },
-            //     Int(n) => {
-
-            //     },
-            // }
-
-            todo!()
-
-            // v.borrow_mut().push(value)
-        }
-    }
-}
+pub use impl_type;
 
 #[test]
 fn gen_all_core() {

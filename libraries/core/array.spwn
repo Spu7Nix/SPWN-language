@@ -6,11 +6,9 @@
 impl @array {
     
     	
-	#[doc("\ndsf \"fuck\"")]
+	#[doc("\ndsf \"fuck\" 😨")]
 	push: (
-		drfgdf: @array & (">4") = [1, 2],
-		&mut glaggle: @string & ("==69"),
-		doinky: (@string) | (@array) = "guny",
+		drfgdf: @array & (>4) = [1, 2], ...glaggle: [@string & (==69)],
 	) {
     	/* compiler built-in */
 	},
