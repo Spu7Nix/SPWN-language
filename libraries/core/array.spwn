@@ -3,52 +3,15 @@
  * Do not modify or your changes will be overwritten!
 */
 
-
 impl @array {
-
-	is_empty:
-
-		(self: @array) {
-    		/* compiler built-in */
-		},
-	join:
-
-		(self: @array, sep: @string) {
-    		/* compiler built-in */
-		},
-	pop:
-
-		(self: @array) {
-    		/* compiler built-in */
-		},
-	push:
-
-		(self: @array, el) {
-    		/* compiler built-in */
-		},
-	insert:
-
-		(self: @array, index: @int, el) {
-    		/* compiler built-in */
-		},
-	remove:
-
-		(self: @array, index: @int) {
-    		/* compiler built-in */
-		},
-	reversed:
-
-		(self: @array) {
-    		/* compiler built-in */
-		},
-	shift:
-
-		(self: @array) {
-    		/* compiler built-in */
-		},
-	unshift:
-
-		(self: @array, el) {
-    		/* compiler built-in */
-		},
+    
+    	
+	#[doc("\ndsf \"fuck\"")]
+	push: (
+		drfgdf: @array & (">4") = [1, 2],
+		&mut glaggle: @string & ("==69"),
+		doinky: (@string) | (@array) = "guny",
+	) {
+    	/* compiler built-in */
+	},
 }

@@ -48,13 +48,16 @@ macro_rules! impl_type {
                     let macros: &[String] = &[
                         $(
                             indoc::formatdoc!("\t{macro_raw}
-                                \t{macro_name}:
-                                \t\t#[doc(u{macro_doc:?})]
-                                \t\t({macro_args}){macro_ret}{{
-                                    \t\t/* compiler built-in */
-                                \t\t}},",
+                                \t#[doc({macro_doc:?})]
+                                \t{macro_name}: ({macro_args}\n\t){macro_ret}{{
+                                    \t/* compiler built-in */
+                                \t}},",
                                 macro_raw = { "" $(; $fn_raw)? },
-                                macro_doc = <[&'static str]>::join(&[$($fn_doc),*], "\n"),
+                                macro_doc = {
+                                    let doc = <[&'static str]>::join(&["\n\t", $($fn_doc),*], "\n");
+                                    assert!(doc != "", "ERROR: empty doc for builtin fn");
+                                    unindent::unindent(&doc)
+                                },
                                 macro_name = stringify!($func_name),
                                 macro_args = {
                                     let mut out = String::new();
@@ -96,18 +99,20 @@ macro_rules! impl_type {
     // no more args
     (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident)) => {};
 
-    // any kind of argument by reference
-    (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) & $ident:ident $($t:tt)+) => {
-        impl_type! { @ArgsB[$ __ $idx]($args, $vm, $area) $ident $($t)+ }
-    };
-    // any kind of argument ( deep cloned )
-    (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) $ident:ident $($t:tt)+) => {
-        $args[$idx] = $crate::interpreting::vm::DeepClone::deep_clone_ref($vm, &$args[$idx]);
+    // any kind of argument
+    (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) $(&)? $ident:ident $($t:tt)+) => {
         impl_type! { @ArgsB[$ __ $idx]($args, $vm, $area) $ident $($t)+ }
     };
 
     // tuple variant destructure argument
-    (@ArgsB[$_:tt __ $idx:expr]($args:ident, $vm:ident, $area:ident) $variant:ident ($field:ident) as $spwn_name:literal /* rest */ $(, $($t:tt)*)? ) => {
+    (
+        @ArgsB[$_:tt __ $idx:expr]($args:ident, $vm:ident, $area:ident)
+        
+        $variant:ident ($field:ident) $(if $pattern:literal)? as $spwn_name:literal $( = $default:literal )?
+        
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
         paste::paste! {
             let $field = [< $variant Getter >]::make_from(& $args[$idx]).0;
         }
@@ -115,7 +120,14 @@ macro_rules! impl_type {
         impl_type! { @ArgsA[$idx + 1]($args, $vm, $area) $($($t)*)? }
     };
     // struct variant destructure argument
-    (@ArgsB[$_:tt __ $idx:expr]($args:ident, $vm:ident, $area:ident) $variant:ident{ $( $field:ident $(: $bind:ident)? ),* $(,)? } as $spwn_name:literal /* rest */ $(, $($t:tt)*)? ) => {
+    (
+        @ArgsB[$_:tt __ $idx:expr]($args:ident, $vm:ident, $area:ident)
+
+        $variant:ident{ $( $field:ident $(: $bind:ident)? ),* $(,)? } $(if $pattern:literal)? as $spwn_name:literal $( = $default:literal )?
+
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
         paste::paste! {
             let getter = [< $variant Getter >]::make_from(& $args[$idx]);
             
@@ -127,14 +139,28 @@ macro_rules! impl_type {
         impl_type! { @ArgsA[$idx + 1]($args, $vm, $area) $($($t)*)? }
     };
     // single type argument
-    (@ArgsB[$_:tt __ $idx:expr]($args:ident, $vm:ident, $area:ident) $var:ident : $typ:ident $(as $spwn_name:literal)? /* rest */ $(, $($t:tt)*)? ) => {
+    (
+        @ArgsB[$_:tt __ $idx:expr]($args:ident, $vm:ident, $area:ident)
+
+        $var:ident : $typ:ident $(if $pattern:literal)? $(as $spwn_name:literal)? $( = $default:literal )?
+
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
         paste::paste! {
             let $var = [< $typ Getter >]::make_from(& $args[$idx]);
         }
         impl_type! { @ArgsA[$idx + 1]($args, $vm, $area) $($($t)*)? }
     };
     // multiple type argument
-    (@ArgsB[$_:tt __ $idx:expr]($args:ident, $vm:ident, $area:ident) $var:ident : $($typ:ident)|+ $(as $spwn_name:literal)? /* rest */ $(, $($t:tt)*)? ) => {
+    (
+        @ArgsB[$_:tt __ $idx:expr]($args:ident, $vm:ident, $area:ident)
+        
+        $var:ident : $($typ:ident $(if $pattern:literal)?)|+ $(as $spwn_name:literal)? $( = $default:literal )?
+
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
         randsym::randsym! {
             paste::paste! {
                 enum Union<'a> {
@@ -195,22 +221,49 @@ macro_rules! impl_type {
     (@SpwnArgsGenA($out:ident)) => {};
 
     (@SpwnArgsGenA($out:ident) & $ident:ident $($t:tt)+) => {
-        $out += "&";
+        $out += "\n\t\t";
+
+        $out += "&mut ";
         impl_type! { @SpwnArgsGenB($out) $ident $($t)+ }
     };
     (@SpwnArgsGenA($out:ident) $ident:ident $($t:tt)+) => {
+        $out += "\n\t\t";
         impl_type! { @SpwnArgsGenB($out) $ident $($t)+ }
     };
 
-    (@SpwnArgsGenB($out:ident) $variant:ident $( ( $($t1:tt)* ) )? $( { $($t2:tt)* } )? as $spwn_name:literal /* rest */ $(, $($t:tt)*)?) => {
+    (
+        @SpwnArgsGenB($out:ident)
+
+        $variant:ident $( ( $($t1:tt)* ) )? $( { $($t2:tt)* } )? $(if $pattern:literal)? as $spwn_name:literal $( = $default:literal )?
+        
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
         paste::paste! {
             $out += $spwn_name;
             $out += ": @";
             $out += stringify!([< $variant:snake >]);
         }
+
+        $(
+            $out += &format!(" & ({})", stringify!($pattern));
+        )?
+
+        $(
+            $out += " = ";
+            $out += $default;
+        )?
+        $out += ",";
         impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
     };
-    (@SpwnArgsGenB($out:ident) $var:ident : $typ:ident $(as $spwn_name:literal)? /* rest */ $(, $($t:tt)*)? ) => {
+    (
+        @SpwnArgsGenB($out:ident)
+
+        $var:ident : $typ:ident $(if $pattern:literal)? $(as $spwn_name:literal)? $( = $default:literal )?
+        
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
         paste::paste! {
 
             let arg_name = {
@@ -224,9 +277,26 @@ macro_rules! impl_type {
             $out += ": @";
             $out += stringify!([< $typ:snake >]);
         }
+
+        $(
+            $out += &format!(" & ({})", stringify!($pattern));
+        )?
+        
+        $(
+            $out += " = ";
+            $out += $default;
+        )?
+        $out += ",";
         impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
     };
-    (@SpwnArgsGenB($out:ident) $var:ident : $($typ:ident)|+ $(as $spwn_name:literal)? /* rest */ $(, $($t:tt)*)? ) => {
+    (
+        @SpwnArgsGenB($out:ident)
+
+        $var:ident : $($typ:ident $(if $pattern:literal)?)|+ $(as $spwn_name:literal)? $( = $default:literal )?
+        
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
         paste::paste! {
 
             let arg_name = {
@@ -241,9 +311,19 @@ macro_rules! impl_type {
             $out += ": ";
             {
                 use itertools::Itertools;
-                $out += &[$( format!("@{}", stringify!([< $typ:snake >])) ),+].iter().join(" | ")
+                $out += &[$( format!("(@{}{})", stringify!([< $typ:snake >]), {
+                    ""
+                    $(;
+                        format!(" & ({})", $pattern)
+                    )?
+                }) ),+].iter().join(" | ")
             }
         }
+        $(
+            $out += " = ";
+            $out += $default;
+        )?
+        $out += ",";
         impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
     };
 
@@ -252,18 +332,19 @@ macro_rules! impl_type {
 
 impl_type! {
     impl Array {
-        fn push(Array(v) as "drfgdf", bitch: Range | Int) {
+        /// dsf "fuck"
+        fn push(Array(v) if ">4" as "drfgdf" = "[1, 2]", &glaggle: String if "==69", doinky: String | Array = r#""guny""#) {
 
 
-            bitch! {
-                Range {start, step: balls} => {
+            // bitch! {
+            //     Range {start, step: balls} => {
 
-                    // start
-                },
-                Int(n) => {
+            //         // start
+            //     },
+            //     Int(n) => {
 
-                },
-            }
+            //     },
+            // }
 
             todo!()
 
