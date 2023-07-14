@@ -233,5 +233,16 @@ error_maker! {
         IllegalAssign {
             area: CodeArea,
         },
+
+        // ==================================================================
+        #[
+            Message: "`builtin` attribute used outside of core", Note: None;
+            Labels: [
+                area => "This attribute is only allowed inside the core";
+            ]
+        ]
+        BuiltinAttrOutsideOfCore {
+            area: CodeArea,
+        },
     }
 }

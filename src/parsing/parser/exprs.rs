@@ -15,9 +15,13 @@ use crate::sources::{Spannable, Spanned};
 
 impl Parser<'_> {
     pub fn parse_unit(&mut self, allow_macros: bool) -> ParseResult<ExprNode> {
-        let attrs = self.parse_attributes()?;
+        let attrs = if self.next_is(Token::Hashtag)? {
+            self.next()?;
 
-        dbg!(attrs);
+            self.parse_attributes::<Attributes>()?
+        } else {
+            vec![]
+        };
 
         let peek = self.peek()?;
         let start = self.peek_span()?;
@@ -412,9 +416,9 @@ impl Parser<'_> {
             }
         };
 
-        // attrs.is_valid_on(&expr, &self.src)?;
+        attrs.is_valid_on(&expr, &self.src)?;
 
-        Ok(expr.value.into_node(vec![], expr.span))
+        Ok(expr.value.into_node(attrs, expr.span))
     }
 
     pub fn parse_value(&mut self, allow_macros: bool) -> ParseResult<ExprNode> {
@@ -476,7 +480,7 @@ impl Parser<'_> {
                             self.next()?;
                             let start = self.span();
                             let name = self.slice_interned();
-
+                            
                             if let Some((prev, _)) = named_params.iter().find(|(s, _)| s.value == name) {
                                 return Err(SyntaxError::DuplicateKeywordArg { name: self.resolve(&name).to_string(), prev_area: self.make_area(prev.span), area: self.make_area(self.span()) })
                             }

@@ -276,4 +276,6 @@ opcodes! {
     #[delve(display = |b, d| format!("impl @{b} {{{d}}}"))]
     Impl { [base], [dict] },
 
+    #[delve(display = |args, dest| format!("run builtin with {args} args -> {dest}"))]
+    RunBuiltin { args: u8, [dest] },
 }

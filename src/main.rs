@@ -96,6 +96,7 @@ fn run_spwn(
             func: start,
             return_dest: None,
             call_area: None,
+            is_builtin: None,
         },
         Box::new(|_| Ok(())),
         ContextSplitMode::Allow,

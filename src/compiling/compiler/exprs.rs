@@ -17,7 +17,7 @@ use crate::parsing::ast::{
 };
 use crate::parsing::attributes::Attributes;
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
-use crate::sources::{CodeSpan, Spannable, ZEROSPAN};
+use crate::sources::{CodeSpan, Spannable, SpwnSource, ZEROSPAN};
 use crate::util::ImmutVec;
 
 impl Compiler<'_> {
@@ -356,6 +356,23 @@ impl Compiler<'_> {
                     .map(|(i, (_, v))| (v.reg, Register(i + args.len())))
                     .collect_vec();
 
+                let mut is_builtin = false;
+
+                for attr in &expr.attributes {
+                    match &**attr {
+                        Attributes::Builtin => {
+                            // if !matches!(*self.src, SpwnSource::Core(_)) {
+                            //     return Err(CompileError::BuiltinAttrOutsideOfCore {
+                            //         area: self.make_area(attr.span),
+                            //     });
+                            // }
+                            is_builtin = true
+                        },
+                        Attributes::DebugBytecode => (),
+                        _ => unreachable!(),
+                    }
+                }
+
                 let func_id = builder.new_func(
                     |builder| {
                         let base_scope = self.scopes.insert(Scope {
@@ -386,6 +403,26 @@ impl Compiler<'_> {
                             let matches_reg = self
                                 .compile_pattern_check(arg_reg, pat, true, base_scope, builder)?;
                             builder.mismatch_throw_if_false(matches_reg, arg_reg, pat.span);
+                        }
+
+                        if is_builtin {
+                            let ret_reg = builder.next_reg();
+                            builder.push_raw_opcode(
+                                Opcode::RunBuiltin {
+                                    args: args.len() as u8,
+                                    dest: ret_reg,
+                                },
+                                expr.span,
+                            );
+                            self.compile_return(
+                                ret_reg,
+                                ret_pat.as_ref(),
+                                false,
+                                base_scope,
+                                expr.span,
+                                builder,
+                            )?;
+                            return Ok(());
                         }
 
                         match code {
@@ -426,7 +463,10 @@ impl Compiler<'_> {
 
                 for attr in &expr.attributes {
                     match &**attr {
+                        // requires func_id so must be done here
                         Attributes::DebugBytecode => builder.mark_func_debug(func_id),
+                        // handled above
+                        Attributes::Builtin => (),
                         _ => unreachable!(),
                     }
                 }

@@ -20,8 +20,8 @@ use crate::parsing::ast::{MacroArg, Vis, VisSource, VisTrait};
 use crate::sources::{CodeArea, Spanned};
 use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec};
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct BuiltinFn(pub &'static fn(Vec<ValueRef>, &mut Vm, CodeArea) -> RuntimeResult<Value>);
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BuiltinFn(pub fn(Vec<ValueRef>, &mut Vm, CodeArea) -> RuntimeResult<Value>);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -80,43 +80,50 @@ macro_rules! value {
             use super::*;
             
             #[derive(Debug, PartialEq)]
-            pub struct FieldGetter<'a, T> {
+            pub struct FieldGetter<'a, T, const MUT: bool> {
                 value_ref: &'a ValueRef,
                 getter: fn(&'a ValueRef) -> std::cell::Ref<'a, T>,
                 getter_mut: fn(&'a ValueRef) -> std::cell::RefMut<'a, T>,
             }
 
-            impl<'a, T> FieldGetter<'a, T> {
-                pub fn borrow(&'a self) -> std::cell::Ref<'a, T> {
-                    (self.getter)(self.value_ref)
-                }
-                pub fn borrow_mut(&'a self) -> std::cell::RefMut<'a, T> {
-                    (self.getter_mut)(self.value_ref)
-                }
+            impl<'a, T, const MUT: bool> FieldGetter<'a, T, MUT> {
                 pub fn parent_area(&'a self) -> CodeArea {
                     self.value_ref.borrow().area.clone()
                 }
+                pub fn get_ref(&'a self) -> &'a ValueRef {
+                    self.value_ref
+                }
+                pub fn borrow(&'a self) -> std::cell::Ref<'a, T> {
+                    (self.getter)(self.value_ref)
+                }
+            }
+
+            impl<'a, T> FieldGetter<'a, T, true> {
+                pub fn borrow_mut(&'a self) -> std::cell::RefMut<'a, T> {
+                    (self.getter_mut)(self.value_ref)
+                }
             } 
+
 
 
             paste::paste! {
                 $(
                     value! {
-                        @struct [<$name Getter>]<'a>
+                        @struct [<$name Getter>]<'a, const MUT: bool>
                         $(
                             (
-                                FieldGetter<'a, $tuple_typ>,
+                                FieldGetter<'a, $tuple_typ, MUT>,
                             )
                         )?
                         $(
                             {
-                                $( $n: FieldGetter<'a, $t1>, )*
+                                $( $n: FieldGetter<'a, $t1, MUT>, )*
                             }
                         )?
                     }
 
                     $(
-                        impl<'a> [<$name Getter>]<'a> {
+                        impl<'a, const MUT: bool> [<$name Getter>]<'a, MUT> {
                             pub fn area(&'a self) -> CodeArea {
                                 stringify!($tuple_typ);
                                 self.0.parent_area()
@@ -136,27 +143,36 @@ macro_rules! value {
                                 //     (*read).borrow().area.clone()
                                 // }
                             }
+                            pub fn get_ref(&'a self) -> &'a ValueRef {
+                                self.0.get_ref()
+                            }
                         }
                     )?
 
                     $(
-                        impl<'a> [<$name Getter>]<'a> {
+                        impl<'a, const MUT: bool> [<$name Getter>]<'a, MUT> {
                             #[allow(unreachable_code)]
                             pub fn area(&'a self) -> CodeArea {
                                 $(
                                     return self.$n.parent_area();
                                 )*
                             }
+                            #[allow(unreachable_code)]
+                            pub fn get_ref(&'a self) -> &'a ValueRef {
+                                $(
+                                    return self.$n.get_ref();
+                                )*
+                            }
                         }
                     )?
 
-                    impl<'a> [<$name Getter>]<'a> {
+                    impl<'a, const MUT: bool> [<$name Getter>]<'a, MUT> {
                         pub const fn make_from(vref: &'a ValueRef) -> Self {
                             value! { @make
                                 Self 
                                 $( 
                                     ( 
-                                        FieldGetter::<'a, $tuple_typ> {
+                                        FieldGetter::<'a, $tuple_typ, MUT> {
                                             value_ref: vref,
                                             getter: |vr: &ValueRef| {
                                                 std::cell::Ref::map(vr.borrow(), |v| {
@@ -180,7 +196,7 @@ macro_rules! value {
                                 $( 
                                     { 
                                         $(
-                                            $n: FieldGetter::<'a, $t1> {
+                                            $n: FieldGetter::<'a, $t1, MUT> {
                                                 value_ref: vref,
                                                 getter: |vr: &ValueRef| {
                                                     std::cell::Ref::map(vr.borrow(), |v| {
@@ -238,17 +254,17 @@ macro_rules! value {
     };
 
     // required cause structs with curly braces cant have semicolons
-    (@struct $name:ident <$lt:lifetime>) => {
+    (@struct $name:ident <$lt:lifetime $(, const $const_generic:ident : $ty:ty)?>) => {
         #[derive(Clone, Debug, PartialEq)]
-        pub struct $name <$lt> (std::marker::PhantomData<&$lt ()>);
+        pub struct $name <$lt $(, const $const_generic : $ty)?> (std::marker::PhantomData<&$lt ()>);
     };
-    (@struct $name:ident <$lt:lifetime> ( $( $t0:ty, )* )) => {
+    (@struct $name:ident <$lt:lifetime $(, const $const_generic:ident : $ty:ty)?> ( $( $t0:ty, )* )) => {
         #[derive(Debug, PartialEq)]
-        pub struct $name <$lt> ( $( pub $t0, )* );
+        pub struct $name <$lt $(, const $const_generic : $ty)?> ( $( pub $t0, )* );
     };
-    (@struct $name:ident <$lt:lifetime> { $( $n:ident: $t1:ty, )* }) => {
+    (@struct $name:ident <$lt:lifetime $(, const $const_generic:ident : $ty:ty)?> { $( $n:ident: $t1:ty, )* }) => {
         #[derive(Debug, PartialEq)]
-        pub struct $name <$lt> { $( pub $n: $t1, )* }
+        pub struct $name <$lt $(, const $const_generic : $ty)?> { $( pub $n: $t1, )* }
     };
 
     (@make $name:ident) => {

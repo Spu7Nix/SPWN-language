@@ -1,8 +1,0 @@
-
-type @bingy
-
-cunt = "fuck"
-return {
-    blib: 5,
-    cunt,
-}

@@ -14,9 +14,7 @@ use crate::parsing::ast::{
     DictItem, ExprNode, Expression, Import, ImportSettings, ImportType, StringContent, StringFlags,
     StringType, Vis,
 };
-use crate::parsing::attributes::{
-    AttrArgs, AttrItem, AttrStyle, Attribute, Attributes, DelimArg, IsValidOn, ParseAttribute, Path,
-};
+use crate::parsing::attributes::{Attributes, IsValidOn, ParseAttribute};
 use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable, Spanned};
 use crate::util::remove_quotes;
@@ -308,9 +306,12 @@ impl Parser<'_> {
         let mut items = vec![];
 
         list_helper!(self, RBracket {
-            let attrs = self.parse_attributes()?;
+            let attrs = if self.skip_tok(Token::Hashtag)? {
 
-            dbg!(attrs);
+                self.parse_attributes::<Attributes>()?
+            } else {
+                vec![]
+            };
 
             let start = self.peek_span()?;
 
@@ -354,9 +355,9 @@ impl Parser<'_> {
             // this is so backwards if only u could use enum variants as types. . . .
             let mut item = DictItem { name: key.spanned(key_span), attributes: vec![], value: elem }.spanned(start.extend(self.span()));
 
-            // attrs.is_valid_on(&item, &self.src)?;
+            attrs.is_valid_on(&item, &self.src)?;
 
-            // item.attributes = attrs;
+            item.attributes = attrs;
 
             items.push(vis(item.value));
         });
@@ -364,118 +365,14 @@ impl Parser<'_> {
         Ok(items)
     }
 
-    pub fn parse_path(&mut self) -> ParseResult<Path> {
-        let mut segments = vec![];
-
-        loop {
-            self.expect_tok(Token::Ident)?;
-            segments.push(self.slice_interned().spanned(self.span()));
-
-            match self.peek()? {
-                Token::DoubleColon => {
-                    self.next()?;
-                    match self.peek()? {
-                        Token::Ident => continue,
-                        tok => {
-                            return Err(SyntaxError::UnexpectedToken {
-                                expected: Token::Ident.to_str().into(),
-                                found: tok,
-                                area: self.make_area(self.span()),
-                            });
-                        },
-                    }
-                },
-                _ => break,
-            }
-        }
-
-        Ok(Path { segments })
-    }
-
-    pub fn parse_attributes(&mut self) -> ParseResult<Vec<Spanned<Attribute>>> {
+    pub fn parse_attributes<T: ParseAttribute>(&mut self) -> ParseResult<Vec<Spanned<T>>> {
         let mut attrs = vec![];
+        self.expect_tok(Token::LSqBracket)?;
 
-        loop {
-            let start_span = self.span();
-
-            if !self.skip_tok(Token::Hashtag)? {
-                break;
-            }
-
-            let mut attr_style = AttrStyle::Outer;
-            if self.skip_tok(Token::ExclMark)? {
-                attr_style = AttrStyle::Inner;
-            }
-
-            self.expect_tok(Token::LSqBracket)?;
-
-            let path = self.parse_path()?;
-
-            attrs.push(
-                match self.peek()? {
-                    Token::RSqBracket => {
-                        self.next()?;
-                        Attribute {
-                            style: attr_style,
-                            item: AttrItem {
-                                path,
-                                args: AttrArgs::Empty,
-                            },
-                        }
-                    },
-                    Token::Assign => {
-                        self.next()?;
-
-                        let expr = self.parse_expr(false)?.spanned(self.span());
-
-                        self.expect_tok(Token::RSqBracket)?;
-
-                        Attribute {
-                            style: attr_style,
-                            item: AttrItem {
-                                path,
-                                args: AttrArgs::Eq(expr),
-                            },
-                        }
-                    },
-                    Token::LParen => {
-                        self.next()?;
-
-                        let mut args = vec![];
-
-                        list_helper!(self, RParen {
-                            self.expect_tok(Token::Ident)?;
-
-                            let name = self.slice_interned().spanned(self.span());
-
-                            self.expect_tok(Token::Assign)?;
-
-                            let expr = self.parse_expr(false)?.spanned(self.span());
-
-                            args.push(DelimArg { name, expr });
-                        });
-
-                        self.expect_tok(Token::RSqBracket)?;
-
-                        Attribute {
-                            style: attr_style,
-                            item: AttrItem {
-                                path,
-                                args: AttrArgs::Delimited(args),
-                            },
-                        }
-                    },
-                    tok => {
-                        return Err(SyntaxError::UnexpectedToken {
-                            expected: "`(`, `=` or `]`".into(),
-                            found: tok,
-                            area: self.make_area(self.span()),
-                        });
-                    },
-                }
-                .spanned(start_span.extend(self.span())),
-            );
-        }
+        list_helper!(self, RSqBracket {
+            let start = self.peek_span()?;
+            attrs.push(T::parse(self)?.spanned(start.extend(self.span())))
+        });
 
         Ok(attrs)
     }

@@ -13,7 +13,7 @@ use derive_more::{Deref, DerefMut};
 use itertools::{Either, Itertools};
 use lasso::Spur;
 
-use super::context::{CallInfo, Context, ContextSplitMode, ContextStack, FullContext, FuncStorage};
+use super::context::{CallInfo, Context, ContextSplitMode, ContextStack, FullContext, StackItem};
 use super::value::{StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::{
@@ -99,7 +99,7 @@ impl FuncCoord {
 }
 
 pub struct Vm {
-    contexts: ContextStack,
+    pub contexts: ContextStack,
 
     is_doc_gen: bool,
 
@@ -237,6 +237,7 @@ impl Vm {
         let CallInfo {
             func: FuncCoord { program, func },
             return_dest,
+            is_builtin,
             ..
         } = call_info.clone();
 
@@ -261,7 +262,7 @@ impl Vm {
                 regs[i as usize] = ManuallyDrop::new(v);
             }
 
-            context.stack.push(FuncStorage { registers: regs });
+            context.stack.push(StackItem { registers: regs });
         }
 
         self.contexts.push(FullContext::new(context, call_info));
@@ -609,6 +610,7 @@ impl Vm {
                                 func: coord,
                                 return_dest: Some(dest),
                                 call_area: None,
+                                is_builtin: None,
                             },
                             Box::new(|_| Ok(())),
                             ContextSplitMode::Disallow,
@@ -1355,6 +1357,7 @@ impl Vm {
                         }
                         let func = data.func.clone();
                         let captured = data.captured.clone();
+                        let is_builtin = data.is_builtin;
 
                         mem::drop(base);
 
@@ -1366,6 +1369,7 @@ impl Vm {
                                 func,
                                 return_dest: Some(call_expr.dest),
                                 call_area: Some(self.make_area(opcode_span, &program)),
+                                is_builtin,
                             },
                             Box::new(move |vm| {
                                 let arg_amount = fill.len();
@@ -1420,26 +1424,43 @@ impl Vm {
                                     &*program.src,
                                     SpwnSource::Core(_) | SpwnSource::Std(_)
                                 ) {
-                                    return Err(RuntimeError::ImplOnBuiltin {
-                                        area: self.make_area(opcode_span, &program),
-                                        call_stack: self.get_call_stack(),
-                                    });
+                                    // return Err(RuntimeError::ImplOnBuiltin {
+                                    //     area: self.make_area(opcode_span, &program),
+                                    //     call_stack: self.get_call_stack(),
+                                    // });
                                 }
                             },
                         }
 
-                        let mut map = match &self.get_reg_ref(dict).borrow().value {
+                        let map = match &self.get_reg_ref(dict).borrow().value {
                             Value::Dict(t) => t.clone(),
                             _ => unreachable!(),
                         };
 
                         for (k, v) in &map {
                             if let Value::Macro(data) = &mut v.value().borrow_mut().value {
-                                todo!()
+                                if let Some(f) = t.get_override_fn(&k.iter().collect::<String>()) {
+                                    data.is_builtin = Some(f)
+                                }
                             }
                         }
 
                         self.impls.insert(t, map);
+                    },
+                    Opcode::RunBuiltin { args, dest } => {
+                        if let Some(f) = is_builtin {
+                            let area = self.make_area(opcode_span, &program);
+                            let value = f.0(
+                                (0..args)
+                                    .map(|r| self.get_reg_ref(Register(r)).clone())
+                                    .collect_vec(),
+                                self,
+                                area.clone(),
+                            )?;
+                            self.set_reg(dest, value.into_stored(area));
+                        } else {
+                            panic!("mcock")
+                        }
                     },
                 }
                 Ok(LoopFlow::Normal)

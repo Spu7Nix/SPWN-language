@@ -3,24 +3,27 @@ use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
 use std::mem::ManuallyDrop;
 
+use ahash::AHashMap;
 use derive_more::{Deref, DerefMut};
 
-use super::vm::{FuncCoord, ValueRef};
+use super::value::BuiltinFn;
+use super::vm::{FuncCoord, ValueRef, Vm};
 use crate::compiling::bytecode::OptRegister;
 use crate::compiling::opcodes::OpcodePos;
 use crate::gd::ids::Id;
 use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FuncStorage {
+pub struct StackItem {
     pub registers: [ManuallyDrop<ValueRef>; 256],
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CallInfo {
     pub func: FuncCoord,
     pub return_dest: Option<OptRegister>,
     pub call_area: Option<CodeArea>,
+    pub is_builtin: Option<BuiltinFn>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,7 +39,7 @@ pub struct Context {
     pub try_catches: Vec<TryCatch>,
 
     pub group: Id,
-    pub stack: Vec<FuncStorage>,
+    pub stack: Vec<StackItem>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -132,6 +135,33 @@ impl FullContext {
         self.current().group
     }
 }
+
+// impl Vm {
+//     pub fn split_current_context(&mut self) {
+//         let current = self.contexts.current();
+//         let mut new = current.clone();
+
+//         // lord forgive me for what i am about to do
+
+//         let mut clone_map = AHashMap::new();
+
+//         for stack_item in &mut new.stack {
+//             for reg in &mut stack_item.registers {
+//                 let k = match clone_map.get(reg) {
+//                     Some(k) => *k,
+//                     None => {
+//                         let k = self.deep_clone_key_insert(*reg);
+//                         clone_map.insert(*reg, k);
+//                         k
+//                     },
+//                 };
+
+//                 *reg = k;
+//             }
+//         }
+//         self.contexts.last_mut().contexts.push(new);
+//     }
+// }
 
 #[derive(Debug, Deref, DerefMut)]
 pub struct ContextStack(pub Vec<FullContext>);

@@ -1,13 +1,8 @@
 
 
 
-
-m = () -> @string {
-    return false
+if true {
+    import "libraries/core/array.spwn"
 }
 
-try {
-    m()
-} catch e {
-    
-}
+
