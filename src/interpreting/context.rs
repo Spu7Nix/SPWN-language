@@ -6,16 +6,17 @@ use std::mem::ManuallyDrop;
 use ahash::AHashMap;
 use derive_more::{Deref, DerefMut};
 
-use super::value::BuiltinFn;
-use super::vm::{FuncCoord, ValueRef, Vm};
+use super::value::{BuiltinFn, StoredValue};
+use super::vm::{DeepClone, FuncCoord, ValueRef, Vm};
 use crate::compiling::bytecode::OptRegister;
 use crate::compiling::opcodes::OpcodePos;
 use crate::gd::ids::Id;
 use crate::sources::CodeArea;
+use crate::util::ImmutVec;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StackItem {
-    pub registers: [ManuallyDrop<ValueRef>; 256],
+    pub registers: ImmutVec<ValueRef>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,7 +33,7 @@ pub struct TryCatch {
     pub reg: OptRegister,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
     pub ip: usize,
 
@@ -136,32 +137,32 @@ impl FullContext {
     }
 }
 
-// impl Vm {
-//     pub fn split_current_context(&mut self) {
-//         let current = self.contexts.current();
-//         let mut new = current.clone();
+impl Vm {
+    pub fn split_current_context(&mut self) {
+        let current = self.contexts.current();
+        let mut new = current.clone();
 
-//         // lord forgive me for what i am about to do
+        // lord forgive me for what i am about to do
 
-//         let mut clone_map = AHashMap::new();
+        let mut clone_map: AHashMap<*mut StoredValue, ValueRef> = AHashMap::new();
 
-//         for stack_item in &mut new.stack {
-//             for reg in &mut stack_item.registers {
-//                 let k = match clone_map.get(reg) {
-//                     Some(k) => *k,
-//                     None => {
-//                         let k = self.deep_clone_key_insert(*reg);
-//                         clone_map.insert(*reg, k);
-//                         k
-//                     },
-//                 };
+        for stack_item in &mut new.stack {
+            for reg in stack_item.registers.iter_mut() {
+                let k = match clone_map.get(&reg.as_ptr()) {
+                    Some(k) => k.clone(),
+                    None => {
+                        let k = self.deep_clone_ref(&*reg);
+                        clone_map.insert(reg.as_ptr(), k.clone());
+                        k
+                    },
+                };
 
-//                 *reg = k;
-//             }
-//         }
-//         self.contexts.last_mut().contexts.push(new);
-//     }
-// }
+                *reg = k;
+            }
+        }
+        self.contexts.last_mut().contexts.push(new);
+    }
+}
 
 #[derive(Debug, Deref, DerefMut)]
 pub struct ContextStack(pub Vec<FullContext>);

@@ -278,4 +278,12 @@ opcodes! {
 
     #[delve(display = |args, dest| format!("run builtin with {args} args -> {dest}"))]
     RunBuiltin { args: u8, [dest] },
+
+    #[delve(display = |s, d| format!("!{{{s}}} -> {d}"))]
+    MakeTriggerFunc { [src], [dest] },
+    #[delve(display = |f| format!("{f}!"))]
+    CallTriggerFunc { [func] },
+
+    #[delve(display = |r| format!(""))]
+    SetContextGroup { [reg] },
 }

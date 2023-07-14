@@ -92,6 +92,13 @@ impl PartialEq for FuncCoord {
 }
 impl Eq for FuncCoord {}
 
+impl Hash for FuncCoord {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (self.program.as_ref() as *const _ as usize).hash(state);
+        self.func.hash(state);
+    }
+}
+
 impl FuncCoord {
     pub fn get_func(&self) -> &Function {
         self.program.get_function(self.func)
@@ -159,8 +166,7 @@ impl Vm {
     }
 
     pub fn change_reg_ref(&mut self, reg: OptRegister, k: ValueRef) {
-        *self
-            .contexts
+        self.contexts
             .current_mut()
             .stack
             .last_mut()
@@ -210,7 +216,7 @@ impl DeepClone<&ValueRef> for Vm {
 impl DeepClone<OptRegister> for Vm {
     fn deep_clone(&self, input: OptRegister) -> StoredValue {
         let v = &self.contexts.current().stack.last().unwrap().registers[*input as usize];
-        self.deep_clone(&**v)
+        self.deep_clone(v)
     }
 }
 
@@ -245,11 +251,8 @@ impl Vm {
         context.ip = 0;
 
         {
-            let mut regs = unsafe {
-                std::mem::transmute::<_, [ManuallyDrop<ValueRef>; 256]>(
-                    [[0u8; std::mem::size_of::<ManuallyDrop<ValueRef>>()]; 256],
-                )
-            };
+            let used = program.get_function(func).regs_used;
+            let mut regs = Vec::with_capacity(used as usize);
 
             for i in 0..program.get_function(func).regs_used {
                 let v = ValueRef::new(StoredValue {
@@ -259,10 +262,12 @@ impl Vm {
                         span: CodeSpan::internal(),
                     },
                 });
-                regs[i as usize] = ManuallyDrop::new(v);
+                regs.push(v)
             }
 
-            context.stack.push(StackItem { registers: regs });
+            context.stack.push(StackItem {
+                registers: regs.into_boxed_slice(),
+            });
         }
 
         self.contexts.push(FullContext::new(context, call_info));
@@ -274,43 +279,35 @@ impl Vm {
             let ip = self.contexts.ip();
 
             if ip >= opcodes.len() {
-                let ip = self.contexts.ip();
-
-                if ip >= opcodes.len() {
-                    if !self.contexts.last().have_returned {
-                        if has_implicitly_returned && split_mode == ContextSplitMode::Disallow {
-                            return Err(RuntimeError::ContextSplitDisallowed {
-                                area: self.make_area(program.get_function(func).span, &program),
-                                call_stack: self.get_call_stack(),
-                            });
-                        }
-
-                        let return_dest = self.contexts.last().call_info.return_dest;
-                        {
-                            let mut current = self.contexts.current_mut();
-
-                            if let Some(mut regs) = current.stack.pop() {
-                                for i in 0..program.get_function(func).regs_used {
-                                    unsafe { ManuallyDrop::drop(&mut regs.registers[i as usize]) }
-                                }
-                            }
-                        }
-
-                        let mut top = self.contexts.last_mut().yeet_current().unwrap();
-                        top.ip = original_ip + 1;
-
-                        if return_dest.is_some() {
-                            let idx = self.contexts.0.len() - 2;
-                            self.contexts.0[idx].contexts.push(top);
-                        }
-                        has_implicitly_returned = true;
-
-                        continue;
-                    } else {
-                        self.contexts.yeet_current();
+                if !self.contexts.last().have_returned {
+                    if has_implicitly_returned && split_mode == ContextSplitMode::Disallow {
+                        return Err(RuntimeError::ContextSplitDisallowed {
+                            area: self.make_area(program.get_function(func).span, &program),
+                            call_stack: self.get_call_stack(),
+                        });
                     }
+
+                    let return_dest = self.contexts.last().call_info.return_dest;
+                    {
+                        let mut current = self.contexts.current_mut();
+
+                        current.stack.pop();
+                    }
+
+                    let mut top = self.contexts.last_mut().yeet_current().unwrap();
+                    top.ip = original_ip + 1;
+
+                    if return_dest.is_some() {
+                        let idx = self.contexts.0.len() - 2;
+                        self.contexts.0[idx].contexts.push(top);
+                    }
+                    has_implicitly_returned = true;
+
                     continue;
+                } else {
+                    self.contexts.yeet_current();
                 }
+                continue;
             }
 
             let Spanned {
@@ -575,7 +572,7 @@ impl Vm {
                             current.stack.pop();
 
                             if let Some(r) = return_dest {
-                                *current.stack.last_mut().unwrap().registers[*r as usize] =
+                                current.stack.last_mut().unwrap().registers[*r as usize] =
                                     ValueRef::new(ret_val)
                             }
                         }
@@ -616,7 +613,12 @@ impl Vm {
                             ContextSplitMode::Disallow,
                         )?;
                     },
-                    Opcode::EnterArrowStatement { skip } => todo!(),
+                    Opcode::EnterArrowStatement { skip } => {
+                        // println!("futa");
+                        self.split_current_context();
+                        // println!("nari");
+                        self.contexts.jump_current(*skip as usize);
+                    },
                     Opcode::YeetContext => {
                         self.contexts.yeet_current();
                         return Ok(LoopFlow::ContinueLoop);
@@ -624,13 +626,13 @@ impl Vm {
                     Opcode::Dbg { reg } => {
                         let value_ref = self.get_reg_ref(reg).borrow();
 
-                        println!(
-                            "{} {} {}, {:?}",
-                            value_ref.value.runtime_display(self),
-                            "::".dimmed(),
-                            self.contexts.group().fmt("g").green(),
-                            self.get_reg_ref(reg).as_ptr(),
-                        )
+                        // println!(
+                        //     "{} {} {}, {:?}",
+                        //     value_ref.value.runtime_display(self),
+                        //     "::".dimmed(),
+                        //     self.contexts.group().fmt("g").green(),
+                        //     self.get_reg_ref(reg).as_ptr(),
+                        // )
                     },
                     Opcode::Throw { reg } => {
                         let value = self.deep_clone(reg);
@@ -1143,12 +1145,12 @@ impl Vm {
                         self.set_reg(reg, val.into_stored(area))
                     },
                     Opcode::ToString { from, dest } => {
-                        let s = self.get_reg_ref(from).borrow().value.runtime_display(self);
-                        self.set_reg(
-                            dest,
-                            Value::String(s.chars().collect())
-                                .into_stored(self.make_area(opcode_span, &program)),
-                        )
+                        // let s = self.get_reg_ref(from).borrow().value.runtime_display(self);
+                        // self.set_reg(
+                        //     dest,
+                        //     Value::String(s.chars().collect())
+                        //         .into_stored(self.make_area(opcode_span, &program)),
+                        // )
                     },
                     Opcode::MakeInstance { base, items, dest } => {
                         let base = self.get_reg_ref(base).borrow();
@@ -1462,6 +1464,47 @@ impl Vm {
                             panic!("mcock")
                         }
                     },
+                    Opcode::MakeTriggerFunc { src, dest } => {
+                        let group = match &self.get_reg_ref(src).borrow().value {
+                            Value::Group(g) => *g,
+                            _ => unreachable!(),
+                        };
+
+                        self.set_reg(
+                            dest,
+                            Value::TriggerFunction {
+                                group,
+                                prev_context: self.contexts.group(),
+                            }
+                            .into_stored(self.make_area(opcode_span, &program)),
+                        )
+                    },
+                    Opcode::CallTriggerFunc { func } => {
+                        let v = self.get_reg_ref(func).borrow();
+                        let target = match &v.value {
+                            Value::TriggerFunction { group, .. } => *group,
+                            Value::Group(g) => *g,
+                            _ => {
+                                return Err(RuntimeError::TypeMismatch {
+                                    v: (v.value.get_type(), v.area.clone()),
+                                    area: self.make_area(opcode_span, &program),
+                                    expected: ValueType::TriggerFunction, // OR group idk how to make this error do that
+                                    call_stack: self.get_call_stack(),
+                                });
+                            },
+                        };
+                        mem::drop(v);
+                        let trigger = make_spawn_trigger(self.contexts.group(), target, self);
+                        self.triggers.push(trigger);
+                    },
+                    Opcode::SetContextGroup { reg } => {
+                        let group = match &self.get_reg_ref(reg).borrow().value {
+                            Value::Group(g) => *g,
+                            Value::TriggerFunction { prev_context, .. } => *prev_context,
+                            _ => unreachable!(),
+                        };
+                        self.contexts.set_group(group);
+                    },
                 }
                 Ok(LoopFlow::Normal)
             };
@@ -1515,74 +1558,6 @@ impl Vm {
         Ok(())
     }
 
-    pub fn hash_value(&self, val: &ValueRef, state: &mut DefaultHasher) {
-        // hash numbers
-        if let Value::Int(a) = val.borrow().value {
-            mem::discriminant(&Value::Float(0.0)).hash(state);
-            (a as f64).to_bits().hash(state);
-            return;
-            // convert all ints to floats so float-int equality works
-        };
-
-        // hash enum discriminator
-        mem::discriminant(&val.borrow().value).hash(state);
-
-        // todo: rest
-        match &val.borrow().value {
-            Value::Int(_) => unreachable!(),
-            Value::Float(a) => a.to_bits().hash(state),
-            Value::Bool(a) => a.hash(state),
-            Value::String(a) => a.hash(state),
-            Value::Array(a) => {
-                for v in a {
-                    self.hash_value(v, state)
-                }
-            },
-            Value::Dict(a) => {
-                let a: BTreeMap<_, _> = a.iter().collect();
-                for (k, v) in a {
-                    self.hash_value(v.value(), state);
-                    v.source().hash(state);
-                    k.hash(state);
-                }
-            },
-            Value::Group(a) => a.hash(state),
-            Value::Channel(a) => a.hash(state),
-            Value::Block(a) => a.hash(state),
-            Value::Item(a) => a.hash(state),
-            Value::Builtins => (),
-            Value::Range { start, end, step } => (start, end, step).hash(state),
-            Value::Maybe(a) => {
-                if let Some(v) = a {
-                    self.hash_value(v, state)
-                }
-            },
-            Value::Empty => (),
-            Value::Type(a) => a.hash(state),
-            Value::Module { .. } => (),
-            Value::TriggerFunction {
-                group: g,
-                prev_context: p,
-            } => (g, p).hash(state),
-            Value::Error(a) => a.hash(state),
-            Value::Macro(data) => {
-                todo!()
-            },
-            Value::Epsilon => (),
-            Value::Instance { typ, items } => {
-                let items: BTreeMap<_, _> = items.iter().collect();
-                typ.hash(state);
-                for (k, v) in items {
-                    self.hash_value(v.value(), state);
-                    v.source().hash(state);
-                    k.hash(state);
-                }
-            },
-            Value::Chroma { r, g, b, a } => (r, g, b, a).hash(state),
-            Value::ObjectKey(a) => a.hash(state),
-        }
-    }
-
     fn try_merge_contexts(&mut self) {
         let mut top = vec![];
         {
@@ -1612,12 +1587,7 @@ impl Vm {
             let mut hashes = AHashMap::new();
             for ctx in top {
                 let mut state = DefaultHasher::default();
-                for val in &ctx.stack.last().unwrap().registers {
-                    if unsafe {
-                        std::mem::transmute::<_, u64>(std::ptr::read(val as *const _)) == 0
-                    } {
-                        break;
-                    }
+                for val in ctx.stack.last().unwrap().registers.iter() {
                     self.hash_value(val, &mut state);
                 }
                 let hash = state.finish();
@@ -1752,5 +1722,200 @@ impl Vm {
         Ok(match (&v.value, b) {
             _ => todo!("error"),
         })
+    }
+}
+
+impl Vm {
+    pub fn hash_value(&self, val: &ValueRef, state: &mut DefaultHasher) {
+        // todo: rest
+        std::mem::discriminant(&val.borrow().value).hash(state);
+
+        match &val.borrow().value {
+            Value::Int(n) => n.hash(state),
+            Value::Float(a) => a.to_bits().hash(state),
+            Value::Bool(a) => a.hash(state),
+            Value::String(a) => a.hash(state),
+            Value::Array(a) => {
+                for v in a {
+                    self.hash_value(v, state)
+                }
+            },
+            Value::Dict(a) => {
+                let a: BTreeMap<_, _> = a.iter().collect();
+                for (k, v) in a {
+                    self.hash_value(v.value(), state);
+                    v.source().hash(state);
+                    k.hash(state);
+                }
+            },
+            Value::Group(a) => a.hash(state),
+            Value::Channel(a) => a.hash(state),
+            Value::Block(a) => a.hash(state),
+            Value::Item(a) => a.hash(state),
+            Value::Builtins => (),
+            Value::Range { start, end, step } => (start, end, step).hash(state),
+            Value::Maybe(a) => {
+                if let Some(v) = a {
+                    self.hash_value(v, state)
+                }
+            },
+            Value::Empty => (),
+            Value::Type(a) => a.hash(state),
+            Value::Module { exports, types } => {
+                let a: BTreeMap<_, _> = exports.iter().collect();
+                for (k, v) in a {
+                    self.hash_value(v, state);
+                    k.hash(state);
+                }
+                types.hash(state)
+            },
+            Value::TriggerFunction {
+                group: g,
+                prev_context: p,
+            } => (g, p).hash(state),
+            Value::Error(a) => a.hash(state),
+            Value::Macro(MacroData {
+                func,
+                args,
+                self_arg,
+                captured,
+                is_method,
+                is_builtin,
+            }) => {
+                func.hash(state);
+                is_method.hash(state);
+                is_builtin.hash(state);
+                for i in args.iter() {
+                    i.span.hash(state);
+                    if let MacroArg::Single {
+                        default: Some(v), ..
+                    } = &i.value
+                    {
+                        self.hash_value(v, state)
+                    }
+                }
+                if let Some(v) = self_arg {
+                    self.hash_value(v, state)
+                }
+                (captured.as_ref() as *const _ as *const usize).hash(state);
+                // data.func.h
+                // data.hash(state)
+            },
+            Value::Epsilon => (),
+            Value::Instance { typ, items } => {
+                let items: BTreeMap<_, _> = items.iter().collect();
+                typ.hash(state);
+                for (k, v) in items {
+                    self.hash_value(v.value(), state);
+                    v.source().hash(state);
+                    k.hash(state);
+                }
+            },
+            Value::Chroma { r, g, b, a } => (r, g, b, a).hash(state),
+            Value::ObjectKey(a) => a.hash(state),
+        }
+    }
+
+    pub fn runtime_display(&self, value: &ValueRef) -> String {
+        match self {
+            _ => todo!(), // Value::Int(n) => n.to_string(),
+                          // Value::Float(n) => n.to_string(),
+                          // Value::Bool(b) => b.to_string(),
+                          // Value::String(s) => format!("{:?}", s.iter().collect::<String>()),
+                          // Value::Array(arr) => format!(
+                          //     "[{}]",
+                          //     arr.iter()
+                          //         .map(|k| k.borrow().value.runtime_display(vm))
+                          //         .join(", ")
+                          // ),
+                          // Value::Dict(d) => format!(
+                          //     "{{ {} }}",
+                          //     d.iter()
+                          //         .map(|(s, v)| format!(
+                          //             "{}: {}",
+                          //             s.iter().collect::<String>(),
+                          //             v.value().borrow().value.runtime_display(vm)
+                          //         ))
+                          //         .join(", ")
+                          // ),
+                          // Value::Group(id) => id.fmt("g"),
+                          // Value::Channel(id) => id.fmt("c"),
+                          // Value::Block(id) => id.fmt("b"),
+                          // Value::Item(id) => id.fmt("i"),
+                          // Value::Builtins => "$".to_string(),
+                          // Value::Chroma { r, g, b, a } => format!("@chroma::rgb8({r}, {g}, {b}, {a})"),
+                          // Value::Range { start, end, step } => {
+                          //     if *step == 1 {
+                          //         format!("{start}..{end}")
+                          //     } else {
+                          //         format!("{start}..{step}..{end}")
+                          //     }
+                          // },
+                          // Value::Maybe(o) => match o {
+                          //     Some(k) => format!("({})?", k.borrow().value.runtime_display(vm)),
+                          //     None => "?".into(),
+                          // },
+                          // Value::Empty => "()".into(),
+
+                          // Value::Macro(MacroData { args, .. }) => {
+                          //     format!("<{}-arg macro at {:?}>", args.len(), (self as *const _))
+                          // },
+                          // Value::TriggerFunction { .. } => "!{...}".to_string(),
+                          // Value::Type(t) => t.runtime_display(vm),
+                          // // Value::Object(map, typ) => format!(
+                          // //     "{} {{ {} }}",
+                          // //     match typ {
+                          // //         ObjectType::Object => "obj",
+                          // //         ObjectType::Trigger => "trigger",
+                          // //     },
+                          // //     map.iter()
+                          // //         .map(|(s, k)| format!("{s}: {k:?}"))
+                          // //         .collect::<Vec<_>>()
+                          // //         .join(", ")
+                          // // ),
+                          // Value::Epsilon => "$.epsilon()".to_string(),
+                          // Value::Module { exports, types } => format!(
+                          //     "module {{ {}{} }}",
+                          //     exports
+                          //         .iter()
+                          //         .map(|(s, k)| format!(
+                          //             "{}: {}",
+                          //             s.iter().collect::<String>(),
+                          //             k.borrow().value.runtime_display(vm)
+                          //         ))
+                          //         .join(", "),
+                          //     if types.iter().any(|p| p.is_pub()) {
+                          //         format!(
+                          //             "; {}",
+                          //             types
+                          //                 .iter()
+                          //                 .filter(|p| p.is_pub())
+                          //                 .map(|p| ValueType::Custom(*p.value()).runtime_display(vm))
+                          //                 .join(", ")
+                          //         )
+                          //     } else {
+                          //         "".into()
+                          //     }
+                          // ),
+
+                          // // Value::Iterator(_) => "<iterator>".into(),
+                          // // Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
+                          // Value::Error(id) => format!("{} {{...}}", ErrorDiscriminants::VARIANT_NAMES[*id]),
+
+                          // Value::Instance { typ, items } => format!(
+                          //     "@{}::{{ {} }}",
+                          //     vm.type_def_map[&typ].name.iter().collect::<String>(),
+                          //     items
+                          //         .iter()
+                          //         .map(|(s, v)| format!(
+                          //             "{}: {}",
+                          //             s.iter().collect::<String>(),
+                          //             v.value().borrow().value.runtime_display(vm)
+                          //         ))
+                          //         .join(", ")
+                          // ),
+                          // Value::ObjectKey(_) => todo!(),
+                          // // todo: iterator, object
+        }
     }
 }

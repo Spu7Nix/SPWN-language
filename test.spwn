@@ -1,8 +1,15 @@
+// _display_
+// _hash_
+// _index_
+// _bool_
+// _iter_
 
 
-
-if true {
-    import "libraries/core/array.spwn"
+type @sex;
+impl @sex {
+    _display_: (self) {
+        // 
+    }
 }
 
 

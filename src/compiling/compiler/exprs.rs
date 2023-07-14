@@ -430,16 +430,16 @@ impl Compiler<'_> {
                                 for stmt in stmts {
                                     self.compile_stmt(stmt, base_scope, builder)?;
                                 }
-                                let ret_reg = builder.next_reg();
-                                builder.load_empty(ret_reg, expr.span);
-                                self.compile_return(
-                                    ret_reg,
-                                    ret_pat.as_ref(),
-                                    false,
-                                    base_scope,
-                                    expr.span,
-                                    builder,
-                                )?;
+                                // let ret_reg = builder.next_reg();
+                                // builder.load_empty(ret_reg, expr.span);
+                                // self.compile_return(
+                                //     ret_reg,
+                                //     ret_pat.as_ref(),
+                                //     false,
+                                //     base_scope,
+                                //     expr.span,
+                                //     builder,
+                                // )?;
                             },
                             MacroCode::Lambda(expr) => {
                                 let ret_reg = self.compile_expr(expr, base_scope, builder)?;
@@ -507,8 +507,43 @@ impl Compiler<'_> {
 
                 Ok(macro_reg)
             },
-            Expression::TriggerFunc { code } => todo!(),
-            Expression::TriggerFuncCall(_) => todo!(),
+            Expression::TriggerFunc { code } => {
+                let group_reg = builder.next_reg();
+                let out_reg = builder.next_reg();
+
+                builder.push_raw_opcode(
+                    Opcode::LoadArbitraryID {
+                        class: IDClass::Group,
+                        dest: group_reg,
+                    },
+                    expr.span,
+                );
+                builder.push_raw_opcode(
+                    Opcode::MakeTriggerFunc {
+                        src: group_reg,
+                        dest: out_reg,
+                    },
+                    expr.span,
+                );
+
+                builder.push_raw_opcode(Opcode::SetContextGroup { reg: group_reg }, expr.span);
+                builder.new_block(|builder| {
+                    let inner_scope =
+                        self.derive_scope(scope, Some(ScopeType::TriggerFunc(expr.span)));
+                    for s in code {
+                        self.compile_stmt(s, inner_scope, builder)?
+                    }
+                    Ok(())
+                })?;
+                builder.push_raw_opcode(Opcode::SetContextGroup { reg: out_reg }, expr.span);
+                Ok(out_reg)
+            },
+            Expression::TriggerFuncCall(e) => {
+                let reg = self.compile_expr(e, scope, builder)?;
+                builder.push_raw_opcode(Opcode::CallTriggerFunc { func: reg }, expr.span);
+
+                Ok(builder.next_reg())
+            },
             Expression::Ternary {
                 cond,
                 if_true,

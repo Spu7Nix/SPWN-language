@@ -379,7 +379,7 @@ error_maker! {
         #[
             Message: "Thrown error", Note: None;
             Labels: [
-                area => "{}": value.value.runtime_display(vm);
+                area => "{}": "test";
             ]
         ]
         ThrownError {

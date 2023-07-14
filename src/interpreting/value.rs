@@ -20,7 +20,7 @@ use crate::parsing::ast::{MacroArg, Vis, VisSource, VisTrait};
 use crate::sources::{CodeArea, Spanned};
 use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash)]
 pub struct BuiltinFn(pub fn(Vec<ValueRef>, &mut Vm, CodeArea) -> RuntimeResult<Value>);
 
 #[derive(Debug, Clone, PartialEq)]
@@ -380,109 +380,6 @@ impl Value {
 
     pub fn into_stored(self, area: CodeArea) -> StoredValue {
         StoredValue { value: self, area }
-    }
-
-    pub fn runtime_display(&self, vm: &Vm) -> String {
-        match self {
-            Value::Int(n) => n.to_string(),
-            Value::Float(n) => n.to_string(),
-            Value::Bool(b) => b.to_string(),
-            Value::String(s) => format!("{:?}", s.iter().collect::<String>()),
-            Value::Array(arr) => format!(
-                "[{}]",
-                arr.iter()
-                    .map(|k| k.borrow().value.runtime_display(vm))
-                    .join(", ")
-            ),
-            Value::Dict(d) => format!(
-                "{{ {} }}",
-                d.iter()
-                    .map(|(s, v)| format!(
-                        "{}: {}",
-                        s.iter().collect::<String>(),
-                        v.value().borrow().value.runtime_display(vm)
-                    ))
-                    .join(", ")
-            ),
-            Value::Group(id) => id.fmt("g"),
-            Value::Channel(id) => id.fmt("c"),
-            Value::Block(id) => id.fmt("b"),
-            Value::Item(id) => id.fmt("i"),
-            Value::Builtins => "$".to_string(),
-            Value::Chroma { r, g, b, a } => format!("@chroma::rgb8({r}, {g}, {b}, {a})"),
-            Value::Range { start, end, step } => {
-                if *step == 1 {
-                    format!("{start}..{end}")
-                } else {
-                    format!("{start}..{step}..{end}")
-                }
-            },
-            Value::Maybe(o) => match o {
-                Some(k) => format!("({})?", k.borrow().value.runtime_display(vm)),
-                None => "?".into(),
-            },
-            Value::Empty => "()".into(),
-
-            Value::Macro(MacroData { args, .. }) => {
-                format!("<{}-arg macro at {:?}>", args.len(), (self as *const _))
-            },
-            Value::TriggerFunction { .. } => "!{...}".to_string(),
-            Value::Type(t) => t.runtime_display(vm),
-            // Value::Object(map, typ) => format!(
-            //     "{} {{ {} }}",
-            //     match typ {
-            //         ObjectType::Object => "obj",
-            //         ObjectType::Trigger => "trigger",
-            //     },
-            //     map.iter()
-            //         .map(|(s, k)| format!("{s}: {k:?}"))
-            //         .collect::<Vec<_>>()
-            //         .join(", ")
-            // ),
-            Value::Epsilon => "$.epsilon()".to_string(),
-            Value::Module { exports, types } => format!(
-                "module {{ {}{} }}",
-                exports
-                    .iter()
-                    .map(|(s, k)| format!(
-                        "{}: {}",
-                        s.iter().collect::<String>(),
-                        k.borrow().value.runtime_display(vm)
-                    ))
-                    .join(", "),
-                if types.iter().any(|p| p.is_pub()) {
-                    format!(
-                        "; {}",
-                        types
-                            .iter()
-                            .filter(|p| p.is_pub())
-                            .map(|p| ValueType::Custom(*p.value()).runtime_display(vm))
-                            .join(", ")
-                    )
-                } else {
-                    "".into()
-                }
-            ),
-
-            // Value::Iterator(_) => "<iterator>".into(),
-            // Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
-            Value::Error(id) => format!("{} {{...}}", ErrorDiscriminants::VARIANT_NAMES[*id]),
-
-            Value::Instance { typ, items } => format!(
-                "@{}::{{ {} }}",
-                vm.type_def_map[&typ].name.iter().collect::<String>(),
-                items
-                    .iter()
-                    .map(|(s, v)| format!(
-                        "{}: {}",
-                        s.iter().collect::<String>(),
-                        v.value().borrow().value.runtime_display(vm)
-                    ))
-                    .join(", ")
-            ),
-            Value::ObjectKey(_) => todo!(),
-            // todo: iterator, object
-        }
     }
 }
 
