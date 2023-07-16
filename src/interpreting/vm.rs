@@ -12,7 +12,7 @@ use colored::Colorize;
 use derive_more::{Deref, DerefMut};
 use itertools::{Either, Itertools};
 
-use super::context::{CallInfo, Context, ContextSplitMode, ContextStack, FullContext, StackItem};
+use super::context::{CallInfo, Context, ContextStack, FullContext, StackItem};
 use super::value::{StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::{Bytecode, CallExpr, Constant, Function, OptRegister, Register};
@@ -66,7 +66,7 @@ impl Program {
         &self.bytecode.constants[*id as usize]
     }
 
-    pub fn get_call_expr(&self, id: CallExprID) -> &CallExpr<OptRegister, ImmutStr> {
+    pub fn get_call_expr(&self, id: CallExprID) -> &CallExpr<OptRegister, OptRegister, ImmutStr> {
         &self.bytecode.call_exprs[*id as usize]
     }
 
@@ -108,7 +108,7 @@ pub struct Vm {
     is_doc_gen: bool,
 
     //penis
-    pub contexts: ContextStack,
+    pub context_stack: ContextStack,
 
     pub triggers: Vec<TriggerObject>,
     pub trigger_order_count: TriggerOrder,
@@ -121,7 +121,7 @@ pub struct Vm {
 impl Vm {
     pub fn new(is_doc_gen: bool, type_def_map: TypeDefMap, bytecode_map: BytecodeMap) -> Self {
         Self {
-            contexts: ContextStack(vec![]),
+            context_stack: ContextStack(vec![]),
             is_doc_gen,
             triggers: vec![],
             trigger_order_count: TriggerOrder::new(),
@@ -140,7 +140,7 @@ impl Vm {
     }
 
     pub fn set_reg(&mut self, reg: OptRegister, v: StoredValue) {
-        let mut binding = self.contexts.current_mut();
+        let mut binding = self.context_stack.current_mut();
         let mut g = binding.stack.last_mut().unwrap().registers[reg.0 as usize].borrow_mut();
         *g = v;
     }
@@ -149,22 +149,25 @@ impl Vm {
     where
         F: FnOnce(Ref<'_, StoredValue>) -> RuntimeResult<R>,
     {
-        f(self.contexts.current().stack.last().unwrap().registers[*reg as usize].borrow())
+        f(self.context_stack.current().stack.last().unwrap().registers[*reg as usize].borrow())
     }
 
     pub fn borrow_reg_mut<F, R>(&self, reg: OptRegister, f: F) -> RuntimeResult<R>
     where
         F: FnOnce(RefMut<'_, StoredValue>) -> RuntimeResult<R>,
     {
-        f(self.contexts.current().stack.last().unwrap().registers[*reg as usize].borrow_mut())
+        f(
+            self.context_stack.current().stack.last().unwrap().registers[*reg as usize]
+                .borrow_mut(),
+        )
     }
 
     pub fn get_reg_ref(&self, reg: OptRegister) -> &ValueRef {
-        &self.contexts.current().stack.last().unwrap().registers[*reg as usize]
+        &self.context_stack.current().stack.last().unwrap().registers[*reg as usize]
     }
 
     pub fn change_reg_ref(&mut self, reg: OptRegister, k: ValueRef) {
-        self.contexts
+        self.context_stack
             .current_mut()
             .stack
             .last_mut()
@@ -213,14 +216,14 @@ impl DeepClone<&ValueRef> for Vm {
 }
 impl DeepClone<OptRegister> for Vm {
     fn deep_clone(&self, input: OptRegister) -> StoredValue {
-        let v = &self.contexts.current().stack.last().unwrap().registers[*input as usize];
+        let v = &self.context_stack.current().stack.last().unwrap().registers[*input as usize];
         self.deep_clone(v)
     }
 }
 
 impl Vm {
     pub fn get_call_stack(&self) -> Vec<CallInfo> {
-        self.contexts
+        self.context_stack
             .0
             .iter()
             .map(|f| &f.call_info)
@@ -236,7 +239,6 @@ impl Vm {
         mut context: Context,
         call_info: CallInfo,
         cb: Box<dyn FnOnce(&mut Vm) -> RuntimeResult<()>>,
-        split_mode: ContextSplitMode,
     ) -> RuntimeResult<()> {
         let CallInfo {
             func: FuncCoord { program, func },
@@ -252,7 +254,7 @@ impl Vm {
             let used = program.get_function(func).regs_used;
             let mut regs = Vec::with_capacity(used as usize);
 
-            for i in 0..program.get_function(func).regs_used {
+            for _ in 0..program.get_function(func).regs_used {
                 let v = ValueRef::new(StoredValue {
                     value: Value::Empty,
                     area: CodeArea {
@@ -268,42 +270,35 @@ impl Vm {
             });
         }
 
-        self.contexts.push(FullContext::new(context, call_info));
+        self.context_stack
+            .push(FullContext::new(context, call_info));
         cb(self)?;
-        let opcodes = &program.get_function(func).opcodes;
-        let mut has_implicitly_returned = false;
 
-        while self.contexts.valid() {
-            let ip = self.contexts.ip();
+        let opcodes = &program.get_function(func).opcodes;
+
+        let mut finished_contexts = vec![];
+
+        let mut finish_context = |mut c: Context| {
+            c.ip = original_ip + 1;
+            // println!("sigla: {}", c.ip);
+            finished_contexts.push(c)
+        };
+
+        while self.context_stack.last().valid() {
+            let ip = self.context_stack.last().current_ip();
 
             if ip >= opcodes.len() {
-                if !self.contexts.last().have_returned {
-                    if has_implicitly_returned && split_mode == ContextSplitMode::Disallow {
-                        return Err(RuntimeError::ContextSplitDisallowed {
-                            area: self.make_area(program.get_function(func).span, &program),
-                            call_stack: self.get_call_stack(),
-                        });
-                    }
-
-                    let return_dest = self.contexts.last().call_info.return_dest;
+                if !self.context_stack.last().have_returned {
+                    // let return_dest = self.context_stack.last().call_info.return_dest;
                     {
-                        let mut current = self.contexts.current_mut();
+                        let mut current = self.context_stack.current_mut();
 
                         current.stack.pop();
                     }
 
-                    let mut top = self.contexts.last_mut().yeet_current().unwrap();
-                    top.ip = original_ip + 1;
-
-                    if return_dest.is_some() {
-                        let idx = self.contexts.0.len() - 2;
-                        self.contexts.0[idx].contexts.push(top);
-                    }
-                    has_implicitly_returned = true;
-
-                    continue;
+                    finish_context(self.context_stack.last_mut().yeet_current().unwrap());
                 } else {
-                    self.contexts.yeet_current();
+                    self.context_stack.last_mut().yeet_current();
                 }
                 continue;
             }
@@ -436,7 +431,7 @@ impl Vm {
                         self.unary_op(value_ops::unary_negate, &program, v, to, opcode_span)?;
                     },
                     Opcode::Jump { to } => {
-                        self.contexts.jump_current(*to as usize);
+                        self.context_stack.last_mut().jump_current(*to as usize);
                         return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::JumpIfFalse { check, to } => {
@@ -445,7 +440,7 @@ impl Vm {
                         })?;
 
                         if !b {
-                            self.contexts.jump_current(*to as usize);
+                            self.context_stack.last_mut().jump_current(*to as usize);
                             return Ok(LoopFlow::ContinueLoop);
                         }
                     },
@@ -455,7 +450,7 @@ impl Vm {
                         })?;
 
                         if b {
-                            self.contexts.jump_current(*to as usize);
+                            self.context_stack.last_mut().jump_current(*to as usize);
                             return Ok(LoopFlow::ContinueLoop);
                         }
                     },
@@ -468,7 +463,7 @@ impl Vm {
                                     self.set_reg(check, val);
                                 },
                                 None => {
-                                    self.contexts.jump_current(*to as usize);
+                                    self.context_stack.last_mut().jump_current(*to as usize);
                                     return Ok(LoopFlow::ContinueLoop);
                                 },
                             },
@@ -553,20 +548,11 @@ impl Vm {
                             }
                         }
 
-                        if self.contexts.last().have_returned
-                            && split_mode == ContextSplitMode::Disallow
-                        {
-                            return Err(RuntimeError::ContextSplitDisallowed {
-                                area: self.make_area(opcode_span, &program),
-                                call_stack: self.get_call_stack(),
-                            });
-                        }
+                        self.context_stack.last_mut().have_returned = true;
 
-                        self.contexts.last_mut().have_returned = true;
-
-                        let return_dest = self.contexts.last().call_info.return_dest;
+                        let return_dest = self.context_stack.last().call_info.return_dest;
                         {
-                            let mut current = self.contexts.current_mut();
+                            let mut current = self.context_stack.current_mut();
                             current.stack.pop();
 
                             if let Some(r) = return_dest {
@@ -575,14 +561,7 @@ impl Vm {
                             }
                         }
 
-                        let mut top = self.contexts.last_mut().yeet_current().unwrap();
-                        top.ip = original_ip + 1;
-
-                        if return_dest.is_some() {
-                            // dbg!(&self.contexts);
-                            let idx = self.contexts.0.len() - 2;
-                            self.contexts.0[idx].contexts.push(top);
-                        }
+                        finish_context(self.context_stack.last_mut().yeet_current().unwrap());
 
                         return Ok(LoopFlow::ContinueLoop);
                     },
@@ -597,7 +576,7 @@ impl Vm {
                             }),
                         };
 
-                        let current_context = self.contexts.last_mut().yeet_current().unwrap();
+                        let current_context = self.context_stack.last_mut().yeet_current().unwrap();
                         // also i need to do mergig
                         self.run_function(
                             current_context,
@@ -608,28 +587,30 @@ impl Vm {
                                 is_builtin: None,
                             },
                             Box::new(|_| Ok(())),
-                            ContextSplitMode::Disallow,
+                            // ContextSplitMode::Disallow,
                         )?;
+                        return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::EnterArrowStatement { skip } => {
                         // println!("futa");
                         self.split_current_context();
                         // println!("nari");
-                        self.contexts.jump_current(*skip as usize);
+                        self.context_stack.last_mut().jump_current(*skip as usize);
                     },
                     Opcode::YeetContext => {
-                        self.contexts.yeet_current();
+                        self.context_stack.last_mut().yeet_current();
                         return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::Dbg { reg } => {
                         let value_ref = self.get_reg_ref(reg);
 
                         println!(
-                            "{} {} {}, {:?}",
+                            "{} {} {}, {:?}, {}",
                             self.runtime_display(&value_ref.borrow()),
                             "::".dimmed(),
-                            self.contexts.group().fmt("g").green(),
+                            self.context_stack.last().current_group().fmt("g").green(),
                             value_ref.as_ptr(),
+                            self.context_stack.last().current().stack.len(),
                         )
                     },
                     Opcode::Throw { reg } => {
@@ -1143,12 +1124,12 @@ impl Vm {
                         self.set_reg(reg, val.into_stored(area))
                     },
                     Opcode::ToString { from, dest } => {
-                        // let s = self.get_reg_ref(from).borrow().value.runtime_display(self);
-                        // self.set_reg(
-                        //     dest,
-                        //     Value::String(s.chars().collect())
-                        //         .into_stored(self.make_area(opcode_span, &program)),
-                        // )
+                        let s = self.runtime_display(&self.get_reg_ref(from).borrow());
+                        self.set_reg(
+                            dest,
+                            Value::String(s.chars().collect())
+                                .into_stored(self.make_area(opcode_span, &program)),
+                        )
                     },
                     Opcode::MakeInstance { base, items, dest } => {
                         let base = self.get_reg_ref(base).borrow();
@@ -1183,13 +1164,13 @@ impl Vm {
                         )
                     },
                     Opcode::PushTryCatch { reg, to } => {
-                        self.contexts
+                        self.context_stack
                             .current_mut()
                             .try_catches
                             .push(TryCatch { jump_pos: to, reg });
                     },
                     Opcode::PopTryCatch => {
-                        self.contexts.current_mut().try_catches.pop();
+                        self.context_stack.current_mut().try_catches.pop();
                     },
                     Opcode::CreateMacro { func, dest } => {
                         let func: usize = func.into();
@@ -1254,12 +1235,30 @@ impl Vm {
                         }
                     },
                     Opcode::Call { base, call } => {
+                        let call = program.get_call_expr(call);
+                        let call = CallExpr {
+                            dest: call.dest,
+                            positional: call
+                                .positional
+                                .iter()
+                                .map(|r| self.get_reg_ref(*r).clone())
+                                .collect_vec()
+                                .into(),
+                            named: call
+                                .named
+                                .iter()
+                                .map(|(s, r)| (s.clone(), self.get_reg_ref(*r).clone()))
+                                .collect_vec()
+                                .into(),
+                        };
+
                         self.call_macro(
-                            |vm| vm.get_reg_ref(base),
-                            program.get_call_expr(call),
+                            self.get_reg_ref(base).clone(),
+                            &call,
                             &program,
                             self.make_area(opcode_span, &program),
                         )?;
+                        return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::Impl { base, dict } => {
                         let t = match &self.get_reg_ref(base).borrow().value {
@@ -1323,7 +1322,7 @@ impl Vm {
                             dest,
                             Value::TriggerFunction {
                                 group,
-                                prev_context: self.contexts.group(),
+                                prev_context: self.context_stack.last().current_group(),
                             }
                             .into_stored(self.make_area(opcode_span, &program)),
                         )
@@ -1343,7 +1342,11 @@ impl Vm {
                             },
                         };
                         mem::drop(v);
-                        let trigger = make_spawn_trigger(self.contexts.group(), target, self);
+                        let trigger = make_spawn_trigger(
+                            self.context_stack.last().current_group(),
+                            target,
+                            self,
+                        );
                         self.triggers.push(trigger);
                     },
                     Opcode::SetContextGroup { reg } => {
@@ -1352,7 +1355,7 @@ impl Vm {
                             Value::TriggerFunction { prev_context, .. } => *prev_context,
                             _ => unreachable!(),
                         };
-                        self.contexts.set_group(group);
+                        self.context_stack.last_mut().set_group(group);
                     },
                 }
                 Ok(LoopFlow::Normal)
@@ -1366,7 +1369,7 @@ impl Vm {
                     LoopFlow::Normal => {},
                 },
                 Err(err) => {
-                    let t = self.contexts.current_mut().try_catches.pop();
+                    let t = self.context_stack.current_mut().try_catches.pop();
                     if let Some(try_catch) = t {
                         assert_eq!(
                             std::mem::size_of::<std::mem::Discriminant<RuntimeError>>(),
@@ -1383,7 +1386,9 @@ impl Vm {
 
                         self.set_reg(try_catch.reg, val);
 
-                        self.contexts.jump_current(*try_catch.jump_pos as usize);
+                        self.context_stack
+                            .last_mut()
+                            .jump_current(*try_catch.jump_pos as usize);
                         continue;
                     } else {
                         Err(err)?;
@@ -1392,17 +1397,26 @@ impl Vm {
             }
 
             {
-                let mut current = self.contexts.current_mut();
+                let mut current = self.context_stack.current_mut();
                 current.ip += 1;
             };
             self.try_merge_contexts();
         }
 
-        self.contexts.pop();
+        //let f = self.context_stack.pop().unwrap();
+        // if return_dest.is_some() {
+        //     let mut current = self.context_stack.current_mut();
+        //     current.ip -= 1;
+        // };
+
+        // println!("g: {} {}", finished_contexts.len(), func);
+        self.context_stack.pop().unwrap();
         if return_dest.is_some() {
-            let mut current = self.contexts.current_mut();
-            current.ip -= 1;
-        };
+            self.context_stack
+                .last_mut()
+                .contexts
+                .extend(finished_contexts.into_iter());
+        }
 
         Ok(())
     }
@@ -1410,7 +1424,7 @@ impl Vm {
     fn try_merge_contexts(&mut self) {
         let mut top = vec![];
         {
-            let full_ctx = self.contexts.last_mut();
+            let full_ctx = self.context_stack.last_mut();
 
             if full_ctx.contexts.len() <= 1 {
                 return;
@@ -1454,27 +1468,28 @@ impl Vm {
                         let trigger = make_spawn_trigger(ctx2.group, target, self);
                         self.triggers.push(trigger);
                     }
-                    self.contexts.last_mut().contexts.push(ctx);
+                    self.context_stack.last_mut().contexts.push(ctx);
                 } else {
-                    self.contexts.last_mut().contexts.extend(ctxs);
+                    self.context_stack.last_mut().contexts.extend(ctxs);
                 }
             }
         } else {
-            self.contexts.last_mut().contexts.extend(top);
+            self.context_stack.last_mut().contexts.extend(top);
         }
     }
 
-    pub fn call_macro<T>(
+    pub fn call_macro(
         &mut self,
-        get_base: T,
-        call_expr: &CallExpr<Register<u8>, Box<str>>,
+        base: ValueRef,
+        call_expr: &CallExpr<ValueRef, OptRegister, Box<str>>,
         program: &Rc<Program>,
         area: CodeArea,
     ) -> Result<(), RuntimeError>
-    where
-        T: FnOnce(&Self) -> &ValueRef,
+// where
+    //     F1: FnOnce(&Self) -> ValueRef,
+    //     F2: FnOnce(&Self) -> CallExpr<ValueRef, OptRegister, Box<str>>,
     {
-        let base = get_base(self).borrow();
+        let base = base.borrow();
 
         let macro_area = base.area.clone();
 
@@ -1528,14 +1543,13 @@ impl Vm {
             }
         }
 
-        for arg in &*call_expr.positional {
-            let r = self.get_reg_ref(*arg).clone();
+        for arg in call_expr.positional.iter() {
             match fill.get_mut(next_arg_idx) {
                 Some(ArgFill::Single(opt, ..)) => {
-                    *opt = Some(r);
+                    *opt = Some(arg.clone());
                     next_arg_idx += 1;
                 },
-                Some(ArgFill::Spread(s)) => s.push(r),
+                Some(ArgFill::Spread(s)) => s.push(arg.clone()),
                 None => {
                     return Err(RuntimeError::TooManyArguments {
                         call_area: area.clone(),
@@ -1549,8 +1563,7 @@ impl Vm {
         }
         let opcode_area = area.clone();
 
-        for (name, arg) in &*call_expr.named {
-            let r = self.get_reg_ref(*arg).clone();
+        for (name, arg) in call_expr.named.iter() {
             let Some(idx) = arg_name_map.get(&&**name) else {
                 return Err(RuntimeError::UnknownKeywordArgument {
                     name: name.to_string(),
@@ -1561,7 +1574,7 @@ impl Vm {
             };
             match &mut fill[*idx] {
                 ArgFill::Single(opt, ..) => {
-                    *opt = Some(r);
+                    *opt = Some(arg.clone());
                 },
                 ArgFill::Spread(_) => {
                     return Err(RuntimeError::UnknownKeywordArgument {
@@ -1579,7 +1592,7 @@ impl Vm {
 
         mem::drop(base);
 
-        let current_context = self.contexts.last_mut().yeet_current().unwrap();
+        let current_context = self.context_stack.last_mut().yeet_current().unwrap();
 
         self.run_function(
             current_context,
@@ -1626,7 +1639,7 @@ impl Vm {
 
                 Ok(())
             }),
-            ContextSplitMode::Allow,
+            // ContextSplitMode::Allow,
         )?;
         Ok(())
     }

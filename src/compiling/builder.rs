@@ -82,7 +82,7 @@ pub struct ProtoBytecode {
 
     import_paths: UniqueRegister<SpwnSource>,
 
-    call_exprs: UniqueRegister<CallExpr<UnoptRegister, ImmutStr>>,
+    call_exprs: UniqueRegister<CallExpr<UnoptRegister, UnoptRegister, ImmutStr>>,
     debug_funcs: Vec<FuncID>,
 }
 
@@ -727,7 +727,7 @@ impl<'a> CodeBuilder<'a> {
     pub fn call(
         &mut self,
         base: UnoptRegister,
-        v: CallExpr<UnoptRegister, ImmutStr>,
+        v: CallExpr<UnoptRegister, UnoptRegister, ImmutStr>,
         span: CodeSpan,
     ) {
         let id = self.proto_bytecode.call_exprs.insert(v).into();

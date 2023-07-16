@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
+use std::time::Instant;
 
 use clap::Parser as _;
 use cli::{BuildSettings, DocSettings};
@@ -17,7 +18,7 @@ use crate::compiling::builder::ProtoBytecode;
 use crate::compiling::bytecode::Register;
 use crate::compiling::compiler::Compiler;
 use crate::compiling::opcodes::{ConstID, OptOpcode};
-use crate::interpreting::context::{CallInfo, Context, ContextSplitMode};
+use crate::interpreting::context::{CallInfo, Context};
 use crate::interpreting::vm::{FuncCoord, Program};
 use crate::parsing::parser::Parser;
 use crate::sources::{SpwnSource, TypeDefMap};
@@ -90,6 +91,8 @@ fn run_spwn(
 
     println!("\n{}", "════ Output ══════════════════════".dimmed().bold());
 
+    let t = Instant::now();
+
     vm.run_function(
         Context::new(),
         CallInfo {
@@ -99,11 +102,12 @@ fn run_spwn(
             is_builtin: None,
         },
         Box::new(|_| Ok(())),
-        ContextSplitMode::Allow,
+        // ContextSplitMode::Allow,
     )
     .map_err(|e| e.to_report(&vm))?;
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());
+    println!("{}", t.elapsed().as_secs_f64());
 
     Ok(())
 }

@@ -41,13 +41,15 @@ pub struct Context {
 
     pub group: Id,
     pub stack: Vec<StackItem>,
+
+    pub returned: Option<ValueRef>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum ContextSplitMode {
-    Allow,
-    Disallow,
-}
+// #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+// pub enum ContextSplitMode {
+//     Allow,
+//     Disallow,
+// }
 
 #[allow(clippy::new_without_default)]
 impl Context {
@@ -57,6 +59,7 @@ impl Context {
             group: Id::Specific(0),
             stack: vec![],
             try_catches: vec![],
+            returned: None,
         }
     }
 }
@@ -78,6 +81,7 @@ pub struct FullContext {
     pub contexts: BinaryHeap<Context>,
 
     pub call_info: CallInfo,
+
     pub have_returned: bool,
 }
 
@@ -104,7 +108,7 @@ impl FullContext {
         self.current_mut().ip = pos
     }
 
-    pub fn ip(&self) -> usize {
+    pub fn current_ip(&self) -> usize {
         self.current().ip
     }
 
@@ -121,25 +125,14 @@ impl FullContext {
         current.group = group;
     }
 
-    // pub fn pop_group(&mut self) -> Id {
-    //     let mut current = self.current_mut();
-    //     current.group_stack.pop().unwrap()
-    // }
-
-    // pub fn pop_groups_until(&mut self, group: Id) {
-    //     let mut current = self.current_mut();
-    //     while current.group_stack.pop().unwrap() != group {}
-    //     current.group_stack.push(group);
-    // }
-
-    pub fn group(&self) -> Id {
+    pub fn current_group(&self) -> Id {
         self.current().group
     }
 }
 
 impl Vm {
     pub fn split_current_context(&mut self) {
-        let current = self.contexts.current();
+        let current = self.context_stack.current();
         let mut new = current.clone();
 
         // lord forgive me for what i am about to do
@@ -160,7 +153,7 @@ impl Vm {
                 *reg = k;
             }
         }
-        self.contexts.last_mut().contexts.push(new);
+        self.context_stack.last_mut().contexts.push(new);
     }
 }
 
@@ -180,43 +173,7 @@ impl ContextStack {
         self.last().current()
     }
 
-    // pub fn increment_current(&mut self, func_len: usize) {
-    //     self.last_mut().increment_current(func_len)
-    // }
-
-    pub fn jump_current(&mut self, pos: usize) {
-        self.last_mut().jump_current(pos)
-    }
-
     pub fn current_mut(&mut self) -> PeekMut<Context> {
         self.last_mut().current_mut()
-    }
-
-    pub fn ip(&self) -> usize {
-        self.last().ip()
-    }
-
-    pub fn valid(&self) -> bool {
-        self.last().valid()
-    }
-
-    pub fn yeet_current(&mut self) {
-        self.last_mut().yeet_current();
-    }
-
-    pub fn set_group(&mut self, group: Id) {
-        self.last_mut().set_group(group)
-    }
-
-    // pub fn pop_group(&mut self) -> Id {
-    //     self.last_mut().pop_group()
-    // }
-
-    // pub fn pop_groups_until(&mut self, group: Id) {
-    //     self.last_mut().pop_groups_until(group)
-    // }
-
-    pub fn group(&self) -> Id {
-        self.last().group()
     }
 }

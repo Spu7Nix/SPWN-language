@@ -47,11 +47,11 @@ pub enum Constant {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub struct CallExpr<R: Copy + std::fmt::Display, S> {
+pub struct CallExpr<Arg, R, S> {
     // pub base: R,
     pub dest: R,
-    pub positional: ImmutVec<R>,
-    pub named: ImmutVec<(S, R)>,
+    pub positional: ImmutVec<Arg>,
+    pub named: ImmutVec<(S, Arg)>,
 }
 
 impl Hash for Constant {
@@ -141,7 +141,7 @@ pub struct Bytecode {
 
     pub debug_funcs: ImmutVec<FuncID>,
 
-    pub call_exprs: ImmutVec<CallExpr<OptRegister, ImmutStr>>,
+    pub call_exprs: ImmutVec<CallExpr<OptRegister, OptRegister, ImmutStr>>,
 }
 
 mod debug_bytecode {
