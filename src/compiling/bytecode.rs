@@ -48,7 +48,7 @@ pub enum Constant {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct CallExpr<R: Copy + std::fmt::Display, S> {
-    pub base: R,
+    // pub base: R,
     pub dest: R,
     pub positional: ImmutVec<R>,
     pub named: ImmutVec<(S, R)>,
@@ -276,8 +276,7 @@ mod debug_bytecode {
                                 let call_expr = &self.call_exprs[id];
 
                                 format!(
-                                    "{}({}) -> {}",
-                                    call_expr.base.to_string().bright_red(),
+                                    "({}) -> {}",
                                     call_expr
                                         .positional
                                         .iter()

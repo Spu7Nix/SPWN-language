@@ -5,11 +5,26 @@
 // _iter_
 
 
-type @sex;
-impl @sex {
-    _display_: (self) {
-        // 
-    }
+// type @sex;
+// impl @sex {
+//     new: () {
+//         @sex::{
+//             something: 343434
+//         }
+//     }
+
+//     _display_: (self) -> @string {
+//         return f"{self.something}" 
+//     }
+// }
+
+// import "libraries/core/array.spwn"
+
+
+// dbg @array::peniscum(() => 3)
+
+impl @penile {
+    _iter
 }
 
 

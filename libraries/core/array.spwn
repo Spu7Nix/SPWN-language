@@ -16,6 +16,6 @@ impl @array {
 	
 	#[doc("\ndsf \"fuck\"")]
 	peniscum: #[builtin] (
-		...sinky: (@int)[],
+		m: @macro,
 	) {},
 }

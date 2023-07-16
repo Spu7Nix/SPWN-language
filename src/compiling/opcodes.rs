@@ -270,8 +270,8 @@ opcodes! {
     #[delve(display = |r| format!("mark arg 1 of {r} as `self`"))]
     MarkMacroMethod { [reg] },
 
-    #[delve(display = |id| format!("{id}"))]
-    Call { call: CallExprID },
+    #[delve(display = |base, id| format!("{base}({id})"))]
+    Call { [base], call: CallExprID },
 
     #[delve(display = |b, d| format!("impl @{b} {{{d}}}"))]
     Impl { [base], [dict] },

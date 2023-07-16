@@ -18,7 +18,7 @@ macro_rules! impl_type {
                                         $( { $( $c_n:ident: $c_val_s:expr ),* $(,)? } )?;
             )*
 
-            Functions:
+            Functions($vm:ident, $program:ident, $area:ident):
             $(
                 // temporary until 1.0
                 $(#[raw($fn_raw:literal)])?
@@ -47,13 +47,14 @@ macro_rules! impl_type {
                     #[allow(unused)]
                     fn $func_name(
                         mut args: Vec<$crate::interpreting::vm::ValueRef>,
-                        vm: &mut $crate::Vm,
-                        area: $crate::sources::CodeArea,
+                        $vm: &mut $crate::Vm,
+                        $program: &std::rc::Rc<crate::Program>,
+                        $area: $crate::sources::CodeArea,
                     ) -> $crate::interpreting::vm::RuntimeResult<$crate::interpreting::value::Value> {
                         use $crate::interpreting::value::value_structs::*;
                         
-                        impl_type! { @ArgsCheckCloneA[0](args, vm) $($args)* }
-                        impl_type! { @ArgsA[0](args, vm, area) $($args)* }
+                        impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
+                        impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
 
                         Ok({ $($code)* }.into_value())
                     }

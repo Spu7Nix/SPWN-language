@@ -3,23 +3,19 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
-use std::mem::{self, ManuallyDrop, MaybeUninit};
+use std::mem::{self};
 use std::rc::Rc;
 
-use ahash::{AHashMap, RandomState};
+use ahash::AHashMap;
 use base64::Engine;
 use colored::Colorize;
 use derive_more::{Deref, DerefMut};
 use itertools::{Either, Itertools};
-use lasso::Spur;
 
 use super::context::{CallInfo, Context, ContextSplitMode, ContextStack, FullContext, StackItem};
 use super::value::{StoredValue, Value, ValueType};
 use super::value_ops;
-use crate::compiling::bytecode::{
-    Bytecode, CallExpr, Constant, Function, OptRegister, Register, UnoptRegister,
-};
-use crate::compiling::compiler::{CustomTypeID, TypeDef};
+use crate::compiling::bytecode::{Bytecode, CallExpr, Constant, Function, OptRegister, Register};
 use crate::compiling::opcodes::{CallExprID, ConstID, Opcode, RuntimeStringFlag};
 use crate::gd::gd_object::{make_spawn_trigger, TriggerObject, TriggerOrder};
 use crate::gd::ids::{IDClass, Id};
@@ -31,7 +27,7 @@ use crate::parsing::ast::{MacroArg, Vis, VisSource, VisTrait};
 use crate::sources::{
     BytecodeMap, CodeArea, CodeSpan, Spannable, Spanned, SpwnSource, TypeDefMap, ZEROSPAN,
 };
-use crate::util::{ImmutCloneVec, ImmutStr, ImmutVec, Interner};
+use crate::util::{ImmutCloneVec, ImmutStr};
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
@@ -106,15 +102,17 @@ impl FuncCoord {
 }
 
 pub struct Vm {
-    pub contexts: ContextStack,
-
+    // readonly
+    pub bytecode_map: BytecodeMap,
+    pub type_def_map: TypeDefMap,
     is_doc_gen: bool,
+
+    //penis
+    pub contexts: ContextStack,
 
     pub triggers: Vec<TriggerObject>,
     pub trigger_order_count: TriggerOrder,
 
-    pub bytecode_map: BytecodeMap,
-    pub type_def_map: TypeDefMap,
     pub id_counters: [u16; 4],
 
     pub impls: AHashMap<ValueType, AHashMap<ImmutCloneVec<char>, VisSource<ValueRef>>>,
@@ -624,15 +622,15 @@ impl Vm {
                         return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::Dbg { reg } => {
-                        let value_ref = self.get_reg_ref(reg).borrow();
+                        let value_ref = self.get_reg_ref(reg);
 
-                        // println!(
-                        //     "{} {} {}, {:?}",
-                        //     value_ref.value.runtime_display(self),
-                        //     "::".dimmed(),
-                        //     self.contexts.group().fmt("g").green(),
-                        //     self.get_reg_ref(reg).as_ptr(),
-                        // )
+                        println!(
+                            "{} {} {}, {:?}",
+                            self.runtime_display(&value_ref.borrow()),
+                            "::".dimmed(),
+                            self.contexts.group().fmt("g").green(),
+                            value_ref.as_ptr(),
+                        )
                     },
                     Opcode::Throw { reg } => {
                         let value = self.deep_clone(reg);
@@ -1255,162 +1253,12 @@ impl Vm {
                             _ => unreachable!(),
                         }
                     },
-                    Opcode::Call { call } => {
-                        let call_expr = program.get_call_expr(call);
-
-                        let base = self.get_reg_ref(call_expr.base).borrow();
-
-                        let macro_area = base.area.clone();
-
-                        let data = match &base.value {
-                            Value::Macro(data) => data,
-                            v => {
-                                return Err(RuntimeError::TypeMismatch {
-                                    v: (v.get_type(), macro_area),
-                                    expected: ValueType::Macro,
-                                    area: self.make_area(opcode_span, &program),
-                                    call_stack: self.get_call_stack(),
-                                })
-                            },
-                        };
-
-                        let func = data.func.get_func();
-
-                        enum ArgFill {
-                            Single(Option<ValueRef>, Option<ImmutStr>),
-                            Spread(Vec<ValueRef>),
-                        }
-
-                        let mut arg_name_map = AHashMap::new();
-
-                        let mut fill = func
-                            .args
-                            .iter()
-                            .enumerate()
-                            .map(|(i, arg)| {
-                                if let Some(name) = &arg.value {
-                                    arg_name_map.insert(&**name, i);
-                                }
-
-                                if func.spread_arg == Some(i as u8) {
-                                    ArgFill::Spread(vec![])
-                                } else {
-                                    ArgFill::Single(None, arg.value.clone())
-                                }
-                            })
-                            .collect_vec();
-
-                        let mut next_arg_idx = 0;
-
-                        if data.is_method {
-                            match fill.get_mut(next_arg_idx) {
-                                Some(ArgFill::Single(v, _)) => {
-                                    *v = data.self_arg.clone();
-                                    next_arg_idx += 1;
-                                },
-                                _ => unreachable!(),
-                            }
-                        }
-
-                        for arg in &*call_expr.positional {
-                            let r = self.get_reg_ref(*arg).clone();
-                            match fill.get_mut(next_arg_idx) {
-                                Some(ArgFill::Single(opt, ..)) => {
-                                    *opt = Some(r);
-                                    next_arg_idx += 1;
-                                },
-                                Some(ArgFill::Spread(s)) => s.push(r),
-                                None => {
-                                    return Err(RuntimeError::TooManyArguments {
-                                        call_area: self.make_area(opcode_span, &program),
-                                        macro_def_area: macro_area,
-                                        call_arg_amount: call_expr.positional.len(),
-                                        macro_arg_amount: data.args.len(),
-                                        call_stack: self.get_call_stack(),
-                                    })
-                                },
-                            }
-                        }
-                        let opcode_area = self.make_area(opcode_span, &program);
-
-                        for (name, arg) in &*call_expr.named {
-                            let r = self.get_reg_ref(*arg).clone();
-                            let Some(idx) = arg_name_map.get(&&**name) else {
-                                return Err(RuntimeError::UnknownKeywordArgument {
-                                    name: name.to_string(),
-                                    macro_def_area: macro_area,
-                                    call_area: opcode_area,
-                                    call_stack: self.get_call_stack(),
-                                });
-                            };
-                            match &mut fill[*idx] {
-                                ArgFill::Single(opt, ..) => {
-                                    *opt = Some(r);
-                                },
-                                ArgFill::Spread(_) => {
-                                    return Err(RuntimeError::UnknownKeywordArgument {
-                                        name: name.to_string(),
-                                        macro_def_area: macro_area,
-                                        call_area: opcode_area,
-                                        call_stack: self.get_call_stack(),
-                                    })
-                                },
-                            }
-                        }
-                        let func = data.func.clone();
-                        let captured = data.captured.clone();
-                        let is_builtin = data.is_builtin;
-
-                        mem::drop(base);
-
-                        let current_context = self.contexts.last_mut().yeet_current().unwrap();
-
-                        self.run_function(
-                            current_context,
-                            CallInfo {
-                                func,
-                                return_dest: Some(call_expr.dest),
-                                call_area: Some(self.make_area(opcode_span, &program)),
-                                is_builtin,
-                            },
-                            Box::new(move |vm| {
-                                let arg_amount = fill.len();
-                                for (i, arg) in fill.into_iter().enumerate() {
-                                    match arg {
-                                        ArgFill::Single(Some(r), ..) => {
-                                            vm.change_reg_ref(Register(i as u8), r);
-                                        },
-                                        ArgFill::Spread(v) => {
-                                            vm.set_reg(
-                                                Register(i as u8),
-                                                StoredValue {
-                                                    value: Value::Array(v),
-                                                    area: opcode_area.clone(),
-                                                },
-                                            );
-                                        },
-                                        ArgFill::Single(None, name) => {
-                                            return Err(RuntimeError::ArgumentNotSatisfied {
-                                                call_area: opcode_area.clone(),
-                                                macro_def_area: macro_area,
-                                                arg: if let Some(name) = name {
-                                                    Either::Left(name.to_string())
-                                                } else {
-                                                    Either::Right(i)
-                                                },
-                                                call_stack: vm.get_call_stack(),
-                                            })
-                                        },
-                                    }
-                                }
-
-                                for (i, v) in captured.iter().enumerate() {
-                                    vm.change_reg_ref(Register((arg_amount + i) as u8), v.clone());
-                                }
-
-                                Ok(())
-                            }),
-                            ContextSplitMode::Allow,
+                    Opcode::Call { base, call } => {
+                        self.call_macro(
+                            |vm| vm.get_reg_ref(base),
+                            program.get_call_expr(call),
+                            &program,
+                            self.make_area(opcode_span, &program),
                         )?;
                     },
                     Opcode::Impl { base, dict } => {
@@ -1457,6 +1305,7 @@ impl Vm {
                                     .map(|r| self.get_reg_ref(Register(r)).clone())
                                     .collect_vec(),
                                 self,
+                                &program,
                                 area.clone(),
                             )?;
                             self.set_reg(dest, value.into_stored(area));
@@ -1613,6 +1462,173 @@ impl Vm {
         } else {
             self.contexts.last_mut().contexts.extend(top);
         }
+    }
+
+    pub fn call_macro<T>(
+        &mut self,
+        get_base: T,
+        call_expr: &CallExpr<Register<u8>, Box<str>>,
+        program: &Rc<Program>,
+        area: CodeArea,
+    ) -> Result<(), RuntimeError>
+    where
+        T: FnOnce(&Self) -> &ValueRef,
+    {
+        let base = get_base(self).borrow();
+
+        let macro_area = base.area.clone();
+
+        let data = match &base.value {
+            Value::Macro(data) => data,
+            v => {
+                return Err(RuntimeError::TypeMismatch {
+                    v: (v.get_type(), macro_area),
+                    expected: ValueType::Macro,
+                    area: area.clone(),
+                    call_stack: self.get_call_stack(),
+                })
+            },
+        };
+
+        let func = data.func.get_func();
+
+        enum ArgFill {
+            Single(Option<ValueRef>, Option<ImmutStr>),
+            Spread(Vec<ValueRef>),
+        }
+
+        let mut arg_name_map = AHashMap::new();
+
+        let mut fill = func
+            .args
+            .iter()
+            .enumerate()
+            .map(|(i, arg)| {
+                if let Some(name) = &arg.value {
+                    arg_name_map.insert(&**name, i);
+                }
+
+                if func.spread_arg == Some(i as u8) {
+                    ArgFill::Spread(vec![])
+                } else {
+                    ArgFill::Single(None, arg.value.clone())
+                }
+            })
+            .collect_vec();
+
+        let mut next_arg_idx = 0;
+
+        if data.is_method {
+            match fill.get_mut(next_arg_idx) {
+                Some(ArgFill::Single(v, _)) => {
+                    *v = data.self_arg.clone();
+                    next_arg_idx += 1;
+                },
+                _ => unreachable!(),
+            }
+        }
+
+        for arg in &*call_expr.positional {
+            let r = self.get_reg_ref(*arg).clone();
+            match fill.get_mut(next_arg_idx) {
+                Some(ArgFill::Single(opt, ..)) => {
+                    *opt = Some(r);
+                    next_arg_idx += 1;
+                },
+                Some(ArgFill::Spread(s)) => s.push(r),
+                None => {
+                    return Err(RuntimeError::TooManyArguments {
+                        call_area: area.clone(),
+                        macro_def_area: macro_area,
+                        call_arg_amount: call_expr.positional.len(),
+                        macro_arg_amount: data.args.len(),
+                        call_stack: self.get_call_stack(),
+                    })
+                },
+            }
+        }
+        let opcode_area = area.clone();
+
+        for (name, arg) in &*call_expr.named {
+            let r = self.get_reg_ref(*arg).clone();
+            let Some(idx) = arg_name_map.get(&&**name) else {
+                return Err(RuntimeError::UnknownKeywordArgument {
+                    name: name.to_string(),
+                    macro_def_area: macro_area,
+                    call_area: opcode_area,
+                    call_stack: self.get_call_stack(),
+                });
+            };
+            match &mut fill[*idx] {
+                ArgFill::Single(opt, ..) => {
+                    *opt = Some(r);
+                },
+                ArgFill::Spread(_) => {
+                    return Err(RuntimeError::UnknownKeywordArgument {
+                        name: name.to_string(),
+                        macro_def_area: macro_area,
+                        call_area: opcode_area,
+                        call_stack: self.get_call_stack(),
+                    })
+                },
+            }
+        }
+        let func = data.func.clone();
+        let captured = data.captured.clone();
+        let is_builtin = data.is_builtin;
+
+        mem::drop(base);
+
+        let current_context = self.contexts.last_mut().yeet_current().unwrap();
+
+        self.run_function(
+            current_context,
+            CallInfo {
+                func,
+                return_dest: Some(call_expr.dest),
+                call_area: Some(area),
+                is_builtin,
+            },
+            Box::new(move |vm| {
+                let arg_amount = fill.len();
+                for (i, arg) in fill.into_iter().enumerate() {
+                    match arg {
+                        ArgFill::Single(Some(r), ..) => {
+                            vm.change_reg_ref(Register(i as u8), r);
+                        },
+                        ArgFill::Spread(v) => {
+                            vm.set_reg(
+                                Register(i as u8),
+                                StoredValue {
+                                    value: Value::Array(v),
+                                    area: opcode_area.clone(),
+                                },
+                            );
+                        },
+                        ArgFill::Single(None, name) => {
+                            return Err(RuntimeError::ArgumentNotSatisfied {
+                                call_area: opcode_area.clone(),
+                                macro_def_area: macro_area,
+                                arg: if let Some(name) = name {
+                                    Either::Left(name.to_string())
+                                } else {
+                                    Either::Right(i)
+                                },
+                                call_stack: vm.get_call_stack(),
+                            })
+                        },
+                    }
+                }
+
+                for (i, v) in captured.iter().enumerate() {
+                    vm.change_reg_ref(Register((arg_amount + i) as u8), v.clone());
+                }
+
+                Ok(())
+            }),
+            ContextSplitMode::Allow,
+        )?;
+        Ok(())
     }
 
     #[inline]
@@ -1816,106 +1832,112 @@ impl Vm {
         }
     }
 
-    pub fn runtime_display(&self, value: &ValueRef) -> String {
-        match self {
-            _ => todo!(), // Value::Int(n) => n.to_string(),
-                          // Value::Float(n) => n.to_string(),
-                          // Value::Bool(b) => b.to_string(),
-                          // Value::String(s) => format!("{:?}", s.iter().collect::<String>()),
-                          // Value::Array(arr) => format!(
-                          //     "[{}]",
-                          //     arr.iter()
-                          //         .map(|k| k.borrow().value.runtime_display(vm))
-                          //         .join(", ")
-                          // ),
-                          // Value::Dict(d) => format!(
-                          //     "{{ {} }}",
-                          //     d.iter()
-                          //         .map(|(s, v)| format!(
-                          //             "{}: {}",
-                          //             s.iter().collect::<String>(),
-                          //             v.value().borrow().value.runtime_display(vm)
-                          //         ))
-                          //         .join(", ")
-                          // ),
-                          // Value::Group(id) => id.fmt("g"),
-                          // Value::Channel(id) => id.fmt("c"),
-                          // Value::Block(id) => id.fmt("b"),
-                          // Value::Item(id) => id.fmt("i"),
-                          // Value::Builtins => "$".to_string(),
-                          // Value::Chroma { r, g, b, a } => format!("@chroma::rgb8({r}, {g}, {b}, {a})"),
-                          // Value::Range { start, end, step } => {
-                          //     if *step == 1 {
-                          //         format!("{start}..{end}")
-                          //     } else {
-                          //         format!("{start}..{step}..{end}")
-                          //     }
-                          // },
-                          // Value::Maybe(o) => match o {
-                          //     Some(k) => format!("({})?", k.borrow().value.runtime_display(vm)),
-                          //     None => "?".into(),
-                          // },
-                          // Value::Empty => "()".into(),
+    pub fn runtime_display(&self, value: &StoredValue) -> String {
+        match &value.value {
+            Value::Int(n) => n.to_string(),
+            Value::Float(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            Value::String(s) => format!("{:?}", s.iter().collect::<String>()),
+            Value::Array(arr) => format!(
+                "[{}]",
+                arr.iter()
+                    .map(|k| self.runtime_display(&k.borrow()))
+                    .join(", ")
+            ),
+            Value::Dict(d) => format!(
+                "{{ {} }}",
+                d.iter()
+                    .map(|(s, v)| format!(
+                        "{}: {}",
+                        s.iter().collect::<String>(),
+                        self.runtime_display(&v.value().borrow())
+                    ))
+                    .join(", ")
+            ),
+            Value::Group(id) => id.fmt("g"),
+            Value::Channel(id) => id.fmt("c"),
+            Value::Block(id) => id.fmt("b"),
+            Value::Item(id) => id.fmt("i"),
+            Value::Builtins => "$".to_string(),
+            Value::Chroma { r, g, b, a } => format!("@chroma::rgb8({r}, {g}, {b}, {a})"),
+            Value::Range { start, end, step } => {
+                if *step == 1 {
+                    format!("{start}..{end}")
+                } else {
+                    format!("{start}..{step}..{end}")
+                }
+            },
+            Value::Maybe(o) => match o {
+                Some(k) => format!("({})?", self.runtime_display(&k.borrow())),
+                None => "?".into(),
+            },
+            Value::Empty => "()".into(),
 
-                          // Value::Macro(MacroData { args, .. }) => {
-                          //     format!("<{}-arg macro at {:?}>", args.len(), (self as *const _))
-                          // },
-                          // Value::TriggerFunction { .. } => "!{...}".to_string(),
-                          // Value::Type(t) => t.runtime_display(vm),
-                          // // Value::Object(map, typ) => format!(
-                          // //     "{} {{ {} }}",
-                          // //     match typ {
-                          // //         ObjectType::Object => "obj",
-                          // //         ObjectType::Trigger => "trigger",
-                          // //     },
-                          // //     map.iter()
-                          // //         .map(|(s, k)| format!("{s}: {k:?}"))
-                          // //         .collect::<Vec<_>>()
-                          // //         .join(", ")
-                          // // ),
-                          // Value::Epsilon => "$.epsilon()".to_string(),
-                          // Value::Module { exports, types } => format!(
-                          //     "module {{ {}{} }}",
-                          //     exports
-                          //         .iter()
-                          //         .map(|(s, k)| format!(
-                          //             "{}: {}",
-                          //             s.iter().collect::<String>(),
-                          //             k.borrow().value.runtime_display(vm)
-                          //         ))
-                          //         .join(", "),
-                          //     if types.iter().any(|p| p.is_pub()) {
-                          //         format!(
-                          //             "; {}",
-                          //             types
-                          //                 .iter()
-                          //                 .filter(|p| p.is_pub())
-                          //                 .map(|p| ValueType::Custom(*p.value()).runtime_display(vm))
-                          //                 .join(", ")
-                          //         )
-                          //     } else {
-                          //         "".into()
-                          //     }
-                          // ),
+            Value::Macro(MacroData { args, .. }) => {
+                format!("<{}-arg macro at {:?}>", args.len(), (self as *const _))
+            },
+            Value::TriggerFunction { .. } => "!{...}".to_string(),
+            Value::Type(t) => t.runtime_display(self),
+            // Value::Object(map, typ) => format!(
+            //     "{} {{ {} }}",
+            //     match typ {
+            //         ObjectType::Object => "obj",
+            //         ObjectType::Trigger => "trigger",
+            //     },
+            //     map.iter()
+            //         .map(|(s, k)| format!("{s}: {k:?}"))
+            //         .collect::<Vec<_>>()
+            //         .join(", ")
+            // ),
+            Value::Epsilon => "$.epsilon()".to_string(),
+            Value::Module { exports, types } => format!(
+                "module {{ {}{} }}",
+                exports
+                    .iter()
+                    .map(|(s, k)| format!(
+                        "{}: {}",
+                        s.iter().collect::<String>(),
+                        self.runtime_display(&k.borrow())
+                    ))
+                    .join(", "),
+                if types.iter().any(|p| p.is_pub()) {
+                    format!(
+                        "; {}",
+                        types
+                            .iter()
+                            .filter(|p| p.is_pub())
+                            .map(|p| ValueType::Custom(*p.value()).runtime_display(self))
+                            .join(", ")
+                    )
+                } else {
+                    "".into()
+                }
+            ),
 
-                          // // Value::Iterator(_) => "<iterator>".into(),
-                          // // Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
-                          // Value::Error(id) => format!("{} {{...}}", ErrorDiscriminants::VARIANT_NAMES[*id]),
+            // Value::Iterator(_) => "<iterator>".into(),
+            // Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
+            Value::Error(id) => {
+                use delve::VariantNames;
+                format!(
+                    "{} {{...}}",
+                    crate::interpreting::error::ErrorDiscriminants::VARIANT_NAMES[*id]
+                )
+            },
 
-                          // Value::Instance { typ, items } => format!(
-                          //     "@{}::{{ {} }}",
-                          //     vm.type_def_map[&typ].name.iter().collect::<String>(),
-                          //     items
-                          //         .iter()
-                          //         .map(|(s, v)| format!(
-                          //             "{}: {}",
-                          //             s.iter().collect::<String>(),
-                          //             v.value().borrow().value.runtime_display(vm)
-                          //         ))
-                          //         .join(", ")
-                          // ),
-                          // Value::ObjectKey(_) => todo!(),
-                          // // todo: iterator, object
+            Value::Instance { typ, items } => format!(
+                "@{}::{{ {} }}",
+                self.type_def_map[&typ].name.iter().collect::<String>(),
+                items
+                    .iter()
+                    .map(|(s, v)| format!(
+                        "{}: {}",
+                        s.iter().collect::<String>(),
+                        self.runtime_display(&v.value().borrow())
+                    ))
+                    .join(", ")
+            ),
+            Value::ObjectKey(_) => todo!(),
+            // todo: iterator, object
         }
     }
 }

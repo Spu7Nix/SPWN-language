@@ -275,7 +275,6 @@ impl ProtoBytecode {
                         .map(|(s, r)| (s, r.try_into().unwrap()))
                         .collect_vec()
                         .into(),
-                    base: ce.base.try_into().unwrap(),
                     dest: ce.dest.try_into().unwrap(),
                 })
                 .collect_vec()
@@ -725,8 +724,13 @@ impl<'a> CodeBuilder<'a> {
         )
     }
 
-    pub fn call(&mut self, v: CallExpr<UnoptRegister, ImmutStr>, span: CodeSpan) {
+    pub fn call(
+        &mut self,
+        base: UnoptRegister,
+        v: CallExpr<UnoptRegister, ImmutStr>,
+        span: CodeSpan,
+    ) {
         let id = self.proto_bytecode.call_exprs.insert(v).into();
-        self.push_opcode(ProtoOpcode::Raw(Opcode::Call { call: id }), span)
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Call { base, call: id }), span)
     }
 }

@@ -9,7 +9,7 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::error::ErrorDiscriminants;
-use super::vm::{FuncCoord, RuntimeResult, Vm};
+use super::vm::{FuncCoord, Program, RuntimeResult, Vm};
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::{CustomTypeID, LocalTypeID};
 use crate::gd::ids::{IDClass, Id};
@@ -21,7 +21,9 @@ use crate::sources::{CodeArea, Spanned};
 use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
-pub struct BuiltinFn(pub fn(Vec<ValueRef>, &mut Vm, CodeArea) -> RuntimeResult<Value>);
+pub struct BuiltinFn(
+    pub fn(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<Value>,
+);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -79,7 +81,7 @@ macro_rules! value {
         pub mod value_structs {
             use super::*;
             
-            #[derive(Debug, PartialEq)]
+            #[derive(Debug, PartialEq, Clone)]
             pub struct FieldGetter<'a, T, const MUT: bool> {
                 value_ref: &'a ValueRef,
                 getter: fn(&'a ValueRef) -> std::cell::Ref<'a, T>,
@@ -259,11 +261,11 @@ macro_rules! value {
         pub struct $name <$lt $(, const $const_generic : $ty)?> (std::marker::PhantomData<&$lt ()>);
     };
     (@struct $name:ident <$lt:lifetime $(, const $const_generic:ident : $ty:ty)?> ( $( $t0:ty, )* )) => {
-        #[derive(Debug, PartialEq)]
+        #[derive(Clone, Debug, PartialEq)]
         pub struct $name <$lt $(, const $const_generic : $ty)?> ( $( pub $t0, )* );
     };
     (@struct $name:ident <$lt:lifetime $(, const $const_generic:ident : $ty:ty)?> { $( $n:ident: $t1:ty, )* }) => {
-        #[derive(Debug, PartialEq)]
+        #[derive(Clone, Debug, PartialEq)]
         pub struct $name <$lt $(, const $const_generic : $ty)?> { $( pub $n: $t1, )* }
     };
 
