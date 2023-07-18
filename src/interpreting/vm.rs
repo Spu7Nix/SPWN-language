@@ -1,6 +1,6 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BinaryHeap};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::mem::{self};
@@ -12,7 +12,8 @@ use colored::Colorize;
 use derive_more::{Deref, DerefMut};
 use itertools::{Either, Itertools};
 
-use super::context::{CallInfo, Context, ContextStack, FullContext, StackItem};
+use super::builtins::RustFnInstr;
+use super::context::{CallInfo, CloneMap, Context, ContextStack, FullContext, StackItem};
 use super::value::{StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::{Bytecode, CallExpr, Constant, Function, OptRegister, Register};
@@ -20,7 +21,7 @@ use crate::compiling::opcodes::{CallExprID, ConstID, Opcode, RuntimeStringFlag};
 use crate::gd::gd_object::{make_spawn_trigger, TriggerObject, TriggerOrder};
 use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::OBJECT_KEYS;
-use crate::interpreting::context::TryCatch;
+use crate::interpreting::context::{ReturnDest, TryCatch};
 use crate::interpreting::error::RuntimeError;
 use crate::interpreting::value::MacroData;
 use crate::parsing::ast::{MacroArg, Vis, VisSource, VisTrait};
@@ -28,6 +29,8 @@ use crate::sources::{
     BytecodeMap, CodeArea, CodeSpan, Spannable, Spanned, SpwnSource, TypeDefMap, ZEROSPAN,
 };
 use crate::util::{ImmutCloneVec, ImmutStr};
+
+const RECURSION_LIMIT: usize = 256;
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
@@ -181,39 +184,34 @@ impl Vm {
     }
 }
 
-impl DeepClone<&ValueRef> for Vm {
-    fn deep_clone(&self, input: &ValueRef) -> StoredValue {
-        let v = &input.borrow();
-        let area = v.area.clone();
+impl DeepClone<&StoredValue> for Vm {
+    fn deep_clone(&self, input: &StoredValue) -> StoredValue {
+        let area = input.area.clone();
 
-        let deep_clone_dict_items = |v: &AHashMap<ImmutCloneVec<char>, VisSource<ValueRef>>| {
-            v.iter()
-                .map(|(k, v)| (Rc::clone(k), v.clone().map(|v| self.deep_clone_ref(&v))))
-                .collect()
-        };
+        // let mut deep_clone_dict_items = |v: &AHashMap<ImmutCloneVec<char>, VisSource<ValueRef>>| {
+        //     v.iter()
+        //         .map(|(k, v)| (Rc::clone(k), v.clone().map(|v| self.deep_clone_ref(&v))))
+        //         .collect()
+        // };
+        let mut value = input.value.clone();
 
-        let value = match &v.value {
-            Value::Array(arr) => Value::Array(arr.iter().map(|v| self.deep_clone_ref(v)).collect()),
-            Value::Dict(map) => Value::Dict(deep_clone_dict_items(map)),
-            Value::Maybe(v) => Value::Maybe(v.as_ref().map(|v| self.deep_clone_ref(v))),
-            Value::Instance { typ, items } => Value::Instance {
-                typ: *typ,
-                items: deep_clone_dict_items(items),
-            },
-            Value::Module { exports, types } => Value::Module {
-                exports: exports
-                    .iter()
-                    .map(|(k, v)| (Rc::clone(k), self.deep_clone_ref(v)))
-                    .collect(),
-                types: types.clone(),
-            },
-            // todo: iterator, object
-            v => v.clone(),
-        };
+        value.inner_references(|v| {
+            let v_clone = v.clone();
+            *v = self.deep_clone_ref(&v_clone);
+        });
 
         value.into_stored(area)
     }
 }
+
+impl DeepClone<&ValueRef> for Vm {
+    fn deep_clone(&self, input: &ValueRef) -> StoredValue {
+        let v = input.borrow();
+
+        self.deep_clone(&*v)
+    }
+}
+
 impl DeepClone<OptRegister> for Vm {
     fn deep_clone(&self, input: OptRegister) -> StoredValue {
         let v = &self.context_stack.current().stack.last().unwrap().registers[*input as usize];
@@ -221,14 +219,77 @@ impl DeepClone<OptRegister> for Vm {
     }
 }
 
+pub struct SplitFnRet;
+
+#[derive(Debug, Clone, Copy)]
+pub enum LoopFlow {
+    ContinueLoop,
+    Normal,
+}
+
 impl Vm {
     pub fn get_call_stack(&self) -> Vec<CallInfo> {
         self.context_stack
             .0
             .iter()
+            .take(5)
             .map(|f| &f.call_info)
             .cloned()
             .collect()
+    }
+
+    pub fn run_rust_instrs(
+        &mut self,
+        // mut context: Context,
+        call_info: CallInfo,
+        instrs: &[RustFnInstr<'_>],
+    ) -> RuntimeResult<SplitFnRet> {
+        let mut context = self.context_stack.last_mut().yeet_current().unwrap();
+
+        let original_ip = context.ip;
+        context.ip = 0;
+
+        self.context_stack
+            .push(FullContext::new(context, call_info));
+
+        let mut finished_contexts = vec![];
+
+        let mut finish_context = |mut c: Context| {
+            c.ip = original_ip + 1;
+            // println!("sigla: {}", c.ip);
+            finished_contexts.push(c)
+        };
+
+        while self.context_stack.last().valid() {
+            let ip = self.context_stack.last().current_ip();
+
+            if ip >= instrs.len() {
+                if !self.context_stack.last().have_returned {
+                    finish_context(self.context_stack.last_mut().yeet_current().unwrap());
+                } else {
+                    self.context_stack.last_mut().yeet_current();
+                }
+                continue;
+            }
+
+            match instrs[ip](self)? {
+                LoopFlow::ContinueLoop => continue,
+                LoopFlow::Normal => {},
+            };
+
+            {
+                let mut current = self.context_stack.current_mut();
+                current.ip += 1;
+            };
+            // self.try_merge_contexts();
+        }
+        self.context_stack.pop().unwrap();
+        self.context_stack
+            .last_mut()
+            .contexts
+            .extend(finished_contexts.into_iter());
+
+        Ok(SplitFnRet)
     }
 
     /// <img src="https://cdna.artstation.com/p/assets/images/images/056/833/046/original/lara-hughes-blahaj-spin-compressed.gif?1670214805" width=60 height=60>
@@ -239,7 +300,7 @@ impl Vm {
         mut context: Context,
         call_info: CallInfo,
         cb: Box<dyn FnOnce(&mut Vm) -> RuntimeResult<()>>,
-    ) -> RuntimeResult<()> {
+    ) -> RuntimeResult<SplitFnRet> {
         let CallInfo {
             func: FuncCoord { program, func },
             return_dest,
@@ -267,6 +328,7 @@ impl Vm {
 
             context.stack.push(StackItem {
                 registers: regs.into_boxed_slice(),
+                store_extra: None,
             });
         }
 
@@ -285,6 +347,27 @@ impl Vm {
         };
 
         while self.context_stack.last().valid() {
+            {
+                if let Some(r) = self
+                    .context_stack
+                    .current()
+                    .stack
+                    .last()
+                    .unwrap()
+                    .store_extra
+                {
+                    let v = self.context_stack.current_mut().extra_stack.pop().unwrap();
+                    // println!("jabba {:?}", v.value);
+                    self.set_reg(r, v);
+                    self.context_stack
+                        .current_mut()
+                        .stack
+                        .last_mut()
+                        .unwrap()
+                        .store_extra = None;
+                }
+            }
+
             let ip = self.context_stack.last().current_ip();
 
             if ip >= opcodes.len() {
@@ -308,16 +391,17 @@ impl Vm {
                 span: opcode_span,
             } = opcodes[ip];
 
+            if self.context_stack.len() > RECURSION_LIMIT {
+                return Err(RuntimeError::RecursionLimit {
+                    area: self.make_area(opcode_span, &program),
+                    call_stack: self.get_call_stack(),
+                });
+            }
+
             macro_rules! load_val {
                 ($val:expr, $to:expr) => {
                     self.set_reg($to, $val.into_stored(self.make_area(opcode_span, &program)))
                 };
-            }
-
-            #[derive(Debug, Clone, Copy)]
-            pub enum LoopFlow {
-                ContinueLoop,
-                Normal,
             }
 
             // MaybeUninit
@@ -395,6 +479,18 @@ impl Vm {
                         self.bin_op(value_ops::as_op, &program, a, b, to, opcode_span)?;
                     },
                     Opcode::PlusEq { a, b } => {
+                        println!(
+                            "albebe {:?} {:?} {:?} {:?}",
+                            self.get_reg_ref(a).borrow().value,
+                            self.get_reg_ref(a).as_ptr(),
+                            self.get_reg_ref(b).borrow().value,
+                            self.get_reg_ref(b).as_ptr()
+                        );
+                        // println!(
+                        //     "tzuma {:?} {:?}",
+                        //     self.get_reg_ref(Register(6)).as_ptr(),
+                        //     self.get_reg_ref(Register(9)).as_ptr(),
+                        // );
                         self.assign_op(value_ops::plus, &program, a, b, opcode_span)?;
                     },
                     Opcode::MinusEq { a, b } => {
@@ -555,10 +651,19 @@ impl Vm {
                             let mut current = self.context_stack.current_mut();
                             current.stack.pop();
 
-                            if let Some(r) = return_dest {
-                                current.stack.last_mut().unwrap().registers[*r as usize] =
-                                    ValueRef::new(ret_val)
+                            match return_dest {
+                                None => (),
+                                Some(ReturnDest::Reg(r)) => {
+                                    current.stack.last_mut().unwrap().registers[*r as usize] =
+                                        ValueRef::new(ret_val)
+                                },
+                                Some(ReturnDest::Extra) => current.extra_stack.push(ret_val),
                             }
+
+                            // if let Some(r) = return_dest {
+                            //     current.stack.last_mut().unwrap().registers[*r as usize] =
+                            //         ValueRef::new(ret_val)
+                            // }
                         }
 
                         finish_context(self.context_stack.last_mut().yeet_current().unwrap());
@@ -582,7 +687,7 @@ impl Vm {
                             current_context,
                             CallInfo {
                                 func: coord,
-                                return_dest: Some(dest),
+                                return_dest: Some(ReturnDest::Reg(dest)),
                                 call_area: None,
                                 is_builtin: None,
                             },
@@ -1235,6 +1340,11 @@ impl Vm {
                         }
                     },
                     Opcode::Call { base, call } => {
+                        println!(
+                            "tzuma {:?} {:?}",
+                            self.get_reg_ref(Register(6)).as_ptr(),
+                            self.get_reg_ref(Register(9)).as_ptr(),
+                        );
                         let call = program.get_call_expr(call);
                         let call = CallExpr {
                             dest: call.dest,
@@ -1299,15 +1409,21 @@ impl Vm {
                     Opcode::RunBuiltin { args, dest } => {
                         if let Some(f) = is_builtin {
                             let area = self.make_area(opcode_span, &program);
-                            let value = f.0(
+                            self.context_stack
+                                .current_mut()
+                                .stack
+                                .last_mut()
+                                .unwrap()
+                                .store_extra = Some(dest);
+                            f.0(
                                 (0..args)
                                     .map(|r| self.get_reg_ref(Register(r)).clone())
                                     .collect_vec(),
                                 self,
                                 &program,
-                                area.clone(),
+                                area,
                             )?;
-                            self.set_reg(dest, value.into_stored(area));
+                            return Ok(LoopFlow::ContinueLoop);
                         } else {
                             panic!("mcock")
                         }
@@ -1400,7 +1516,7 @@ impl Vm {
                 let mut current = self.context_stack.current_mut();
                 current.ip += 1;
             };
-            self.try_merge_contexts();
+            // self.try_merge_contexts();
         }
 
         //let f = self.context_stack.pop().unwrap();
@@ -1418,7 +1534,7 @@ impl Vm {
                 .extend(finished_contexts.into_iter());
         }
 
-        Ok(())
+        Ok(SplitFnRet)
     }
 
     fn try_merge_contexts(&mut self) {
@@ -1433,10 +1549,7 @@ impl Vm {
             // group by pos
 
             let top_ip = full_ctx.current().ip;
-            loop {
-                if full_ctx.contexts.is_empty() {
-                    break;
-                }
+            while !full_ctx.contexts.is_empty() {
                 if full_ctx.current().ip == top_ip {
                     top.push(full_ctx.contexts.pop().unwrap());
                 } else {
@@ -1453,6 +1566,9 @@ impl Vm {
                 for val in ctx.stack.last().unwrap().registers.iter() {
                     self.hash_value(val, &mut state);
                 }
+                // for val in ctx.extra_stack.iter() {
+                //     self.hash_value(val, &mut state);
+                // }
                 let hash = state.finish();
                 hashes.entry(hash).or_insert_with(Vec::new).push(ctx);
             }
@@ -1598,7 +1714,12 @@ impl Vm {
             current_context,
             CallInfo {
                 func,
-                return_dest: Some(call_expr.dest),
+                return_dest: Some(
+                    call_expr
+                        .dest
+                        .map(|r| ReturnDest::Reg(r))
+                        .unwrap_or(ReturnDest::Extra),
+                ),
                 call_area: Some(area),
                 is_builtin,
             },

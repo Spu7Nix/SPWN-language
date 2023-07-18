@@ -425,6 +425,18 @@ error_maker! {
         },
 
 
+        // ==================================================================
+        #[
+            Message: "Recursion limit", Note: None;
+            Labels: [
+                area => "Reached maximum recursion limit from this macro call";
+            ]
+        ]
+        RecursionLimit {
+            area: CodeArea,
+            [call_stack]
+        },
+
 
         // // ============================ BUILTIN FUNC ERRORS ============================
 

@@ -15,7 +15,14 @@ impl @array {
 	) {},
 	
 	#[doc("\ndsf \"fuck\"")]
-	peniscum: #[builtin] (
-		m: @macro,
+	map: #[builtin] (
+		self: @array,
+		f: @macro,
+	) {},
+	
+	#[doc("\ndsf \"fuck\"")]
+	test2: #[builtin] (
+		f1: @macro,
+		f2: @macro,
 	) {},
 }

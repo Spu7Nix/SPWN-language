@@ -1,5 +1,11 @@
 pub mod core;
 
+use super::vm::{LoopFlow, RuntimeResult, Vm};
+
+pub type RustFnInstr<'a> = &'a dyn Fn(&mut Vm) -> RuntimeResult<LoopFlow>;
+
+pub struct Instrs<'a>(&'a [RustFnInstr<'a>]);
+
 #[rustfmt::skip]
 #[macro_export]
 macro_rules! impl_type {
@@ -33,14 +39,76 @@ macro_rules! impl_type {
     ) => {
         impl $crate::interpreting::value::type_aliases::$value_typ {
             pub fn get_override_fn(self, name: &str) -> Option<$crate::interpreting::value::BuiltinFn> {
-                trait IntoValueShortcut {
-                    fn into_value(self) -> $crate::interpreting::value::Value;
+                trait RustFnReturn {
+                    fn rust_fn_return(
+                        self,
+                        vm: &mut $crate::Vm,
+                        area: &$crate::sources::CodeArea,
+                        program: &std::rc::Rc<$crate::Program>,
+                    ) -> $crate::interpreting::vm::RuntimeResult<()>;
                 }
-                impl IntoValueShortcut for () {
-                    fn into_value(self) -> $crate::interpreting::value::Value { $crate::interpreting::value::Value::Empty }
+
+                // trait IntoValueShortcut {
+                //     fn into_value(self) -> $crate::interpreting::value::Value;
+                // }
+                // impl IntoValueShortcut for () {
+                //     fn into_value(self) -> $crate::interpreting::value::Value { $crate::interpreting::value::Value::Empty }
+                // }
+                // impl IntoValueShortcut for $crate::interpreting::value::Value {
+                //     fn into_value(self) -> $crate::interpreting::value::Value { self }
+                // }
+
+                impl RustFnReturn for $crate::interpreting::value::Value {
+                    fn rust_fn_return(
+                        self,
+                        vm: &mut $crate::Vm,
+                        area: &$crate::sources::CodeArea,
+                        program: &std::rc::Rc<$crate::Program>,
+                    ) -> $crate::interpreting::vm::RuntimeResult<()> {
+                        // vm.context_stack.current_mut().extra = self.into_stored(area.clone());
+                        vm.run_rust_instrs(
+                            CallInfo {
+                                func: FuncCoord { program: program.clone(), func: 0 },
+                                return_dest: None,
+                                call_area: None,
+                                is_builtin: None,
+                            }, &[
+                                &|vm| {
+                                    vm.context_stack.current_mut().extra_stack.push(self.clone().into_stored(area.clone()));
+                                    // println!("clog");
+                                    Ok($crate::interpreting::vm::LoopFlow::Normal)
+                                },
+                            ]
+                        )?;
+                        Ok(())
+                    }
                 }
-                impl IntoValueShortcut for $crate::interpreting::value::Value {
-                    fn into_value(self) -> $crate::interpreting::value::Value { self }
+                // impl RustFnReturn for $crate::interpreting::vm::SplitFnRet {
+                //     fn rust_fn_return(
+                //         self,
+                //         vm: &mut $crate::Vm,
+                //         area: &$crate::sources::CodeArea,
+                //         program: &std::rc::Rc<$crate::Program>,
+                //     ) -> $crate::interpreting::vm::RuntimeResult<()> {}
+                // }
+                impl RustFnReturn for $crate::interpreting::builtins::Instrs<'_> {
+                    fn rust_fn_return(
+                        self,
+                        vm: &mut $crate::Vm,
+                        area: &$crate::sources::CodeArea,
+                        program: &std::rc::Rc<$crate::Program>,
+                    ) -> $crate::interpreting::vm::RuntimeResult<()> {
+                        vm.run_rust_instrs(
+                            CallInfo {
+                                func: FuncCoord { program: program.clone(), func: 0 },
+                                return_dest: None,
+                                call_area: None,
+                                is_builtin: None,
+                            },
+                            self.0
+                        )?;
+                        Ok(())
+                    }
                 }
                 
                 $(
@@ -48,15 +116,18 @@ macro_rules! impl_type {
                     fn $func_name(
                         mut args: Vec<$crate::interpreting::vm::ValueRef>,
                         $vm: &mut $crate::Vm,
-                        $program: &std::rc::Rc<crate::Program>,
+                        $program: &std::rc::Rc<$crate::Program>,
                         $area: $crate::sources::CodeArea,
-                    ) -> $crate::interpreting::vm::RuntimeResult<$crate::interpreting::value::Value> {
+                    ) -> $crate::interpreting::vm::RuntimeResult<()> {
+                        // $crate::interpreting::value::Value
                         use $crate::interpreting::value::value_structs::*;
                         
                         impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
                         impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
-
-                        Ok({ $($code)* }.into_value())
+                        // todo!()
+                         $($code)* .rust_fn_return($vm, &$area, $program);
+                        Ok(())
+                        // Ok({ $($code)* }.into_value())
                     }
                 )*
 

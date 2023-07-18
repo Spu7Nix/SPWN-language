@@ -49,7 +49,7 @@ pub enum Constant {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct CallExpr<Arg, R, S> {
     // pub base: R,
-    pub dest: R,
+    pub dest: Option<R>,
     pub positional: ImmutVec<Arg>,
     pub named: ImmutVec<(S, Arg)>,
 }
@@ -287,7 +287,11 @@ mod debug_bytecode {
                                             r.to_string().bright_red()
                                         )))
                                         .join(", "),
-                                    call_expr.dest.to_string().bright_red()
+                                    call_expr
+                                        .dest
+                                        .map(|r| r.to_string())
+                                        .unwrap_or("?".into())
+                                        .bright_red()
                                 )
                             });
                             let c = import_regex.replace_all(&c, |c: &Captures| {

@@ -1,17 +1,12 @@
 
-
-
-
-
-impl @fghfghg {
-    #[overload = _display_]
-    display: (self) {
-        return "b"
-    } 
+f = () {
+    -> return 1
 }
+mut a = [69];
+a[0] += f();
+dbg a
 
 
-$.print( @fghfghg::{})
 
-
+// discord Skill issue????????
 

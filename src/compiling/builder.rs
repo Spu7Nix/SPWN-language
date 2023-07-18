@@ -275,7 +275,7 @@ impl ProtoBytecode {
                         .map(|(s, r)| (s, r.try_into().unwrap()))
                         .collect_vec()
                         .into(),
-                    dest: ce.dest.try_into().unwrap(),
+                    dest: ce.dest.map(|r| r.try_into().unwrap()),
                 })
                 .collect_vec()
                 .into(),

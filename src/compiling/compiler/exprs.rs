@@ -313,7 +313,7 @@ impl Compiler<'_> {
                 let call_expr = CallExpr {
                     positional,
                     named,
-                    dest: out_reg,
+                    dest: Some(out_reg),
                 };
 
                 builder.call(base_reg, call_expr, expr.span);

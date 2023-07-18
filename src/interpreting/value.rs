@@ -21,9 +21,7 @@ use crate::sources::{CodeArea, Spanned};
 use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
-pub struct BuiltinFn(
-    pub fn(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<Value>,
-);
+pub struct BuiltinFn(pub fn(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<()>);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -382,6 +380,29 @@ impl Value {
 
     pub fn into_stored(self, area: CodeArea) -> StoredValue {
         StoredValue { value: self, area }
+    }
+
+    pub fn inner_references<'a, F>(&'a mut self, mut f: F)
+    where
+        F: FnMut(&'a mut ValueRef),
+    {
+        match self {
+            Value::Array(arr) => {
+                arr.iter_mut().for_each(f);
+            },
+            Value::Dict(map) => {
+                map.iter_mut().for_each(|(_, v)| f(v.value_mut()));
+            },
+            Value::Maybe(Some(v)) => f(v),
+            Value::Instance { items, .. } => {
+                items.iter_mut().for_each(|(_, v)| f(v.value_mut()));
+            },
+            Value::Module { exports, .. } => {
+                exports.iter_mut().for_each(|(_, v)| f(v));
+            },
+            // todo: iterator, object
+            v => {},
+        };
     }
 }
 

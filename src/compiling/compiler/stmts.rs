@@ -35,7 +35,7 @@ impl<'a> Compiler<'a> {
                 let right_reg = self.compile_expr(right, scope, &mut marker.with(builder))?;
                 marker
                     .with(builder)
-                    .copy_deep(right_reg, temp_reg, right.span);
+                    .copy_mem(right_reg, temp_reg, right.span);
 
                 builder.mismatch_throw_if_false(match_reg, right_reg, left.span);
             },

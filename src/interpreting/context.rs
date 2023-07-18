@@ -1,28 +1,37 @@
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
 use std::mem::ManuallyDrop;
+use std::rc::Rc;
 
 use ahash::AHashMap;
 use derive_more::{Deref, DerefMut};
 
-use super::value::{BuiltinFn, StoredValue};
+use super::value::{BuiltinFn, StoredValue, Value};
 use super::vm::{DeepClone, FuncCoord, ValueRef, Vm};
 use crate::compiling::bytecode::OptRegister;
 use crate::compiling::opcodes::OpcodePos;
 use crate::gd::ids::Id;
-use crate::sources::CodeArea;
+use crate::sources::{CodeArea, SpwnSource, ZEROSPAN};
 use crate::util::ImmutVec;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StackItem {
+    pub store_extra: Option<OptRegister>,
     pub registers: ImmutVec<ValueRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum ReturnDest {
+    Reg(OptRegister),
+    Extra,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CallInfo {
     pub func: FuncCoord,
-    pub return_dest: Option<OptRegister>,
+    pub return_dest: Option<ReturnDest>,
     pub call_area: Option<CodeArea>,
     pub is_builtin: Option<BuiltinFn>,
 }
@@ -33,7 +42,7 @@ pub struct TryCatch {
     pub reg: OptRegister,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Context {
     pub ip: usize,
 
@@ -42,7 +51,13 @@ pub struct Context {
     pub group: Id,
     pub stack: Vec<StackItem>,
 
+    pub extra_stack: Vec<StoredValue>,
+
     pub returned: Option<ValueRef>,
+}
+
+impl Eq for Context {
+    fn assert_receiver_is_total_eq(&self) {}
 }
 
 // #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -53,13 +68,14 @@ pub struct Context {
 
 #[allow(clippy::new_without_default)]
 impl Context {
-    pub fn new() -> Self {
+    pub fn new(src: &Rc<SpwnSource>) -> Self {
         Self {
             ip: 0,
             group: Id::Specific(0),
             stack: vec![],
             try_catches: vec![],
             returned: None,
+            extra_stack: vec![],
         }
     }
 }
@@ -130,30 +146,92 @@ impl FullContext {
     }
 }
 
+#[derive(Debug)]
+pub struct CloneMap(AHashMap<usize, ValueRef>);
+
+impl CloneMap {
+    pub fn new() -> Self {
+        Self(AHashMap::new())
+    }
+
+    pub fn get(&self, key: &ValueRef) -> Option<&ValueRef> {
+        self.0.get(&(key.as_ptr() as usize))
+    }
+
+    pub fn get_mut(&mut self, key: &ValueRef) -> Option<&mut ValueRef> {
+        self.0.get_mut(&(key.as_ptr() as usize))
+    }
+
+    pub fn insert(&mut self, key: &ValueRef, v: ValueRef) -> Option<ValueRef> {
+        self.0.insert(key.as_ptr() as usize, v)
+    }
+}
+
 impl Vm {
     pub fn split_current_context(&mut self) {
         let current = self.context_stack.current();
         let mut new = current.clone();
 
-        // lord forgive me for what i am about to do
+        let mut clone_map = CloneMap::new();
 
-        let mut clone_map: AHashMap<*mut StoredValue, ValueRef> = AHashMap::new();
+        fn dfs_insert_into_map(ptr: &ValueRef, clone_map: &mut CloneMap) {
+            if clone_map.get(ptr).is_some() {
+                return;
+            }
+            println!("{:?}", ptr.borrow().value.get_type());
+            clone_map.insert(ptr, ValueRef::new(ptr.borrow().clone()));
+            ptr.borrow_mut().value.inner_references(|v| {
+                dfs_insert_into_map(v, clone_map);
+            });
+        }
 
-        for stack_item in &mut new.stack {
-            for reg in stack_item.registers.iter_mut() {
-                let k = match clone_map.get(&reg.as_ptr()) {
-                    Some(k) => k.clone(),
-                    None => {
-                        let k = self.deep_clone_ref(&*reg);
-                        clone_map.insert(reg.as_ptr(), k.clone());
-                        k
-                    },
-                };
+        fn dfs_replace_ptrs(ptr: &mut ValueRef, clone_map: &CloneMap) {
+            ptr.borrow_mut().value.inner_references(|v| {
+                dfs_replace_ptrs(v, clone_map);
+            });
+            match clone_map.get(ptr) {
+                Some(replacement) => *ptr = replacement.clone(),
+                None => {
+                    println!("{:?}", ptr.borrow());
+                },
+            };
+        }
 
-                *reg = k;
+        for stack_item in &new.stack {
+            for reg in stack_item.registers.iter() {
+                dfs_insert_into_map(reg, &mut clone_map);
             }
         }
-        self.context_stack.last_mut().contexts.push(new);
+        for stack_item in &mut new.stack {
+            for reg in stack_item.registers.iter_mut() {
+                dfs_replace_ptrs(reg, &clone_map);
+            }
+        }
+
+        // lord forgive me for what i am about to do
+
+        // let mut clone_map: AHashMap<usize, ValueRef> = AHashMap::new();
+
+        // for stack_item in &mut new.stack {
+        //     for reg in stack_item.registers.iter_mut() {
+        //         let k = match clone_map.get(&(reg.as_ptr() as usize)) {
+        //             Some(k) => k.clone(),
+        //             None => {
+        //                 let k = self.deep_clone_ref(&*reg);
+        //                 clone_map.insert(reg.as_ptr() as usize, k.clone());
+        //                 k
+        //             },
+        //         };
+
+        //         *reg = k;
+        //     }
+        // }
+
+        // for i in &mut new.extra_stack {
+        //     *i = self.deep_clone(&*i)
+        // }
+
+        // self.context_stack.last_mut().contexts.push(new);
     }
 }
 

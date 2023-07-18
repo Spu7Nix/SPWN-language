@@ -478,6 +478,7 @@ where
     fn is_priv(&self) -> bool;
     fn is_pub(&self) -> bool;
     fn value(&self) -> &Self::Value;
+    fn value_mut(&mut self) -> &mut Self::Value;
 
     fn source(&self) -> Option<&Rc<SpwnSource>> {
         None
@@ -502,6 +503,13 @@ impl<T> VisTrait for VisSource<T> {
     }
 
     fn value(&self) -> &Self::Value {
+        match self {
+            VisSource::Public(v) => v,
+            VisSource::Private(v, _) => v,
+        }
+    }
+
+    fn value_mut(&mut self) -> &mut Self::Value {
         match self {
             VisSource::Public(v) => v,
             VisSource::Private(v, _) => v,
@@ -553,6 +561,13 @@ impl<T> VisTrait for Vis<T> {
     }
 
     fn value(&self) -> &Self::Value {
+        match self {
+            Vis::Public(v) => v,
+            Vis::Private(v) => v,
+        }
+    }
+
+    fn value_mut(&mut self) -> &mut Self::Value {
         match self {
             Vis::Public(v) => v,
             Vis::Private(v) => v,
