@@ -3,6 +3,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BinaryHeap};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
+use std::io::{self, Write};
 use std::mem::{self};
 use std::rc::Rc;
 
@@ -35,9 +36,16 @@ const RECURSION_LIMIT: usize = 256;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 pub trait DeepClone<I> {
-    fn deep_clone(&self, input: I) -> StoredValue;
+    fn deep_clone_map(&self, input: I, map: &mut Option<&mut CloneMap>) -> StoredValue;
+    fn deep_clone(&self, input: I) -> StoredValue {
+        self.deep_clone_map(input, &mut None)
+    }
     fn deep_clone_ref(&self, input: I) -> ValueRef {
         let v: StoredValue = self.deep_clone(input);
+        ValueRef::new(v)
+    }
+    fn deep_clone_ref_map(&self, input: I, map: &mut Option<&mut CloneMap>) -> ValueRef {
+        let v: StoredValue = self.deep_clone_map(input, map);
         ValueRef::new(v)
     }
 }
@@ -55,6 +63,21 @@ impl Eq for ValueRef {}
 impl ValueRef {
     pub fn new(v: StoredValue) -> Self {
         Self(Rc::new(RefCell::new(v)))
+    }
+
+    pub fn deep_clone_checked(&self, vm: &Vm, map: &mut Option<&mut CloneMap>) -> Self {
+        if let Some(m) = map {
+            if let Some(v) = m.get(self) {
+                return v.clone();
+            }
+            let new = vm.deep_clone_ref_map(self, map);
+            // goofy thing to avoid borrow checker
+            if let Some(m) = map {
+                m.insert(self, new.clone());
+            }
+            return new;
+        }
+        vm.deep_clone_ref_map(self, map)
     }
 }
 
@@ -185,37 +208,77 @@ impl Vm {
 }
 
 impl DeepClone<&StoredValue> for Vm {
-    fn deep_clone(&self, input: &StoredValue) -> StoredValue {
+    fn deep_clone_map(&self, input: &StoredValue, map: &mut Option<&mut CloneMap>) -> StoredValue {
         let area = input.area.clone();
 
-        // let mut deep_clone_dict_items = |v: &AHashMap<ImmutCloneVec<char>, VisSource<ValueRef>>| {
-        //     v.iter()
-        //         .map(|(k, v)| (Rc::clone(k), v.clone().map(|v| self.deep_clone_ref(&v))))
-        //         .collect()
-        // };
-        let mut value = input.value.clone();
+        let mut deep_clone_dict_items = |v: &AHashMap<ImmutCloneVec<char>, VisSource<ValueRef>>| {
+            v.iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        v.clone().map(|v| v.deep_clone_checked(self, map)),
+                    )
+                })
+                .collect()
+        };
 
-        value.inner_references(|v| {
-            let v_clone = v.clone();
-            *v = self.deep_clone_ref(&v_clone);
-        });
+        let value = match &input.value {
+            Value::Array(arr) => Value::Array(
+                arr.iter()
+                    .map(|v| v.deep_clone_checked(self, map))
+                    .collect(),
+            ),
+            Value::Dict(map) => Value::Dict(deep_clone_dict_items(map)),
+            Value::Maybe(v) => Value::Maybe(v.as_ref().map(|v| v.deep_clone_checked(self, map))),
+            Value::Instance { typ, items } => Value::Instance {
+                typ: *typ,
+                items: deep_clone_dict_items(items),
+            },
+            Value::Module { exports, types } => Value::Module {
+                exports: exports
+                    .iter()
+                    .map(|(k, v)| (Rc::clone(k), v.deep_clone_checked(self, map)))
+                    .collect(),
+                types: types.clone(),
+            },
+            Value::Macro(data) => {
+                let mut new_data = data.clone();
+                for i in new_data.args.iter_mut() {
+                    if let MacroArg::Single {
+                        default: Some(r), ..
+                    } = &mut i.value
+                    {
+                        *r = r.deep_clone_checked(self, map)
+                    }
+                }
+                if let Some(r) = &mut new_data.self_arg {
+                    *r = r.deep_clone_checked(self, map)
+                }
+                for r in new_data.captured.iter_mut() {
+                    *r = r.deep_clone_checked(self, map)
+                }
+                Value::Macro(new_data)
+            },
+            // todo: iterator, object
+            v => v.clone(),
+        };
 
         value.into_stored(area)
     }
 }
 
 impl DeepClone<&ValueRef> for Vm {
-    fn deep_clone(&self, input: &ValueRef) -> StoredValue {
+    fn deep_clone_map(&self, input: &ValueRef, map: &mut Option<&mut CloneMap>) -> StoredValue {
         let v = input.borrow();
 
-        self.deep_clone(&*v)
+        self.deep_clone_map(&*v, map)
     }
 }
 
 impl DeepClone<OptRegister> for Vm {
-    fn deep_clone(&self, input: OptRegister) -> StoredValue {
+    fn deep_clone_map(&self, input: OptRegister, map: &mut Option<&mut CloneMap>) -> StoredValue {
         let v = &self.context_stack.current().stack.last().unwrap().registers[*input as usize];
-        self.deep_clone(v)
+        self.deep_clone_map(v, map)
     }
 }
 
@@ -404,6 +467,56 @@ impl Vm {
                 };
             }
 
+            // loop {
+            //     print!(
+            //         "{} {} ",
+            //         format!(
+            //             "CTX {:?}, F{}, next {}",
+            //             self.context_stack.current().unique_id,
+            //             func,
+            //             ip
+            //         )
+            //         .green()
+            //         .dimmed(),
+            //         "Debug:".bright_green().bold()
+            //     );
+            //     // self.context_stack.current();
+            //     io::stdout().flush().unwrap();
+
+            //     let mut user_input = String::new();
+            //     io::stdin().read_line(&mut user_input).unwrap();
+            //     let s = user_input.trim();
+
+            //     if s.is_empty() {
+            //         // println!("{}", "END DEBUG".bright_red().bold());
+            //         break;
+            //     } else {
+            //         fn is_debug_type<'a>(s: &'a str, prefix: &'a str) -> Option<&'a str> {
+            //             if s.len() > prefix.len() && &s[..prefix.len()] == prefix {
+            //                 Some(&s[prefix.len()..])
+            //             } else {
+            //                 None
+            //             }
+            //         }
+
+            //         if let Some(s) = is_debug_type(s, "0x") {
+            //             let ptr = unsafe {
+            //                 &*(usize::from_str_radix(s, 16).unwrap() as *mut StoredValue)
+            //             };
+
+            //             println!("{} {:?}", "value:".dimmed(), ptr.value);
+            //         } else if let Some(s) = is_debug_type(s, "R") {
+            //             let reg = Register(s.parse().unwrap());
+
+            //             let value_ref = self.get_reg_ref(reg);
+
+            //             println!("{}", self.runtime_display(value_ref, true),)
+            //         } else {
+            //             println!("{}", "stupid bitch".dimmed())
+            //         }
+            //     }
+            // }
+
             // MaybeUninit
             let mut run_opcode = |opcode| -> RuntimeResult<LoopFlow> {
                 match opcode {
@@ -479,13 +592,13 @@ impl Vm {
                         self.bin_op(value_ops::as_op, &program, a, b, to, opcode_span)?;
                     },
                     Opcode::PlusEq { a, b } => {
-                        println!(
-                            "albebe {:?} {:?} {:?} {:?}",
-                            self.get_reg_ref(a).borrow().value,
-                            self.get_reg_ref(a).as_ptr(),
-                            self.get_reg_ref(b).borrow().value,
-                            self.get_reg_ref(b).as_ptr()
-                        );
+                        // println!(
+                        //     "albebe {:?} {:?} {:?} {:?}",
+                        //     self.get_reg_ref(a).borrow().value,
+                        //     self.get_reg_ref(a).as_ptr(),
+                        //     self.get_reg_ref(b).borrow().value,
+                        //     self.get_reg_ref(b).as_ptr()
+                        // );
                         // println!(
                         //     "tzuma {:?} {:?}",
                         //     self.get_reg_ref(Register(6)).as_ptr(),
@@ -706,12 +819,12 @@ impl Vm {
                         self.context_stack.last_mut().yeet_current();
                         return Ok(LoopFlow::ContinueLoop);
                     },
-                    Opcode::Dbg { reg } => {
+                    Opcode::Dbg { reg, show_ptr } => {
                         let value_ref = self.get_reg_ref(reg);
 
                         println!(
                             "{} {} {}, {:?}, {}",
-                            self.runtime_display(&value_ref.borrow()),
+                            self.runtime_display(value_ref, show_ptr),
                             "::".dimmed(),
                             self.context_stack.last().current_group().fmt("g").green(),
                             value_ref.as_ptr(),
@@ -1229,7 +1342,7 @@ impl Vm {
                         self.set_reg(reg, val.into_stored(area))
                     },
                     Opcode::ToString { from, dest } => {
-                        let s = self.runtime_display(&self.get_reg_ref(from).borrow());
+                        let s = self.runtime_display(self.get_reg_ref(from), false);
                         self.set_reg(
                             dest,
                             Value::String(s.chars().collect())
@@ -1340,11 +1453,11 @@ impl Vm {
                         }
                     },
                     Opcode::Call { base, call } => {
-                        println!(
-                            "tzuma {:?} {:?}",
-                            self.get_reg_ref(Register(6)).as_ptr(),
-                            self.get_reg_ref(Register(9)).as_ptr(),
-                        );
+                        // println!(
+                        //     "tzuma {:?} {:?}",
+                        //     self.get_reg_ref(Register(6)).as_ptr(),
+                        //     self.get_reg_ref(Register(9)).as_ptr(),
+                        // );
                         let call = program.get_call_expr(call);
                         let call = CallExpr {
                             dest: call.dest,
@@ -1516,6 +1629,7 @@ impl Vm {
                 let mut current = self.context_stack.current_mut();
                 current.ip += 1;
             };
+
             // self.try_merge_contexts();
         }
 
@@ -1717,7 +1831,7 @@ impl Vm {
                 return_dest: Some(
                     call_expr
                         .dest
-                        .map(|r| ReturnDest::Reg(r))
+                        .map(ReturnDest::Reg)
                         .unwrap_or(ReturnDest::Extra),
                 ),
                 call_area: Some(area),
@@ -1966,8 +2080,14 @@ impl Vm {
         }
     }
 
-    pub fn runtime_display(&self, value: &StoredValue) -> String {
-        match &value.value {
+    pub fn runtime_display(&self, value: &ValueRef, with_ptr: bool) -> String {
+        let mut out = if with_ptr {
+            format!("{:?}: ", value.as_ptr()).dimmed().to_string()
+        } else {
+            "".to_string()
+        };
+
+        out += &match &value.borrow().value {
             Value::Int(n) => n.to_string(),
             Value::Float(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
@@ -1975,7 +2095,7 @@ impl Vm {
             Value::Array(arr) => format!(
                 "[{}]",
                 arr.iter()
-                    .map(|k| self.runtime_display(&k.borrow()))
+                    .map(|k| self.runtime_display(k, with_ptr))
                     .join(", ")
             ),
             Value::Dict(d) => format!(
@@ -1984,7 +2104,7 @@ impl Vm {
                     .map(|(s, v)| format!(
                         "{}: {}",
                         s.iter().collect::<String>(),
-                        self.runtime_display(&v.value().borrow())
+                        self.runtime_display(v.value(), with_ptr)
                     ))
                     .join(", ")
             ),
@@ -2002,13 +2122,13 @@ impl Vm {
                 }
             },
             Value::Maybe(o) => match o {
-                Some(k) => format!("({})?", self.runtime_display(&k.borrow())),
+                Some(k) => format!("({})?", self.runtime_display(k, with_ptr)),
                 None => "?".into(),
             },
             Value::Empty => "()".into(),
 
             Value::Macro(MacroData { args, .. }) => {
-                format!("<{}-arg macro at {:?}>", args.len(), (self as *const _))
+                format!("<{}-arg macro at {:?}>", args.len(), value.as_ptr())
             },
             Value::TriggerFunction { .. } => "!{...}".to_string(),
             Value::Type(t) => t.runtime_display(self),
@@ -2031,7 +2151,7 @@ impl Vm {
                     .map(|(s, k)| format!(
                         "{}: {}",
                         s.iter().collect::<String>(),
-                        self.runtime_display(&k.borrow())
+                        self.runtime_display(k, with_ptr)
                     ))
                     .join(", "),
                 if types.iter().any(|p| p.is_pub()) {
@@ -2066,12 +2186,13 @@ impl Vm {
                     .map(|(s, v)| format!(
                         "{}: {}",
                         s.iter().collect::<String>(),
-                        self.runtime_display(&v.value().borrow())
+                        self.runtime_display(v.value(), with_ptr)
                     ))
                     .join(", ")
             ),
             Value::ObjectKey(_) => todo!(),
             // todo: iterator, object
-        }
+        };
+        out
     }
 }

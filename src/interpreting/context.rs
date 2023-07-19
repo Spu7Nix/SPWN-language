@@ -44,6 +44,8 @@ pub struct TryCatch {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context {
+    pub unique_id: usize,
+
     pub ip: usize,
 
     pub try_catches: Vec<TryCatch>,
@@ -66,10 +68,16 @@ impl Eq for Context {
 //     Disallow,
 // }
 
+static mut CONTEXT_DBG_ID: usize = 0;
+
 #[allow(clippy::new_without_default)]
 impl Context {
     pub fn new(src: &Rc<SpwnSource>) -> Self {
         Self {
+            unique_id: unsafe {
+                CONTEXT_DBG_ID += 1;
+                CONTEXT_DBG_ID - 1
+            },
             ip: 0,
             group: Id::Specific(0),
             stack: vec![],
@@ -148,6 +156,11 @@ impl FullContext {
 
 #[derive(Debug)]
 pub struct CloneMap(AHashMap<usize, ValueRef>);
+// #[derive(Debug)]
+// pub struct CloneInfo<'a> {
+//     map: &'a mut CloneMap,
+//     ptr: usize,
+// }
 
 impl CloneMap {
     pub fn new() -> Self {
@@ -172,66 +185,26 @@ impl Vm {
         let current = self.context_stack.current();
         let mut new = current.clone();
 
-        let mut clone_map = CloneMap::new();
-
-        fn dfs_insert_into_map(ptr: &ValueRef, clone_map: &mut CloneMap) {
-            if clone_map.get(ptr).is_some() {
-                return;
-            }
-            println!("{:?}", ptr.borrow().value.get_type());
-            clone_map.insert(ptr, ValueRef::new(ptr.borrow().clone()));
-            ptr.borrow_mut().value.inner_references(|v| {
-                dfs_insert_into_map(v, clone_map);
-            });
-        }
-
-        fn dfs_replace_ptrs(ptr: &mut ValueRef, clone_map: &CloneMap) {
-            ptr.borrow_mut().value.inner_references(|v| {
-                dfs_replace_ptrs(v, clone_map);
-            });
-            match clone_map.get(ptr) {
-                Some(replacement) => *ptr = replacement.clone(),
-                None => {
-                    println!("{:?}", ptr.borrow());
-                },
-            };
-        }
-
-        for stack_item in &new.stack {
-            for reg in stack_item.registers.iter() {
-                dfs_insert_into_map(reg, &mut clone_map);
-            }
-        }
-        for stack_item in &mut new.stack {
-            for reg in stack_item.registers.iter_mut() {
-                dfs_replace_ptrs(reg, &clone_map);
-            }
-        }
+        new.unique_id = unsafe {
+            CONTEXT_DBG_ID += 1;
+            CONTEXT_DBG_ID - 1
+        };
 
         // lord forgive me for what i am about to do
 
-        // let mut clone_map: AHashMap<usize, ValueRef> = AHashMap::new();
+        let mut clone_map = CloneMap::new();
 
-        // for stack_item in &mut new.stack {
-        //     for reg in stack_item.registers.iter_mut() {
-        //         let k = match clone_map.get(&(reg.as_ptr() as usize)) {
-        //             Some(k) => k.clone(),
-        //             None => {
-        //                 let k = self.deep_clone_ref(&*reg);
-        //                 clone_map.insert(reg.as_ptr() as usize, k.clone());
-        //                 k
-        //             },
-        //         };
+        for stack_item in &mut new.stack {
+            for reg in stack_item.registers.iter_mut() {
+                *reg = reg.deep_clone_checked(self, &mut Some(&mut clone_map));
+            }
+        }
 
-        //         *reg = k;
-        //     }
-        // }
+        for v in &mut new.extra_stack {
+            *v = self.deep_clone_map(&*v, &mut Some(&mut clone_map))
+        }
 
-        // for i in &mut new.extra_stack {
-        //     *i = self.deep_clone(&*i)
-        // }
-
-        // self.context_stack.last_mut().contexts.push(new);
+        self.context_stack.last_mut().contexts.push(new);
     }
 }
 

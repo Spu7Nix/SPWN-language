@@ -1,12 +1,11 @@
 
-f = () {
-    -> return 1
-}
-mut a = [69];
-a[0] += f();
-dbg a
+
+import "libraries/core/array.spwn"
 
 
 
-// discord Skill issue????????
+
+
+
+
 

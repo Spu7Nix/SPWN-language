@@ -266,7 +266,7 @@ impl Compiler<'_> {
                 let base = self.compile_expr(base, scope, builder)?;
                 let index = self.compile_expr(index, scope, builder)?;
                 let out = builder.next_reg();
-                builder.index(base, out, index, expr.span);
+                builder.index_mem(base, out, index, expr.span);
                 Ok(out)
             },
             Expression::Member { base, name } => {
@@ -663,10 +663,10 @@ impl Compiler<'_> {
 
                 Ok(out_reg)
             },
-            Expression::Dbg(v) => {
+            Expression::Dbg(v, show_ptr) => {
                 let out = builder.next_reg();
                 let v = self.compile_expr(v, scope, builder)?;
-                builder.dbg(v, expr.span);
+                builder.dbg(v, *show_ptr, expr.span);
                 builder.load_empty(out, expr.span);
                 Ok(out)
             },

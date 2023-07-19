@@ -266,7 +266,7 @@ pub enum Expression {
 
     Import(Import),
 
-    Dbg(ExprNode),
+    Dbg(ExprNode, bool),
 
     Instance {
         base: ExprNode,

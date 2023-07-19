@@ -282,7 +282,7 @@ pub struct MacroData {
     pub args: ImmutVec<Spanned<MacroArg<ValueRef, ()>>>,
     pub self_arg: Option<ValueRef>,
 
-    pub captured: ImmutCloneVec<ValueRef>,
+    pub captured: ImmutVec<ValueRef>,
 
     pub is_method: bool,
 
@@ -380,29 +380,6 @@ impl Value {
 
     pub fn into_stored(self, area: CodeArea) -> StoredValue {
         StoredValue { value: self, area }
-    }
-
-    pub fn inner_references<'a, F>(&'a mut self, mut f: F)
-    where
-        F: FnMut(&'a mut ValueRef),
-    {
-        match self {
-            Value::Array(arr) => {
-                arr.iter_mut().for_each(f);
-            },
-            Value::Dict(map) => {
-                map.iter_mut().for_each(|(_, v)| f(v.value_mut()));
-            },
-            Value::Maybe(Some(v)) => f(v),
-            Value::Instance { items, .. } => {
-                items.iter_mut().for_each(|(_, v)| f(v.value_mut()));
-            },
-            Value::Module { exports, .. } => {
-                exports.iter_mut().for_each(|(_, v)| f(v));
-            },
-            // todo: iterator, object
-            v => {},
-        };
     }
 }
 

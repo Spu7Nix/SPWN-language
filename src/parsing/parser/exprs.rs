@@ -386,7 +386,9 @@ impl Parser<'_> {
                 Token::Dbg => {
                     self.next()?;
 
-                    Expression::Dbg(self.parse_expr(true)?).spanned(start.extend(self.span()))
+                    let show_ptr = self.skip_tok(Token::Mult)?;
+
+                    Expression::Dbg(self.parse_expr(true)?, show_ptr).spanned(start.extend(self.span()))
                 },
                 unary_op
                     if {

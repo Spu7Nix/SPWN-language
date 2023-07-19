@@ -472,8 +472,8 @@ impl<'a> CodeBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(Opcode::Return { src, module_ret }), span)
     }
 
-    pub fn dbg(&mut self, reg: UnoptRegister, span: CodeSpan) {
-        self.push_opcode(ProtoOpcode::Raw(Opcode::Dbg { reg }), span)
+    pub fn dbg(&mut self, reg: UnoptRegister, show_ptr: bool, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Dbg { reg, show_ptr }), span)
     }
 
     pub fn throw(&mut self, reg: UnoptRegister, span: CodeSpan) {

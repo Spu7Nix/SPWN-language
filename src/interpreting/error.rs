@@ -6,6 +6,7 @@ use super::context::CallInfo;
 use super::value::{StoredValue, Value, ValueType};
 use super::vm::Vm;
 use crate::error_maker;
+use crate::interpreting::vm::ValueRef;
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;
 
@@ -379,7 +380,7 @@ error_maker! {
         #[
             Message: "Thrown error", Note: None;
             Labels: [
-                area => "{}": vm.runtime_display(&value);
+                area => "{}": vm.runtime_display(&ValueRef::new(value.clone()), false);
             ]
         ]
         ThrownError {
