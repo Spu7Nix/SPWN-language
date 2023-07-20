@@ -15,7 +15,7 @@ use itertools::{Either, Itertools};
 
 use super::builtins::RustFnInstr;
 use super::context::{CallInfo, CloneMap, Context, ContextStack, FullContext, StackItem};
-use super::value::{StoredValue, Value, ValueType};
+use super::value::{MacroTarget, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::{Bytecode, CallExpr, Constant, Function, OptRegister, Register};
 use crate::compiling::opcodes::{CallExprID, ConstID, Opcode, RuntimeStringFlag};
@@ -241,23 +241,30 @@ impl DeepClone<&StoredValue> for Vm {
                     .collect(),
                 types: types.clone(),
             },
-            Value::Macro(data) => {
+            v @ (Value::Macro(data) | Value::Iterator(data)) => {
                 let mut new_data = data.clone();
-                for i in new_data.args.iter_mut() {
-                    if let MacroArg::Single {
-                        default: Some(r), ..
-                    } = &mut i.value
-                    {
+                for i in new_data.defaults.iter_mut() {
+                    if let Some(r) = i {
                         *r = r.deep_clone_checked(self, map)
                     }
                 }
                 if let Some(r) = &mut new_data.self_arg {
                     *r = r.deep_clone_checked(self, map)
                 }
-                for r in new_data.captured.iter_mut() {
-                    *r = r.deep_clone_checked(self, map)
+
+                match &mut new_data.target {
+                    MacroTarget::Spwn { captured, .. } => {
+                        for r in captured.iter_mut() {
+                            *r = r.deep_clone_checked(self, map)
+                        }
+                    },
+                    MacroTarget::FullyRust { .. } => (),
                 }
-                Value::Macro(new_data)
+                if matches!(v, Value::Macro(_)) {
+                    Value::Macro(new_data)
+                } else {
+                    Value::Iterator(new_data)
+                }
             },
             // todo: iterator, object
             v => v.clone(),
@@ -1398,21 +1405,7 @@ impl Vm {
                         };
                         let f = &program.bytecode.functions[func];
 
-                        let mut args = vec![];
-
-                        for (i, arg) in f.args.iter().enumerate() {
-                            args.push(
-                                if f.spread_arg.is_some_and(|v| v == i as u8) {
-                                    MacroArg::Spread { pattern: () }
-                                } else {
-                                    MacroArg::Single {
-                                        pattern: (),
-                                        default: None,
-                                    }
-                                }
-                                .spanned(arg.span),
-                            )
-                        }
+                        let mut defaults = vec![None; f.args.len()];
 
                         let captured = f
                             .captured_regs
@@ -1421,12 +1414,15 @@ impl Vm {
                             .collect_vec();
 
                         let value = Value::Macro(MacroData {
-                            func: func_coord,
-                            args: args.into(),
+                            target: MacroTarget::Spwn {
+                                func: func_coord,
+                                is_builtin: None,
+                                captured: captured.into(),
+                            },
+
+                            defaults: defaults.into(),
                             self_arg: None,
-                            captured: captured.into(),
                             is_method: false,
-                            is_builtin: None,
                         });
 
                         self.set_reg(
@@ -1437,11 +1433,7 @@ impl Vm {
                     Opcode::PushMacroDefault { to, from, arg } => {
                         match &mut self.get_reg_ref(to).borrow_mut().value {
                             Value::Macro(data) => {
-                                if let MacroArg::Single { default, .. } =
-                                    &mut data.args[arg as usize].value
-                                {
-                                    *default = Some(self.get_reg_ref(from).clone())
-                                }
+                                data.defaults[arg as usize] = Some(self.get_reg_ref(from).clone());
                             },
                             _ => unreachable!(),
                         }
@@ -1510,9 +1502,13 @@ impl Vm {
                         };
 
                         for (k, v) in &map {
-                            if let Value::Macro(data) = &mut v.value().borrow_mut().value {
+                            if let Value::Macro(MacroData {
+                                target: MacroTarget::Spwn { is_builtin, .. },
+                                ..
+                            }) = &mut v.value().borrow_mut().value
+                            {
                                 if let Some(f) = t.get_override_fn(&k.iter().collect::<String>()) {
-                                    data.is_builtin = Some(f)
+                                    *is_builtin = Some(f)
                                 }
                             }
                         }
@@ -1735,7 +1731,27 @@ impl Vm {
             },
         };
 
-        let func = data.func.get_func();
+        let (args, spread_arg): (Box<dyn Iterator<Item = Option<&ImmutStr>>>, Option<u8>) =
+            match &data.target {
+                MacroTarget::Spwn {
+                    func,
+                    is_builtin,
+                    captured,
+                } => {
+                    let f = func.get_func();
+                    (
+                        Box::new(f.args.iter().map(|v| v.value.as_ref())),
+                        f.spread_arg,
+                    )
+                },
+                MacroTarget::FullyRust {
+                    fn_ptr,
+                    args,
+                    spread_arg,
+                } => (Box::new(args.iter().map(|f| Some(f))), *spread_arg),
+            };
+
+        // let func = data.func.get_func();
 
         enum ArgFill {
             Single(Option<ValueRef>, Option<ImmutStr>),
@@ -1744,19 +1760,17 @@ impl Vm {
 
         let mut arg_name_map = AHashMap::new();
 
-        let mut fill = func
-            .args
-            .iter()
+        let mut fill = args
             .enumerate()
             .map(|(i, arg)| {
-                if let Some(name) = &arg.value {
+                if let Some(name) = &arg {
                     arg_name_map.insert(&**name, i);
                 }
 
-                if func.spread_arg == Some(i as u8) {
+                if spread_arg == Some(i as u8) {
                     ArgFill::Spread(vec![])
                 } else {
-                    ArgFill::Single(None, arg.value.clone())
+                    ArgFill::Single(None, arg.cloned())
                 }
             })
             .collect_vec();
@@ -1782,23 +1796,22 @@ impl Vm {
                 Some(ArgFill::Spread(s)) => s.push(arg.clone()),
                 None => {
                     return Err(RuntimeError::TooManyArguments {
-                        call_area: area.clone(),
+                        call_area: area,
                         macro_def_area: macro_area,
                         call_arg_amount: call_expr.positional.len(),
-                        macro_arg_amount: data.args.len(),
+                        macro_arg_amount: fill.len(),
                         call_stack: self.get_call_stack(),
                     })
                 },
             }
         }
-        let opcode_area = area.clone();
 
         for (name, arg) in call_expr.named.iter() {
-            let Some(idx) = arg_name_map.get(&&**name) else {
+            let Some(idx) = arg_name_map.get(name) else {
                 return Err(RuntimeError::UnknownKeywordArgument {
                     name: name.to_string(),
                     macro_def_area: macro_area,
-                    call_area: opcode_area,
+                    call_area: area,
                     call_stack: self.get_call_stack(),
                 });
             };
@@ -1810,72 +1823,117 @@ impl Vm {
                     return Err(RuntimeError::UnknownKeywordArgument {
                         name: name.to_string(),
                         macro_def_area: macro_area,
-                        call_area: opcode_area,
+                        call_area: area,
                         call_stack: self.get_call_stack(),
                     })
                 },
             }
         }
-        let func = data.func.clone();
-        let captured = data.captured.clone();
-        let is_builtin = data.is_builtin;
 
-        mem::drop(base);
-
-        let current_context = self.context_stack.last_mut().yeet_current().unwrap();
-
-        self.run_function(
-            current_context,
-            CallInfo {
+        match &data.target {
+            MacroTarget::Spwn {
                 func,
-                return_dest: Some(
-                    call_expr
-                        .dest
-                        .map(ReturnDest::Reg)
-                        .unwrap_or(ReturnDest::Extra),
-                ),
-                call_area: Some(area),
                 is_builtin,
+                captured,
+            } => {
+                let func = func.clone();
+                let is_builtin = *is_builtin;
+                let captured = captured.clone();
+
+                mem::drop(base);
+
+                let current_context = self.context_stack.last_mut().yeet_current().unwrap();
+
+                self.run_function(
+                    current_context,
+                    CallInfo {
+                        func,
+                        return_dest: Some(
+                            call_expr
+                                .dest
+                                .map(ReturnDest::Reg)
+                                .unwrap_or(ReturnDest::Extra),
+                        ),
+                        call_area: Some(area.clone()),
+                        is_builtin,
+                    },
+                    Box::new(move |vm| {
+                        let arg_amount = fill.len();
+                        for (i, arg) in fill.into_iter().enumerate() {
+                            match arg {
+                                ArgFill::Single(Some(r), ..) => {
+                                    vm.change_reg_ref(Register(i as u8), r);
+                                },
+                                ArgFill::Spread(v) => {
+                                    vm.set_reg(
+                                        Register(i as u8),
+                                        StoredValue {
+                                            value: Value::Array(v),
+                                            area: area.clone(),
+                                        },
+                                    );
+                                },
+                                ArgFill::Single(None, name) => {
+                                    return Err(RuntimeError::ArgumentNotSatisfied {
+                                        call_area: area.clone(),
+                                        macro_def_area: macro_area,
+                                        arg: if let Some(name) = name {
+                                            Either::Left(name.to_string())
+                                        } else {
+                                            Either::Right(i)
+                                        },
+                                        call_stack: vm.get_call_stack(),
+                                    })
+                                },
+                            }
+                        }
+
+                        for (i, v) in captured.iter().enumerate() {
+                            vm.change_reg_ref(Register((arg_amount + i) as u8), v.clone());
+                        }
+
+                        Ok(())
+                    }),
+                    // ContextSplitMode::Allow,
+                )?;
             },
-            Box::new(move |vm| {
-                let arg_amount = fill.len();
-                for (i, arg) in fill.into_iter().enumerate() {
-                    match arg {
-                        ArgFill::Single(Some(r), ..) => {
-                            vm.change_reg_ref(Register(i as u8), r);
-                        },
-                        ArgFill::Spread(v) => {
-                            vm.set_reg(
-                                Register(i as u8),
-                                StoredValue {
+            MacroTarget::FullyRust { fn_ptr, .. } => {
+                let fn_ptr = fn_ptr.clone();
+                mem::drop(base);
+
+                fn_ptr.0.borrow_mut()(
+                    {
+                        let mut out = Vec::with_capacity(fill.len());
+                        for (i, arg) in fill.into_iter().enumerate() {
+                            out.push(match arg {
+                                ArgFill::Single(Some(r), ..) => r,
+                                ArgFill::Spread(v) => ValueRef::new(StoredValue {
                                     value: Value::Array(v),
-                                    area: opcode_area.clone(),
+                                    area: area.clone(),
+                                }),
+                                ArgFill::Single(None, name) => {
+                                    return Err(RuntimeError::ArgumentNotSatisfied {
+                                        call_area: area.clone(),
+                                        macro_def_area: macro_area,
+                                        arg: if let Some(name) = name {
+                                            Either::Left(name.to_string())
+                                        } else {
+                                            Either::Right(i)
+                                        },
+                                        call_stack: self.get_call_stack(),
+                                    })
                                 },
-                            );
-                        },
-                        ArgFill::Single(None, name) => {
-                            return Err(RuntimeError::ArgumentNotSatisfied {
-                                call_area: opcode_area.clone(),
-                                macro_def_area: macro_area,
-                                arg: if let Some(name) = name {
-                                    Either::Left(name.to_string())
-                                } else {
-                                    Either::Right(i)
-                                },
-                                call_stack: vm.get_call_stack(),
                             })
-                        },
-                    }
-                }
+                        }
+                        out
+                    },
+                    self,
+                    program,
+                    area,
+                )?;
+            },
+        }
 
-                for (i, v) in captured.iter().enumerate() {
-                    vm.change_reg_ref(Register((arg_amount + i) as u8), v.clone());
-                }
-
-                Ok(())
-            }),
-            // ContextSplitMode::Allow,
-        )?;
         Ok(())
     }
 
@@ -2038,30 +2096,46 @@ impl Vm {
                 prev_context: p,
             } => (g, p).hash(state),
             Value::Error(a) => a.hash(state),
-            Value::Macro(MacroData {
-                func,
-                args,
-                self_arg,
-                captured,
-                is_method,
-                is_builtin,
-            }) => {
-                func.hash(state);
-                is_method.hash(state);
-                is_builtin.hash(state);
-                for i in args.iter() {
-                    i.span.hash(state);
-                    if let MacroArg::Single {
-                        default: Some(v), ..
-                    } = &i.value
-                    {
-                        self.hash_value(v, state)
-                    }
+            Value::Macro(data) | Value::Iterator(data) => {
+                let MacroData {
+                    target,
+                    defaults,
+                    self_arg,
+                    is_method,
+                } = data;
+
+                match target {
+                    MacroTarget::Spwn {
+                        func,
+                        is_builtin,
+                        captured,
+                    } => {
+                        func.hash(state);
+                        is_builtin.hash(state);
+                        for i in captured.iter() {
+                            self.hash_value(i, state);
+                        }
+                    },
+                    MacroTarget::FullyRust {
+                        fn_ptr,
+                        args,
+                        spread_arg,
+                    } => {
+                        fn_ptr.hash(state);
+                        args.hash(state);
+                        spread_arg.hash(state);
+                    },
                 }
+
+                is_method.hash(state);
+
+                for r in defaults.iter().flatten() {
+                    self.hash_value(r, state)
+                }
+
                 if let Some(v) = self_arg {
                     self.hash_value(v, state)
                 }
-                (captured.as_ref() as *const _ as *const usize).hash(state);
                 // data.func.h
                 // data.hash(state)
             },
@@ -2127,8 +2201,11 @@ impl Vm {
             },
             Value::Empty => "()".into(),
 
-            Value::Macro(MacroData { args, .. }) => {
-                format!("<{}-arg macro at {:?}>", args.len(), value.as_ptr())
+            Value::Macro(MacroData { defaults, .. }) => {
+                format!("<{}-arg macro at {:?}>", defaults.len(), value.as_ptr())
+            },
+            Value::Iterator(_) => {
+                format!("<iterator at {:?}>", value.as_ptr())
             },
             Value::TriggerFunction { .. } => "!{...}".to_string(),
             Value::Type(t) => t.runtime_display(self),

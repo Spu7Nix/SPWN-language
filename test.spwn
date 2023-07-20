@@ -5,7 +5,8 @@ import "libraries/core/array.spwn"
 
 
 
-
-
-
-
+biddy = @array::boinky(7)
+biddy("sexo");
+biddy("billy");
+biddy("fartman");
+biddy("dicker");

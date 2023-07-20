@@ -20,9 +20,8 @@ impl @array {
 		f: @macro,
 	) {},
 	
-	#[doc("\ndsf \"fuck\"")]
-	test2: #[builtin] (
-		f1: @macro,
-		f2: @macro,
+	#[doc("\npanic")]
+	boinky: #[builtin] (
+		boinke: @int,
 	) {},
 }

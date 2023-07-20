@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::rc::Rc;
 
 use ahash::AHashMap;
@@ -22,6 +23,30 @@ use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
 pub struct BuiltinFn(pub fn(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<()>);
+
+#[derive(Clone)]
+pub struct BuiltinClosure(
+    pub Rc<RefCell<dyn FnMut(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<()>>>,
+);
+
+impl Debug for BuiltinClosure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BuiltinClosure at {:?}", Rc::as_ptr(&self.0))
+    }
+}
+
+impl PartialEq for BuiltinClosure {
+    #[allow(clippy::vtable_address_comparisons)]
+    fn eq(&self, other: &Self) -> bool {
+        Rc::as_ptr(&self.0) == Rc::as_ptr(&other.0)
+    }
+}
+
+impl Hash for BuiltinClosure {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        Rc::as_ptr(&self.0).hash(state);
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -275,18 +300,48 @@ macro_rules! value {
     };
 }
 
+// #[derive(Clone, Debug, PartialEq)]
+// pub enum MacroData {
+//     Spwn {
+//         func: FuncCoord,
+
+//         args: ImmutVec<Spanned<MacroArg<ValueRef, ()>>>,
+//         self_arg: Option<ValueRef>,
+
+//         captured: ImmutVec<ValueRef>,
+
+//         is_method: bool,
+
+//         is_builtin: Option<BuiltinFn>,
+//     },
+//     FullyRust {
+//         func: BuiltinFn,
+//         args: ImmutVec<Spanned<MacroArg<ValueRef, ()>>>,
+//     }
+// }
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MacroTarget {
+    Spwn {
+        func: FuncCoord,
+        is_builtin: Option<BuiltinFn>,
+        captured: ImmutVec<ValueRef>,
+    },
+    FullyRust {
+        fn_ptr: BuiltinClosure,
+        args: ImmutVec<ImmutStr>,
+        spread_arg: Option<u8>,
+    },
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct MacroData {
-    pub func: FuncCoord,
+    pub target: MacroTarget,
 
-    pub args: ImmutVec<Spanned<MacroArg<ValueRef, ()>>>,
+    pub defaults: ImmutVec<Option<ValueRef>>,
     pub self_arg: Option<ValueRef>,
 
-    pub captured: ImmutVec<ValueRef>,
-
     pub is_method: bool,
-
-    pub is_builtin: Option<BuiltinFn>,
 }
 
 value! {
@@ -317,6 +372,7 @@ value! {
     Empty,
 
     Macro(MacroData),
+    Iterator(MacroData),
 
     Type(ValueType),
 
@@ -337,7 +393,6 @@ value! {
 
     Epsilon,
 
-    //Iterator(IteratorData),
 
     Chroma {
         r: u8, g: u8, b: u8, a: u8,

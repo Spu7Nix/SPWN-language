@@ -1,7 +1,10 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::compiling::bytecode::{CallExpr, Register};
-use crate::interpreting::builtins::{impl_type, Instrs, RustFnInstr};
+use crate::interpreting::builtins::{impl_type, raw_macro, Instrs, RustFnInstr};
 use crate::interpreting::context::CallInfo;
-use crate::interpreting::value::Value;
+use crate::interpreting::value::{BuiltinClosure, MacroData, MacroTarget, Value};
 use crate::interpreting::vm::{FuncCoord, LoopFlow, ValueRef};
 
 impl_type! {
@@ -70,6 +73,33 @@ impl_type! {
                     Ok(LoopFlow::Normal)
                 },
             ])
+        }
+
+
+        /// panic
+        fn boinky(Int(n) as "boinke") {
+            let x = *n.borrow();
+            let mut n = 0i64;
+
+            raw_macro! { let test = (String(s) as "bick") {
+                n += x;
+                println!("{}: {}", s.borrow().iter().collect::<String>(), n);
+
+                Value::Empty
+            } vm program area }
+
+            Value::Macro(MacroData {
+                target: MacroTarget::FullyRust {
+                    fn_ptr: BuiltinClosure(Rc::new(RefCell::new(test))),
+                    args: Box::new(["bick".into()]),
+                    spread_arg: None
+                },
+
+                defaults: Box::new([]),
+                self_arg: None,
+
+                is_method: false,
+            })
         }
 
         // /// fgfedggggggggggggggggggggggggggg
