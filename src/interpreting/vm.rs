@@ -757,17 +757,13 @@ impl Vm {
                     Opcode::IntoIterator { src, dest } => {
                         let value = self.get_reg_ref(src).borrow();
 
-                        let Some(f) = self
-                            .impls
-                            .get(&value.value.get_type())
-                            .and_then(|map| {
-                                map.get::<Rc<[char]>>(&"_iter_".chars().collect_vec().into())
-                            })
-                        else {
-                            return Err(RuntimeError::CannotIterate { 
-                                value: (value.value.get_type(), value.area.clone()), 
-                                area: self.make_area(opcode_span, &program), 
-                                call_stack: self.get_call_stack() 
+                        let Some(f) = self.impls.get(&value.value.get_type()).and_then(|map| {
+                            map.get::<Rc<[char]>>(&"_iter_".chars().collect_vec().into())
+                        }) else {
+                            return Err(RuntimeError::CannotIterate {
+                                value: (value.value.get_type(), value.area.clone()),
+                                area: self.make_area(opcode_span, &program),
+                                call_stack: self.get_call_stack(),
                             });
                         };
 
@@ -782,9 +778,9 @@ impl Vm {
                                 named: Box::new([]),
                             },
                             &program,
-                            self.make_area(opcode_span, &program)
+                            self.make_area(opcode_span, &program),
                         )?;
-                        return Ok(LoopFlow::ContinueLoop)
+                        return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::IterNext { src, dest } => {
                         self.call_macro(
@@ -795,7 +791,7 @@ impl Vm {
                                 named: Box::new([]),
                             },
                             &program,
-                            self.make_area(opcode_span, &program)
+                            self.make_area(opcode_span, &program),
                         )?;
                         return Ok(LoopFlow::ContinueLoop);
                     },
@@ -891,8 +887,6 @@ impl Vm {
                     Opcode::Dbg { reg, show_ptr } => {
                         let ptr = self.get_reg_ref(reg).as_ptr();
 
-
-
                         self.run_rust_instrs(
                             &program,
                             &[
@@ -910,10 +904,12 @@ impl Vm {
                                         .context_stack
                                         .current_mut()
                                         .pop_extra_stack()
-                                        .unwrap().value else {
-                                            unreachable!()
-                                        };
-                                    
+                                        .unwrap()
+                                        .value
+                                    else {
+                                        unreachable!()
+                                    };
+
                                     println!(
                                         "{:?} {} {}, {:?}, {}",
                                         s.iter().collect::<String>(),
@@ -1474,11 +1470,8 @@ impl Vm {
                                     Ok(LoopFlow::ContinueLoop)
                                 },
                                 &|vm| {
-                                    let v = vm
-                                        .context_stack
-                                        .current_mut()
-                                        .pop_extra_stack()
-                                        .unwrap();
+                                    let v =
+                                        vm.context_stack.current_mut().pop_extra_stack().unwrap();
                                     vm.set_reg(dest, v);
                                     Ok(LoopFlow::Normal)
                                 },
@@ -1904,7 +1897,7 @@ impl Vm {
             };
 
         // let func = data.func.get_func();
-        
+
         #[derive(Clone)]
         enum ArgFill {
             Single(Option<ValueRef>, Option<ImmutStr>),
@@ -2061,52 +2054,51 @@ impl Vm {
                 let fn_ptr = fn_ptr.clone();
                 mem::drop(base);
 
-                self.run_rust_instrs(program, &[
-                    &|vm| {
-                        fn_ptr.0.borrow_mut()(
-                            {
-                                let mut out = Vec::with_capacity(fill.len());
-                                for (i, arg) in fill.clone().into_iter().enumerate() {
-                                    out.push(match arg {
-                                        ArgFill::Single(Some(r), ..) => r,
-                                        ArgFill::Spread(v) => ValueRef::new(StoredValue {
-                                            value: Value::Array(v),
-                                            area: area.clone(),
-                                        }),
-                                        ArgFill::Single(None, name) => {
-                                            return Err(RuntimeError::ArgumentNotSatisfied {
-                                                call_area: area.clone(),
-                                                macro_def_area: macro_area.clone(),
-                                                arg: if let Some(name) = name {
-                                                    Either::Left(name.to_string())
-                                                } else {
-                                                    Either::Right(i)
-                                                },
-                                                call_stack: vm.get_call_stack(),
-                                            })
-                                        },
-                                    })
-                                }
-                                out
-                            },
-                            vm,
-                            program,
-                            area.clone(),
-                        )?;
-                        Ok(LoopFlow::ContinueLoop)
-                    },
-                    &|vm| {
-                        if let Some(r) = call_expr.dest {
-                            let v = vm
-                                .context_stack
-                                .current_mut()
-                                .pop_extra_stack()
-                                .unwrap();
-                            vm.set_reg(r, v);
-                        }
-                        Ok(LoopFlow::Normal)
-                    }
-                ])?;
+                self.run_rust_instrs(
+                    program,
+                    &[
+                        &|vm| {
+                            fn_ptr.0.borrow_mut()(
+                                {
+                                    let mut out = Vec::with_capacity(fill.len());
+                                    for (i, arg) in fill.clone().into_iter().enumerate() {
+                                        out.push(match arg {
+                                            ArgFill::Single(Some(r), ..) => r,
+                                            ArgFill::Spread(v) => ValueRef::new(StoredValue {
+                                                value: Value::Array(v),
+                                                area: area.clone(),
+                                            }),
+                                            ArgFill::Single(None, name) => {
+                                                return Err(RuntimeError::ArgumentNotSatisfied {
+                                                    call_area: area.clone(),
+                                                    macro_def_area: macro_area.clone(),
+                                                    arg: if let Some(name) = name {
+                                                        Either::Left(name.to_string())
+                                                    } else {
+                                                        Either::Right(i)
+                                                    },
+                                                    call_stack: vm.get_call_stack(),
+                                                })
+                                            },
+                                        })
+                                    }
+                                    out
+                                },
+                                vm,
+                                program,
+                                area.clone(),
+                            )?;
+                            Ok(LoopFlow::ContinueLoop)
+                        },
+                        &|vm| {
+                            if let Some(r) = call_expr.dest {
+                                let v = vm.context_stack.current_mut().pop_extra_stack().unwrap();
+                                vm.set_reg(r, v);
+                            }
+                            Ok(LoopFlow::Normal)
+                        },
+                    ],
+                )?;
             },
         }
 
@@ -2218,9 +2210,7 @@ impl Vm {
         }
 
         Ok(match (&v.value, b) {
-            (Value::Macro(data), ValueType::Iterator) => {
-                Value::Iterator(data.clone())
-            }
+            (Value::Macro(data), ValueType::Iterator) => Value::Iterator(data.clone()),
             _ => todo!("error"),
         })
     }

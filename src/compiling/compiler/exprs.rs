@@ -15,7 +15,6 @@ use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{
     ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, StringType, VisTrait,
 };
-use crate::parsing::attributes::Attributes;
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::{CodeSpan, Spannable, SpwnSource, ZEROSPAN};
 use crate::util::ImmutVec;
@@ -355,22 +354,8 @@ impl Compiler<'_> {
                     .map(|(i, (_, v))| (v.reg, Register(i + args.len())))
                     .collect_vec();
 
-                let mut is_builtin = false;
-
-                for attr in &expr.attributes {
-                    match &**attr {
-                        Attributes::Builtin => {
-                            // if !matches!(*self.src, SpwnSource::Core(_)) {
-                            //     return Err(CompileError::BuiltinAttrOutsideOfCore {
-                            //         area: self.make_area(attr.span),
-                            //     });
-                            // }
-                            is_builtin = true
-                        },
-                        Attributes::DebugBytecode => (),
-                        _ => unreachable!(),
-                    }
-                }
+                let is_builtin = self.find_builtin_attr(&expr.attributes);
+                let is_debug = self.find_debug_bytecode_attr(&expr.attributes);
 
                 let func_id = builder.new_func(
                     |builder| {
@@ -460,14 +445,8 @@ impl Compiler<'_> {
                     expr.span,
                 )?;
 
-                for attr in &expr.attributes {
-                    match &**attr {
-                        // requires func_id so must be done here
-                        Attributes::DebugBytecode => builder.mark_func_debug(func_id),
-                        // handled above
-                        Attributes::Builtin => (),
-                        _ => unreachable!(),
-                    }
+                if is_debug {
+                    builder.mark_func_debug(func_id)
                 }
 
                 let macro_reg = builder.next_reg();

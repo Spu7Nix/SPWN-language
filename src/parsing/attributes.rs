@@ -1,384 +1,235 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
-use ahash::AHashMap;
-use lasso::Spur;
-use paste::paste;
+use once_cell::sync::Lazy;
 
-use super::ast::{DictItem, ExprNode, Expression};
-use crate::lexing::tokens::Token;
-use crate::parsing::ast::Statement;
-use crate::parsing::error::SyntaxError;
-use crate::parsing::parser::{ParseResult, Parser};
-use crate::sources::{CodeSpan, Spanned};
-use crate::util::hyperlink;
-use crate::SpwnSource;
+use super::ast::{AttrStyle, Expression, Statement};
+use crate::util::ImmutStr;
 
-pub trait ParseAttribute {
-    fn parse(parser: &mut Parser<'_>) -> ParseResult<Self>
-    where
-        Self: Sized;
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(unused)]
+pub enum AttributeTarget {
+    Int,
+    String,
+    Float,
+    Bool,
+    Id,
+    Var,
+    Type,
+    Array,
+    Dict,
+    Maybe,
+    Macro,
+    TriggerFunc,
+    TriggerFuncCall,
+    Import,
+    Match,
+    Obj,
+
+    Assign,
+    If,
+    While,
+    For,
+    TryCatch,
+    Arrow,
+    Return,
+    Break,
+    Continue,
+    TypeDef,
+    ExtractImport,
+    Impl,
+    Overload,
+    Throw,
+
+    DictItem,
+
+    Unknown,
 }
 
-pub trait IsValidOn<T: Into<&'static str>> {
-    fn is_valid_on(&self, node: &Spanned<T>, src: &Rc<SpwnSource>) -> ParseResult<()>;
+impl Expression {
+    pub fn target(&self) -> AttributeTarget {
+        use AttributeTarget as AT;
+        match self {
+            Expression::Int(..) => AT::Int,
+            Expression::Float(..) => AT::Float,
+            Expression::String(..) => AT::String,
+            Expression::Bool(..) => AT::Bool,
+            Expression::Id(..) => AT::Id,
+            Expression::Var(..) => AT::Var,
+            Expression::Type(..) => AT::Type,
+            Expression::Array(..) => AT::Array,
+            Expression::Dict(..) => AT::Dict,
+            Expression::Maybe(..) => AT::Maybe,
+            Expression::Macro { .. } => AT::Macro,
+            Expression::TriggerFunc { .. } => AT::TriggerFunc,
+            Expression::TriggerFuncCall(..) => AT::TriggerFuncCall,
+            Expression::Import(..) => AT::Import,
+            Expression::Match { .. } => AT::Match,
+            _ => AT::Unknown,
+        }
+    }
 }
 
-fn into_t<T: std::str::FromStr>(
-    parser: &mut Parser,
-    s: &str,
-    span: CodeSpan,
-    t_name: &'static str,
-) -> ParseResult<T> {
-    T::from_str(s).map_err(|_| SyntaxError::InvalidAttributeArgType {
-        expected: t_name,
-        area: parser.make_area(span),
-    })
+impl Statement {
+    pub fn target(&self) -> AttributeTarget {
+        use AttributeTarget as AT;
+        match self {
+            Statement::Expr(e) => e.expr.target(),
+            Statement::Assign(..) => AT::Assign,
+            Statement::If { .. } => AT::If,
+            Statement::While { .. } => AT::While,
+            Statement::For { .. } => AT::For,
+            Statement::TryCatch { .. } => AT::TryCatch,
+            Statement::Arrow(..) => AT::Arrow,
+            Statement::Return(..) => AT::Return,
+            Statement::Break => AT::Break,
+            Statement::Continue => AT::Continue,
+            Statement::TypeDef(..) => AT::TypeDef,
+            Statement::ExtractImport(..) => AT::ExtractImport,
+            Statement::Impl { .. } => AT::Impl,
+            Statement::Overload { .. } => AT::Overload,
+            Statement::Throw(..) => AT::Throw,
+            _ => AT::Unknown,
+        }
+    }
 }
 
-#[rustfmt::skip]
-macro_rules! attributes {
-    (
-        $vis:vis enum
-        $enum:ident {
-            $(
-                $(
-                    #[
-                        valid_on(
-                            $(
-                                $(Expression:: $v_expr:ident)?
-                                $(Statement:: $v_stmt:ident)?
-                            ),*
-                        )
-                    ]
-                )?
-                $variant:ident $(($typ1:ty $(, $typ:ty)*))? $({ $field1:ident : $f_typ1:ty, $($field:ident : $f_typ:ty,)* })?,
-            )*
-        }
-    ) => {
-        impl IsValidOn<Expression> for Vec<Spanned<$enum>> {
-            fn is_valid_on(&self, node: &Spanned<Expression>, src: &Rc<SpwnSource>) -> ParseResult<()> {
-                let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
-                paste! {
-                    for attr in self {
-                        match &attr.value {
-                            $(
-                                $enum::$variant {..} => match &node.value {
-                                    $(
-                                        $(
-                                            $(Expression::$v_expr {..} => (),)?
-                                        )*
-                                    )?
-                                    other => return Err(SyntaxError::MismatchedAttribute {
-                                        area: src.area(attr.span),
-                                        expr_area: src.area(node.span),
-                                        attr: stringify!([< $variant:snake >]).into(),
-                                        valid:  {
-                                            $(
-                                                $(
-                                                    $(
-                                                        map.entry(
-                                                            stringify!($v_expr)
-                                                        )
-                                                        .and_modify( |v| v.push(
-                                                            stringify!([<$variant:snake>])
-                                                                .to_string()
-                                                        ))
-                                                        .or_insert(vec![
-                                                            stringify!([<$variant:snake>]).to_string()
-                                                        ]);
-                                                    )?
-                                                )*
-                                            )?
-                                            map.remove(Into::<&'static str>::into(other))
-                                        },
-                                    }),
-                                }
-                            )*
-                        }
-                    }
-                }
+#[derive(Clone, Copy, Default)]
+#[allow(unused)]
+pub enum AttributeDuplicates {
+    #[default]
+    DuplicatesOk,
+    WarnFollowing,
+    ErrorFollowing,
+}
 
-                Ok(())
-            }
-        }
+#[allow(unused)]
+pub enum ListArg {
+    Optional(&'static str),
+    Required(&'static str),
+}
 
-        impl IsValidOn<Statement> for Vec<Spanned<$enum>> {
-            fn is_valid_on(&self, node: &Spanned<Statement>, src: &Rc<SpwnSource>) -> ParseResult<()> {
-                let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
+pub struct AttributeTemplate {
+    pub word: bool,
+    pub list: Option<&'static [ListArg]>,
+    pub name_value: bool,
+}
 
-                paste! {
-                    for attr in self {
-                        match &attr.value {
-                            $(
-                                $enum::$variant {..} => match &node.value {
-                                    $(
-                                        $(
-                                            $(Statement::$v_stmt {..} => (),)?
-                                        )*
-                                    )?
-                                    other => return Err(SyntaxError::MismatchedAttribute {
-                                        area: src.area(attr.span),
-                                        expr_area: src.area(node.span),
-                                        attr: stringify!([< $variant:snake >]).into(),
-                                        valid: {
-                                            $(
-                                                $(
-                                                    $(
-                                                        map.entry(
-                                                            stringify!($v_stmt)
-                                                        )
-                                                        .and_modify( |v| v.push(
-                                                            stringify!([<$variant:snake>])
-                                                                .to_string()
-                                                        ))
-                                                        .or_insert(vec![
-                                                            stringify!([<$variant:snake>]).to_string()
-                                                        ]);
-                                                    )?
-                                                )*
-                                            )?
-                                            map.remove(Into::<&'static str>::into(other))
-                                        },
-                                    }),
-                                }
-                            )*
-                        }
-                    }
-                }
-
-                Ok(())
-            }
-        }
-
-        #[allow(unused_variables, unused_mut, dead_code, unused_assignments)]
-        impl ParseAttribute for $enum {
-            fn parse(parser: &mut Parser<'_>) -> ParseResult<Self>
-            where
-                Self: Sized
-            {
-                // the #[ are already consumed by the parser
-                parser.expect_tok(Token::Ident)?;
-
-                let attr_name = parser.slice().to_string();
-                let attr_name_span = parser.span();
-
-                paste! {
-                    match &attr_name[..] {
-                        $(
-                            stringify!([< $variant:snake >]) => {
-                                $(
-                                    stringify!($typ1);
-
-                                    let mut used_paren = false;
-
-                                    const TOTAL: usize = { [stringify!($typ1), $(stringify!($typ)),*].len() };
-                                    let mut found = 0;
-
-                                    if parser.next_is(Token::LParen)? {
-                                        used_paren = true;
-                                        parser.next()?;
-                                    } else if {
-                                        #[allow(unreachable_code, unused_labels)]
-                                        'v: {
-                                            $(break 'v false; stringify!($typ);)*
-                                            parser.next_is(Token::Assign)?
-                                        }
-                                    } {
-                                        parser.next()?;
-                                    } else {
-                                        return Err(SyntaxError::UnexpectedToken {
-                                            expected: format!("({}", { " or =" $(; stringify!($typ); "")* }),
-                                            found: parser.next()?,
-                                            area: parser.make_area(parser.span()),
-                                        })
-                                    }
-
-
-                                    let mut fields: Vec<($crate::sources::CodeSpan, Box<str>)> = Vec::new();
-
-                                    for i in 0..TOTAL {
-                                        parser.expect_tok(Token::String)?;
-
-                                        fields.push((parser.span(), parser.parse_compile_time_string()?.into()));
-
-                                        // cant underflow if the loop nevers runs
-                                        if i < TOTAL - 1 {
-                                            parser.expect_tok(Token::Comma)?;
-                                        }
-                                    }
-
-                                    parser.skip_tok(Token::Comma)?;
-
-                                    if used_paren {
-                                        parser.expect_tok(Token::RParen)?;
-                                    }
-                                )?
-                                $(
-                                    const FIELD_NAMES: &[&str] = &[stringify!($field1) $(,stringify!($field))*];
-                                    let mut field_map: AHashMap<String, ($crate::sources::CodeSpan, Box<str>)> = AHashMap::new();
-
-                                    parser.expect_tok(Token::LParen)?;
-
-                                    for i in 0..FIELD_NAMES.len() {
-                                        parser.expect_tok(Token::Ident)?;
-                                        let name = parser.slice().to_string();
-
-                                        if !FIELD_NAMES.contains(&&name[..]) {
-                                            return Err(SyntaxError::InvalidAttributeField {
-                                                field: name.to_string(),
-                                                area: parser.make_area(parser.span()),
-                                                attribute: attr_name,
-                                                fields: FIELD_NAMES.iter().map(|s| s.to_string()).collect()
-                                            })
-                                        }
-
-                                        if let Some((prev_span, _)) = field_map.get(&name) {
-                                            return Err(SyntaxError::DuplicateAttributeField {
-                                                field: name.to_string(),
-                                                used_again: parser.make_area(parser.span()),
-                                                first_used: parser.make_area(*prev_span),
-                                            })
-                                        }
-
-                                        parser.expect_tok(Token::Assign)?;
-                                        parser.expect_tok(Token::String)?;
-
-                                        field_map.insert(name, (parser.span(), parser.parse_compile_time_string()?.into()));
-
-                                        if i < FIELD_NAMES.len() - 1 {
-                                            parser.expect_tok(Token::Comma)?;
-                                        }
-                                    }
-
-                                    parser.skip_tok(Token::Comma)?;
-
-                                    if field_map.len() != FIELD_NAMES.len() {
-                                        return Err(SyntaxError::InvalidAttributeArgCount {
-                                            attribute: stringify!([< $variant:snake >]).into(),
-                                            expected: FIELD_NAMES.len(),
-                                            found: field_map.len(),
-                                            area: parser.make_area(attr_name_span)
-                                        })
-                                    }
-
-                                    parser.expect_tok(Token::RParen)?;
-                                )?
-
-                                let mut i = 0;
-
-                                let v = $enum::$variant $(
-                                    (
-                                        {
-                                            let (span, s) = &fields[i];
-                                            let t = into_t::<$typ1>(parser, s, *span, stringify!($typ1))?;
-                                            i += 1;
-                                            t
-                                        }
-                                        $(
-                                            {
-                                                let (span, s) = &fields[i];
-                                                let t = into_t::<$typ>(parser, s, *span, stringify!($typ))?;
-                                                i += 1;
-                                                t
-                                            }
-                                        )*
-                                    )
-                                )?
-                                $(
-                                    {
-                                        $field1: {
-                                            let (span, s) = &field_map[stringify!($field1)];
-                                            into_t::<$f_typ1>(parser, s, *span, stringify!($f_typ1))?
-                                        },
-                                        $(
-                                            $field: {
-                                                let (span, s) = &field_map[stringify!($field)];
-                                                into_t::<$f_typ>(parser, s, *span, stringify!($f_typ))?
-                                            },
-                                        )*
-                                    }
-                                )?;
-
-                                parser.skip_tok(Token::RParen)?;
-
-                                Ok(v)
-                            },
-                        )*
-                        _ => Err(SyntaxError::UnknownAttribute {
-                            area: parser.make_area(attr_name_span),
-                            attribute: attr_name,
-                            valid: paste!(vec![$(hyperlink(
-                                "https://spu7nix.net/spwn/#/attributes?id=attributes",
-                                Some(stringify!([<$variant:snake>]))
-                            )),*])
-                        }),
-                    }
-                }
-            }
-        }
-
-        #[derive(Debug, Clone, PartialEq, Eq, Hash, delve::EnumToStr, serde::Serialize, serde::Deserialize)]
-        #[delve(rename_variants = "snakecase")]
-        $vis enum $enum {
-            $(
-                $variant $( ( $typ1 $(,$typ)*) )? $( { $field1: $f_typ1, $($field: $f_typ,)* } )?,
-            )*
-        }
+impl AttributeTemplate {
+    const WORD: AttributeTemplate = AttributeTemplate {
+        word: true,
+        list: None,
+        name_value: false,
     };
 }
 
-attributes! {
-    pub enum FileAttribute {
-        CacheOutput,
-        NoStd,
-
-        Doc(String),
-    }
+pub struct Attribute {
+    pub namespace: Option<&'static str>,
+    pub name: &'static str,
+    pub template: AttributeTemplate,
+    pub duplicates: AttributeDuplicates,
+    pub style: &'static [AttrStyle],
+    pub targets: &'static [AttributeTarget],
 }
 
-type SemVer = semver::Version;
-
-attributes! {
-    pub enum Attributes {
-        #[valid_on(Expression::TriggerFunc)]
-        NoOptimize,
-
-        #[valid_on(Expression::Macro)]
-        DebugBytecode,
-        #[valid_on(Expression::Macro)]
-        Builtin,
-
-        #[valid_on(
-            Statement::TypeDef,
-            Statement::Assign,
-        )]
-        Deprecated { since: SemVer, note: String, },
-
-        #[valid_on(
-            Statement::TypeDef,
-            Statement::Assign,
-        )]
-        Doc(String),
-    }
+pub(crate) mod attr_names {
+    pub const DOC: &str = "doc";
+    pub const DEBUG_BYTECODE: &str = "debug_bytecode";
+    pub const BUILTIN: &str = "builtin";
+    pub const OVERLOAD: &str = "overload";
 }
 
-impl IsValidOn<DictItem> for Vec<Spanned<Attributes>> {
-    fn is_valid_on(&self, node: &Spanned<DictItem>, src: &Rc<SpwnSource>) -> ParseResult<()> {
-        for attr in self {
-            match &attr.value {
-                Attributes::Deprecated { .. } => (),
-                Attributes::Doc(..) => (),
-                other => {
-                    return Err(SyntaxError::MismatchedAttribute {
-                        area: src.area(attr.span),
-                        expr_area: src.area(node.span),
-                        attr: Into::<&'static str>::into(other).into(),
-                        valid: Some(vec!["doc".into(), "deprecated".into()]),
-                    });
-                },
-            }
-        }
+pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
+    Arc::new(vec![
+        // ================================================================== file attributes
+        // Attribute {
+        //     namespace: None,
+        //     name: "cache_output",
+        //     template: AttributeTemplate::WORD,
+        //     duplicates: AttributeDuplicates::ErrorFollowing,
+        // },
+        // Attribute {
+        //     namespace: None,
+        //     name: "no_std",
+        //     template: AttributeTemplate::WORD,
+        //     duplicates: AttributeDuplicates::ErrorFollowing,
+        // },
+        // Attribute {
+        //     namespace: None,
+        //     name: "doc",
+        //     template: AttributeTemplate {
+        //         word: true,
+        //         list: None,
+        //         name_value: true,
+        //     },
+        //     duplicates: AttributeDuplicates::DuplicatesOk,
+        // },
+        // ================================================================== attributes
+        Attribute {
+            namespace: None,
+            name: attr_names::DEBUG_BYTECODE,
+            template: AttributeTemplate::WORD,
+            duplicates: AttributeDuplicates::ErrorFollowing,
+            style: &[AttrStyle::Outer],
+            targets: &[AttributeTarget::Macro],
+        },
+        Attribute {
+            namespace: None,
+            name: attr_names::BUILTIN,
+            template: AttributeTemplate::WORD,
+            duplicates: AttributeDuplicates::ErrorFollowing,
+            style: &[AttrStyle::Outer],
+            targets: &[AttributeTarget::Macro],
+        },
+        // Attribute {
+        //     namespace: None,
+        //     name: "deprecated",
+        //     template: AttributeTemplate {
+        //         word: true,
+        //         list: Some(&[ListArg::Required("reason"), ListArg::Optional("since")]),
+        //         name_value: false,
+        //     },
+        //     duplicates: AttributeDuplicates::ErrorFollowing,
+        // },
+        Attribute {
+            namespace: None,
+            name: attr_names::DOC,
+            template: AttributeTemplate {
+                word: true,
+                list: None,
+                name_value: true,
+            },
+            duplicates: AttributeDuplicates::DuplicatesOk,
+            style: &[AttrStyle::Inner, AttrStyle::Outer],
+            targets: &[
+                AttributeTarget::Assign,
+                AttributeTarget::TypeDef,
+                AttributeTarget::DictItem,
+            ],
+        },
+        Attribute {
+            namespace: None,
+            name: attr_names::OVERLOAD,
+            template: AttributeTemplate {
+                word: false,
+                list: None,
+                name_value: true,
+            },
+            duplicates: AttributeDuplicates::ErrorFollowing,
+            style: &[AttrStyle::Outer],
+            targets: &[AttributeTarget::DictItem],
+        },
+    ])
+});
 
-        Ok(())
-    }
+pub fn namespace_exists(namespace: &ImmutStr) -> bool {
+    ATTRIBUTES.iter().any(|a| a.namespace == Some(namespace))
+}
+
+pub fn get_attr_by_name_in_namespace<'a>(
+    namespace: &Option<ImmutStr>,
+    name: &ImmutStr,
+) -> Option<&'a Attribute> {
+    ATTRIBUTES
+        .iter()
+        .find(|&attr| attr.name == &**name && attr.namespace == namespace.as_deref())
 }

@@ -6,23 +6,16 @@ use crate::gd::object_keys::OBJECT_KEYS;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{
-    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, Pattern, PatternNode,
-    StringContent, StringType, ObjKeyType, ObjectType,
+    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, ObjKeyType,
+    ObjectType, Pattern, PatternNode, StringContent, StringType,
 };
-use crate::parsing::attributes::{Attributes, IsValidOn};
 use crate::parsing::error::SyntaxError;
 use crate::parsing::operators::operators::{self, unary_prec};
 use crate::sources::{Spannable, Spanned};
 
 impl Parser<'_> {
     pub fn parse_unit(&mut self, allow_macros: bool) -> ParseResult<ExprNode> {
-        let attrs = if self.next_is(Token::Hashtag)? {
-            self.next()?;
-
-            self.parse_attributes::<Attributes>()?
-        } else {
-            vec![]
-        };
+        let attrs = self.parse_outer_attributes()?;
 
         let peek = self.peek()?;
         let start = self.peek_span()?;
@@ -389,7 +382,8 @@ impl Parser<'_> {
 
                     let show_ptr = self.skip_tok(Token::Mult)?;
 
-                    Expression::Dbg(self.parse_expr(true)?, show_ptr).spanned(start.extend(self.span()))
+                    Expression::Dbg(self.parse_expr(true)?, show_ptr)
+                        .spanned(start.extend(self.span()))
                 },
                 unary_op
                     if {
@@ -419,7 +413,7 @@ impl Parser<'_> {
             }
         };
 
-        attrs.is_valid_on(&expr, &self.src)?;
+        self.check_attributes(&attrs, Some(expr.value.target().spanned(expr.span)))?;
 
         Ok(expr.value.into_node(attrs, expr.span))
     }
@@ -483,7 +477,7 @@ impl Parser<'_> {
                             self.next()?;
                             let start = self.span();
                             let name = self.slice_interned();
-                            
+
                             if let Some((prev, _)) = named_params.iter().find(|(s, _)| s.value == name) {
                                 return Err(SyntaxError::DuplicateKeywordArg { name: self.resolve(&name).to_string(), prev_area: self.make_area(prev.span), area: self.make_area(self.span()) })
                             }

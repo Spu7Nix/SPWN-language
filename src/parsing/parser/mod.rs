@@ -1,3 +1,4 @@
+mod attributes;
 mod exprs;
 mod patterns;
 mod stmts;
@@ -9,7 +10,7 @@ use std::rc::Rc;
 use lasso::Spur;
 
 use super::ast::Ast;
-use super::attributes::FileAttribute;
+use super::attributes::AttributeTarget;
 use super::error::SyntaxError;
 use crate::lexing::lexer::{Lexer, LexerError};
 use crate::lexing::tokens::Token;
@@ -163,13 +164,14 @@ impl Parser<'_> {
 
     pub fn next_are(&self, toks: &[Token]) -> ParseResult<bool> {
         let mut peek = self.lexer.clone();
+
         for tok in toks {
-            if peek
-                .next()
-                .unwrap_or(Ok(Token::Eof))
-                .map_err(|e| self.map_lexer_err(e))?
-                != *tok
-            {
+            let mut peeked = peek.next_or_eof().map_err(|e| self.map_lexer_err(e))?;
+            while peeked == Token::Newline {
+                peeked = peek.next_or_eof().map_err(|e| self.map_lexer_err(e))?;
+            }
+
+            if peeked != *tok {
                 return Ok(false);
             }
         }
@@ -185,21 +187,15 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> ParseResult<Ast> {
-        let file_attributes = if self.next_are(&[Token::Hashtag, Token::ExclMark])? {
-            self.next()?;
-            self.next()?;
-
-            self.parse_attributes::<FileAttribute>()?
-        } else {
-            vec![]
-        };
+        let file_attributes = self.parse_inner_attributes()?;
+        self.check_attributes(&file_attributes, None)?; // inner attributes will not have a target
 
         let statements = self.parse_statements()?;
         self.expect_tok(Token::Eof)?;
 
         Ok(Ast {
             statements,
-            file_attributes: file_attributes.into_iter().map(|a| a.value).collect(),
+            file_attributes,
         })
     }
 }

@@ -14,7 +14,6 @@ use crate::compiling::compiler::CustomTypeID;
 use crate::compiling::opcodes::OptOpcode;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
-use crate::parsing::attributes::Attributes;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
 use crate::util::{ImmutStr, ImmutVec, SlabMap, UniqueRegister};
 

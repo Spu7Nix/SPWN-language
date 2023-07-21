@@ -1,5 +1,6 @@
 use std::string::ToString;
 
+use super::ast::AttrStyle;
 use crate::error_maker;
 use crate::lexing::lexer::LexerError;
 use crate::lexing::tokens::Token;
@@ -93,20 +94,6 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: "Unknown attribute", Note: Some(format!("The valid attributes are: {}", list_join(valid)));
-            Labels: [
-                area => "Attribute `{}` does not exist": attribute;
-            ]
-        ]
-        UnknownAttribute {
-            attribute: String,
-            area: CodeArea,
-
-            valid: Vec<String>,
-        },
-
-        // ==================================================================
-        #[
             Message: "Cannot have multiple spread arguments", Note: None;
             Labels: [
                 area => "Second spread argument provided here";
@@ -147,40 +134,6 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: "Mismatched attribute", Note: None;
-            Labels: [
-                area => "Attribute `{}` cannot be added to this element": attr;
-
-                expr_area => "{}": =>(match valid {
-                    Some(v) => format!("The valid attributes for this element are: {}", list_join(v)),
-                    None => "This element doesn't support any attributes".into(),
-                });
-            ]
-        ]
-        MismatchedAttribute {
-            area: CodeArea,
-            expr_area: CodeArea,
-            attr: String,
-
-            valid: Option<Vec<String>>,
-        },
-
-        // ==================================================================
-        #[
-            Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are {}", attribute, list_join(fields)));
-            Labels: [
-                area => "Unexpected field `{}`": field;
-            ]
-        ]
-        InvalidAttributeField {
-            field: String,
-            area: CodeArea,
-            attribute: String,
-            fields: Vec<String>,
-        },
-
-        // ==================================================================
-        #[
             Message: "Duplicate attribute field", Note: None;
             Labels: [
                 first_used => "Field `{}` first used here": field;
@@ -193,32 +146,79 @@ error_maker! {
             first_used: CodeArea,
         },
 
-        // ==================================================================
-        #[
-            Message: "Invalid number of arguments", Note: None;
-            Labels: [
-                area => "Attribute `{}` expected {} arguments, found `{}`": attribute, expected, found;
-            ]
-        ]
-        InvalidAttributeArgCount {
-            attribute: String,
-            expected: usize,
-            found: usize,
+        // // ==================================================================
+        // #[
+        //     Message: "Invalid number of arguments", Note: None;
+        //     Labels: [
+        //         area => "Attribute `{}` expected {} arguments, found `{}`": attribute, expected, found;
+        //     ]
+        // ]
+        // InvalidAttributeArgCount {
+        //     attribute: String,
+        //     expected: usize,
+        //     found: usize,
 
-            area: CodeArea,
-        },
+        //     area: CodeArea,
+        // },
 
-        // ==================================================================
-        #[
-            Message: "Invalid type for attribute", Note: None;
-            Labels: [
-                area => "Attribute expected type `{}` as string literal": expected;
-            ]
-        ]
-        InvalidAttributeArgType {
-            expected: &'static str,
-            area: CodeArea,
-        },
+        // // ==================================================================
+        // #[
+        //     Message: "Invalid type for attribute", Note: None;
+        //     Labels: [
+        //         area => "Attribute expected type `{}` as string literal": expected;
+        //     ]
+        // ]
+        // InvalidAttributeArgType {
+        //     expected: &'static str,
+        //     area: CodeArea,
+        // },
+
+        // // ==================================================================
+        // #[
+        //     Message: "Unknown attribute", Note: Some(format!("The valid attributes are: {}", list_join(valid)));
+        //     Labels: [
+        //         area => "Attribute `{}` does not exist": attribute;
+        //     ]
+        // ]
+        // UnknownAttribute {
+        //     attribute: String,
+        //     area: CodeArea,
+
+        //     valid: Vec<String>,
+        // },
+        // // ==================================================================
+        // #[
+        //     Message: "Mismatched attribute", Note: None;
+        //     Labels: [
+        //         area => "Attribute `{}` cannot be added to this element": attr;
+
+        //         expr_area => "{}": =>(match valid {
+        //             Some(v) => format!("The valid attributes for this element are: {}", list_join(v)),
+        //             None => "This element doesn't support any attributes".into(),
+        //         });
+        //     ]
+        // ]
+        // MismatchedAttribute {
+        //     area: CodeArea,
+        //     expr_area: CodeArea,
+        //     attr: String,
+
+        //     valid: Option<Vec<String>>,
+        // },
+
+        // // ==================================================================
+        // #[
+        //     Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are {}", attribute, list_join(fields)));
+        //     Labels: [
+        //         area => "Unexpected field `{}`": field;
+        //     ]
+        // ]
+        // InvalidAttributeField {
+        //     field: String,
+        //     area: CodeArea,
+        //     attribute: String,
+        //     fields: Vec<String>,
+        // },
 
         // ==================================================================
         #[
@@ -277,5 +277,129 @@ error_maker! {
         SelfArgumentCannotBeSpread {
             area: CodeArea,
         },
+
+
+
+
+        // ==================================================================
+        #[
+            Message: "Unknown attribute namespace", Note: None;
+            Labels: [
+                area => "Namespace `{}` does not exist": namespace;
+            ]
+        ]
+        UnknownAttributeNamespace {
+            namespace: String,
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Unknown attribute", Note: None;
+            Labels: [
+                area => "Attribute `{}` does not exist": attribute;
+            ]
+        ]
+        UnknownAttribute {
+            attribute: String,
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Mismatched attribute style", Note: Some("`#![...]` in an inner attribute and `#[...]` is an outer attribute".into());
+            Labels: [
+                area => "Attribute does not exist as an {} attribute": =>(style);
+            ]
+        ]
+        MismatchedAttributeStyle {
+            style: AttrStyle,
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Duplicate attribute", Note: None;
+            Labels: [
+                old_area => "Attribute `{}` originally specified here": attribute;
+                current_area => "Attribute also specified here";
+            ]
+        ]
+        DuplicateAttribute {
+            attribute: String,
+            current_area: CodeArea,
+            old_area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "No arguments provided to attribute", Note: Some("A `word` attribute is an attribute without values (E.G. `#[debug_bytecode]`)".into());
+            Labels: [
+                attribute_area => "Attribute `{}` expected to take value(s)": attribute;
+                attribute_area => "Attribute used as a word here";
+            ]
+        ]
+        NoArgumentsProvidedToAttribute {
+            attribute: String,
+            attribute_area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Unknown argument in attribute", Note: None;
+            Labels: [
+                attribute_area => "Unknown argument for attribute `{}`": attribute;
+                arg_area => "Argument provided here";
+            ]
+        ]
+        UnknownAttributeArgument {
+            attribute: String,
+            attribute_area: CodeArea,
+            arg_area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Unexpected value for attribute", Note: None;
+            Labels: [
+                attribute_area => "Unexpected value provided to attribute `{}`": attribute;
+                value_area => "Argument provided here";
+            ]
+        ]
+        UnexpectedValueForAttribute {
+            attribute: String,
+            attribute_area: CodeArea,
+            value_area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Missing required arguments for attribute", Note: Some(format!("The missing arguments may be: {}", list_join(missing)));
+            Labels: [
+                attribute_area => "Expected {} required arguments for attribute `{}`": expected, attribute;
+                args_area => "Found only {} args here": found;
+            ]
+        ]
+        MissingRequiredArgumentsForAttribute {
+            attribute: String,
+            expected: usize,
+            found: usize,
+            attribute_area: CodeArea,
+            args_area: CodeArea,
+            missing: Vec<String>,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Mismatched attribute target", Note: None;
+            Labels: [
+                target_area => "Attribute `{}` cannot be added to this element": attribute;
+            ]
+        ]
+        MismatchedAttributeTarget {
+            target_area: CodeArea,
+            attribute: String,
+        },
+
     }
 }

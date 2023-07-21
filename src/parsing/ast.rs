@@ -11,7 +11,6 @@ use itertools::Either;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
-use super::attributes::{Attributes, FileAttribute};
 use super::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
@@ -100,7 +99,7 @@ pub enum MacroCode {
 #[derive(Debug, Clone)]
 pub struct ExprNode {
     pub expr: Box<Expression>,
-    pub attributes: Vec<Spanned<Attributes>>,
+    pub attributes: Vec<Attribute>,
     pub span: CodeSpan,
 }
 
@@ -108,7 +107,7 @@ pub struct ExprNode {
 #[derive(Debug, Clone)]
 pub struct StmtNode {
     pub stmt: Box<Statement>,
-    pub attributes: Vec<Spanned<Attributes>>,
+    pub attributes: Vec<Attribute>,
     pub span: CodeSpan,
 }
 
@@ -123,7 +122,7 @@ pub struct PatternNode {
 #[derive(Debug, Clone)]
 pub struct DictItem {
     pub name: Spanned<Spur>,
-    pub attributes: Vec<Spanned<Attributes>>,
+    pub attributes: Vec<Attribute>,
     pub value: Option<ExprNode>,
 }
 
@@ -432,7 +431,7 @@ pub enum AssignPath<E, S: Hash + Eq> {
 }
 
 impl Expression {
-    pub fn into_node(self, attributes: Vec<Spanned<Attributes>>, span: CodeSpan) -> ExprNode {
+    pub fn into_node(self, attributes: Vec<Attribute>, span: CodeSpan) -> ExprNode {
         ExprNode {
             expr: Box::new(self),
             attributes,
@@ -441,7 +440,7 @@ impl Expression {
     }
 }
 impl Statement {
-    pub fn into_node(self, attributes: Vec<Spanned<Attributes>>, span: CodeSpan) -> StmtNode {
+    pub fn into_node(self, attributes: Vec<Attribute>, span: CodeSpan) -> StmtNode {
         StmtNode {
             stmt: Box::new(self),
             attributes,
@@ -469,7 +468,7 @@ impl StmtNode {
 #[derive(Debug)]
 pub struct Ast {
     pub statements: Vec<StmtNode>,
-    pub file_attributes: Vec<FileAttribute>,
+    pub file_attributes: Vec<Attribute>,
 }
 
 pub trait VisTrait
@@ -593,6 +592,85 @@ impl<T> Vis<T> {
         match *self {
             Vis::Public(ref v) => Vis::Public(v),
             Vis::Private(ref v) => Vis::Private(v),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, EnumDisplay)]
+pub enum AttrStyle {
+    /// `#[...]`
+    #[delve(display = "outer")]
+    Outer,
+    /// `#![...]`
+    #[delve(display = "inner")]
+    Inner,
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub enum AttrArgs {
+    Empty,
+
+    Delimited(Vec<DelimArg>),
+
+    Eq(ExprNode),
+}
+
+impl AttrArgs {
+    pub fn delimited_span(&self) -> CodeSpan {
+        match self {
+            AttrArgs::Delimited(args) => {
+                let first_span = args.first().unwrap().expr.span;
+                args.last()
+                    .map(|last| first_span.extend(last.expr.span))
+                    .unwrap_or(first_span)
+            },
+            _ => unreachable!("BUG: called `delimited_span` on non-delimited args"),
+        }
+    }
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub struct DelimArg {
+    pub name: Spanned<Spur>,
+    pub expr: ExprNode,
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub struct AttrItem {
+    pub namespace: Option<Spanned<Spur>>,
+    pub name: Spanned<Spur>,
+    pub args: AttrArgs,
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub struct Attribute {
+    pub style: AttrStyle,
+    pub item: AttrItem,
+    pub span: CodeSpan,
+}
+
+impl Attribute {
+    pub fn is_word(&self) -> bool {
+        matches!(self.item.args, AttrArgs::Empty)
+    }
+
+    pub fn value_str(&self, interner: &Rc<RefCell<Interner>>) -> Option<String> {
+        self.item.value_str(interner)
+    }
+}
+
+impl AttrItem {
+    fn value_str(&self, interner: &Rc<RefCell<Interner>>) -> Option<String> {
+        match &self.args {
+            AttrArgs::Eq(args) => match &*args.expr {
+                Expression::String(s) => s.get_compile_time(interner),
+                _ => None,
+            },
+            AttrArgs::Delimited(_) | AttrArgs::Empty => None,
         }
     }
 }

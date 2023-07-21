@@ -6,13 +6,6 @@ use crate::parsing::error::SyntaxError;
 use crate::sources::CodeArea;
 use crate::util::{hyperlink, ImmutStr};
 
-fn list_join<T: std::fmt::Display>(l: &[T]) -> String {
-    l.iter()
-        .map(|v| format!("`{v}`"))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
 error_maker! {
     Title: "Compile Error"
     Extra: {}
@@ -243,6 +236,18 @@ error_maker! {
         ]
         BuiltinAttrOutsideOfCore {
             area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Invalid type for attribute argument", Note: None;
+            Labels: [
+                args_area => "Expected type `{}`": expected;
+            ]
+        ]
+        InvalidAttributeArgType {
+            expected: &'static str,
+            args_area: CodeArea,
         },
     }
 }

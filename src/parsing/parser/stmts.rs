@@ -2,7 +2,6 @@ use super::{ParseResult, Parser};
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{Statement, Statements, StmtNode, Vis};
-use crate::parsing::attributes::{Attributes, IsValidOn};
 use crate::parsing::error::SyntaxError;
 use crate::parsing::operators::operators::Operator;
 use crate::sources::{CodeSpan, Spannable};
@@ -19,13 +18,7 @@ impl Parser<'_> {
     pub fn parse_statement(&mut self) -> ParseResult<StmtNode> {
         let start = self.peek_span()?;
 
-        let attrs = if self.skip_tok(Token::Hashtag)? {
-            self.parse_attributes::<Attributes>()?
-        } else {
-            vec![]
-        };
-
-        let attrs = vec![];
+        let attrs = self.parse_outer_attributes()?;
 
         let is_arrow = if self.next_is(Token::Arrow)? {
             self.next()?;
@@ -267,7 +260,7 @@ impl Parser<'_> {
         }
         .spanned(start.extend(self.span()));
 
-        attrs.is_valid_on(&stmt, &self.src)?;
+        self.check_attributes(&attrs, Some(stmt.value.target().spanned(stmt.span)))?;
 
         Ok(stmt.value.into_node(attrs, stmt.span))
     }

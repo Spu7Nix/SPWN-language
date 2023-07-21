@@ -9,7 +9,6 @@ use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::Opcode;
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{Expression, Pattern, Statement, StmtNode, VisTrait};
-use crate::parsing::attributes::Attributes;
 use crate::parsing::operators::operators::AssignOp;
 use crate::sources::Spannable;
 

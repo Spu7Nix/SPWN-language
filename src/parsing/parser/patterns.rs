@@ -8,14 +8,6 @@ use crate::parsing::ast::{AssignPath, Pattern, PatternNode};
 use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable};
 
-// mod modify_pattern {
-//     use super::*;
-
-//     impl Parser<'_> {
-
-//     }
-// }
-
 impl<'a> Parser<'a> {
     pub fn parse_pattern_value(&mut self) -> ParseResult<PatternNode> {
         let start = self.peek_span()?;

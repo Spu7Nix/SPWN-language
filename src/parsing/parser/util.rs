@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use std::str::Chars;
 
+use ahash::AHashMap;
 use base64::Engine;
 use itertools::Either;
 use lasso::Spur;
@@ -11,10 +12,10 @@ use crate::gd::ids::IDClass;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{
-    DictItem, ExprNode, Expression, Import, ImportSettings, ImportType, StringContent, StringFlags,
-    StringType, Vis,
+    Attribute, DictItem, ExprNode, Expression, Import, ImportSettings, ImportType, StringContent,
+    StringFlags, StringType, Vis,
 };
-use crate::parsing::attributes::{Attributes, IsValidOn, ParseAttribute};
+use crate::parsing::attributes::AttributeTarget;
 use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable, Spanned};
 use crate::util::remove_quotes;
@@ -306,12 +307,7 @@ impl Parser<'_> {
         let mut items = vec![];
 
         list_helper!(self, RBracket {
-            let attrs = if self.skip_tok(Token::Hashtag)? {
-
-                self.parse_attributes::<Attributes>()?
-            } else {
-                vec![]
-            };
+            let attributes = self.parse_outer_attributes()?;
 
             let start = self.peek_span()?;
 
@@ -352,29 +348,14 @@ impl Parser<'_> {
                 None
             };
 
-            // this is so backwards if only u could use enum variants as types. . . .
-            let mut item = DictItem { name: key.spanned(key_span), attributes: vec![], value: elem }.spanned(start.extend(self.span()));
+            let item_span = start.extend(self.span());
 
-            attrs.is_valid_on(&item, &self.src)?;
+            self.check_attributes(&attributes, Some(AttributeTarget::DictItem.spanned(item_span)))?;
 
-            item.attributes = attrs;
-
-            items.push(vis(item.value));
+            items.push(vis(DictItem { name: key.spanned(key_span), attributes, value: elem }));
         });
 
         Ok(items)
-    }
-
-    pub fn parse_attributes<T: ParseAttribute>(&mut self) -> ParseResult<Vec<Spanned<T>>> {
-        let mut attrs = vec![];
-        self.expect_tok(Token::LSqBracket)?;
-
-        list_helper!(self, RSqBracket {
-            let start = self.peek_span()?;
-            attrs.push(T::parse(self)?.spanned(start.extend(self.span())))
-        });
-
-        Ok(attrs)
     }
 
     pub fn parse_import(&mut self) -> ParseResult<Import> {
