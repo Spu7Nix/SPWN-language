@@ -352,6 +352,52 @@ impl<'a> CodeBuilder<'a> {
         self.proto_bytecode.new_func(f, args, captured_regs, span)
     }
 
+    // pub fn new_object<F>(
+    //     &mut self,
+    //     len: u16,
+    //     dest: UnoptRegister,
+    //     f: F,
+    //     span: CodeSpan,
+    //     typ: ObjectType,
+    // ) -> CompileResult<()>
+    // where
+    //     F: FnOnce(
+    //         &mut FuncBuilder,
+    //         &mut Vec<(Spanned<ObjKeyType>, UnoptRegister)>,
+    //     ) -> CompileResult<()>,
+    // {
+    //     self.push_opcode_spanned(
+    //         ProtoOpcode::Raw(match typ {
+    //             ObjectType::Object => UnoptOpcode::AllocObject { size: len, dest },
+    //             ObjectType::Trigger => UnoptOpcode::AllocTrigger { size: len, dest },
+    //         }),
+    //         span,
+    //     );
+
+    //     let mut items = vec![];
+    //     f(self, &mut items)?;
+
+    //     for (k, r) in items {
+    //         self.push_opcode_spanned(
+    //             match k.value {
+    //                 ObjKeyType::Name(k) => ProtoOpcode::Raw(UnoptOpcode::PushObjectElemKey {
+    //                     elem: r,
+    //                     obj_key: k,
+    //                     dest,
+    //                 }),
+    //                 ObjKeyType::Num(n) => ProtoOpcode::Raw(UnoptOpcode::PushObjectElemUnchecked {
+    //                     elem: r,
+    //                     obj_key: n,
+    //                     dest,
+    //                 }),
+    //             },
+    //             k.span,
+    //         )
+    //     }
+
+    //     Ok(())
+    // }
+
     fn push_opcode(&mut self, opcode: ProtoOpcode, span: CodeSpan) {
         self.current_block()
             .content

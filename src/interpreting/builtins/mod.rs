@@ -1,10 +1,56 @@
 pub mod core;
 
-use super::vm::{LoopFlow, RuntimeResult, Vm};
+use std::rc::Rc;
+
+use super::context::CallInfo;
+use super::value::Value;
+use super::vm::{FuncCoord, LoopFlow, Program, RuntimeResult, Vm};
+use crate::sources::CodeArea;
 
 pub type RustFnInstr<'a> = &'a dyn Fn(&mut Vm) -> RuntimeResult<LoopFlow>;
 
 pub struct Instrs<'a>(&'a [RustFnInstr<'a>]);
+
+pub trait RustFnReturn {
+    fn rust_fn_return(
+        self,
+        vm: &mut Vm,
+        area: &CodeArea,
+        program: &std::rc::Rc<Program>,
+    ) -> RuntimeResult<()>;
+}
+
+impl RustFnReturn for Value {
+    fn rust_fn_return(
+        self,
+        vm: &mut Vm,
+        area: &CodeArea,
+        program: &Rc<Program>,
+    ) -> RuntimeResult<()> {
+        vm.run_rust_instrs(
+            program,
+            &[&|vm| {
+                vm.context_stack
+                    .current_mut()
+                    .extra_stack
+                    .push(self.clone().into_stored(area.clone()));
+                Ok(LoopFlow::Normal)
+            }],
+        )?;
+        Ok(())
+    }
+}
+impl RustFnReturn for Instrs<'_> {
+    fn rust_fn_return(
+        self,
+        vm: &mut Vm,
+        area: &CodeArea,
+        program: &std::rc::Rc<Program>,
+    ) -> RuntimeResult<()> {
+        vm.run_rust_instrs(program, self.0)?;
+        Ok(())
+    }
+}
 
 #[rustfmt::skip]
 #[macro_export]
@@ -13,7 +59,7 @@ macro_rules! raw_macro {
         fn $fn_name:ident( $($args:tt)* ) { $($code:tt)*} $vm:ident $program:ident $area:ident
     ) => {
         #[allow(unused)]
-        fn $fn_name(
+        pub fn $fn_name(
             mut args: Vec<$crate::interpreting::vm::ValueRef>,
             $vm: &mut $crate::Vm,
             $program: &std::rc::Rc<$crate::Program>,
@@ -24,8 +70,8 @@ macro_rules! raw_macro {
             
             $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
             $crate::interpreting::builtins::impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
-
-                $($code)* .rust_fn_return($vm, &$area, $program);
+            use $crate::interpreting::builtins::RustFnReturn;
+                $($code)* .rust_fn_return($vm, &$area, $program)?;
             Ok(())
         }
     };
@@ -86,59 +132,6 @@ macro_rules! impl_type {
     ) => {
         impl $crate::interpreting::value::type_aliases::$value_typ {
             pub fn get_override_fn(self, name: &str) -> Option<$crate::interpreting::value::BuiltinFn> {
-                trait RustFnReturn {
-                    fn rust_fn_return(
-                        self,
-                        vm: &mut $crate::Vm,
-                        area: &$crate::sources::CodeArea,
-                        program: &std::rc::Rc<$crate::Program>,
-                    ) -> $crate::interpreting::vm::RuntimeResult<()>;
-                }
-
-                impl RustFnReturn for $crate::interpreting::value::Value {
-                    fn rust_fn_return(
-                        self,
-                        vm: &mut $crate::Vm,
-                        area: &$crate::sources::CodeArea,
-                        program: &std::rc::Rc<$crate::Program>,
-                    ) -> $crate::interpreting::vm::RuntimeResult<()> {
-                        // vm.context_stack.current_mut().extra = self.into_stored(area.clone());
-                        vm.run_rust_instrs(
-                            CallInfo {
-                                func: FuncCoord { program: program.clone(), func: 0 },
-                                return_dest: None,
-                                call_area: None,
-                                is_builtin: None,
-                            }, &[
-                                &|vm| {
-                                    vm.context_stack.current_mut().extra_stack.push(self.clone().into_stored(area.clone()));
-                                    // println!("clog");
-                                    Ok($crate::interpreting::vm::LoopFlow::Normal)
-                                },
-                            ]
-                        )?;
-                        Ok(())
-                    }
-                }
-                impl RustFnReturn for $crate::interpreting::builtins::Instrs<'_> {
-                    fn rust_fn_return(
-                        self,
-                        vm: &mut $crate::Vm,
-                        area: &$crate::sources::CodeArea,
-                        program: &std::rc::Rc<$crate::Program>,
-                    ) -> $crate::interpreting::vm::RuntimeResult<()> {
-                        vm.run_rust_instrs(
-                            CallInfo {
-                                func: FuncCoord { program: program.clone(), func: 0 },
-                                return_dest: None,
-                                call_area: None,
-                                is_builtin: None,
-                            },
-                            self.0
-                        )?;
-                        Ok(())
-                    }
-                }
                 
                 $(
 

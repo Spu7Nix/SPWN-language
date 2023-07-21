@@ -169,7 +169,7 @@ opcodes! {
 
 
     #[delve(display = |src, dest| format!("{src}.iter() -> {dest}"))]
-    WrapIterator { [src], [dest] },
+    IntoIterator { [src], [dest] },
     #[delve(display = |src, dest| format!("{src}.next() -> {dest}"))]
     IterNext { [src], [dest] },
 

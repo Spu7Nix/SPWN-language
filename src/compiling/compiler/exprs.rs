@@ -670,6 +670,25 @@ impl Compiler<'_> {
                 builder.load_empty(out, expr.span);
                 Ok(out)
             },
+            Expression::Obj(typ, items) => {
+                todo!();
+                // builder.new_object(
+                //     items.len() as u16,
+                //     out_reg,
+                //     |builder, elems| {
+                //         for (key, expr) in items {
+                //             let value_reg =
+                //                 self.compile_expr(expr, scope, builder, ExprType::normal())?;
+
+                //             elems.push((*key, value_reg));
+                //         }
+
+                //         Ok(())
+                //     },
+                //     expr.span,
+                //     *typ,
+                // )?;
+            },
         }
     }
 }

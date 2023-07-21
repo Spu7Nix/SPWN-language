@@ -18,7 +18,6 @@ use crate::util::ImmutVec;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StackItem {
-    pub store_extra: Option<OptRegister>,
     pub registers: ImmutVec<ValueRef>,
 }
 
@@ -85,6 +84,23 @@ impl Context {
             returned: None,
             extra_stack: vec![],
         }
+    }
+
+    pub fn extra_stack_top(&self, pos: usize) -> &StoredValue {
+        &self.extra_stack[self.extra_stack.len() - pos - 1]
+    }
+
+    pub fn extra_stack_top_mut(&mut self, pos: usize) -> &mut StoredValue {
+        let len = self.extra_stack.len();
+        &mut self.extra_stack[len - pos - 1]
+    }
+
+    pub fn push_extra_stack(&mut self, v: StoredValue) {
+        self.extra_stack.push(v)
+    }
+
+    pub fn pop_extra_stack(&mut self) -> Option<StoredValue> {
+        self.extra_stack.pop()
     }
 }
 

@@ -55,12 +55,13 @@ error_maker! {
         #[
             Message: "Type mismatch", Note: None;
             Labels: [
-                area => "Expected {}, found {}": expected.runtime_display(vm), v.0.runtime_display(vm);
-                v.1 => "Value defined as {} here": v.0.runtime_display(vm);
+                area => "Expected {}, found {}": expected.runtime_display(vm), value_type.runtime_display(vm);
+                value_area => "Value defined as {} here": value_type.runtime_display(vm);
             ]
         ]
         TypeMismatch {
-            v: (ValueType, CodeArea),
+            value_type: ValueType,
+            value_area: CodeArea,
             area: CodeArea,
             expected: ValueType,
             [call_stack]
@@ -81,19 +82,22 @@ error_maker! {
         //     [call_stack]
         // },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Cannot iterator", Note: None;
-        //     Labels: [
-        //         area => "Cannot iterate over {}": v.0.runtime_display(vm);
-        //         v.1 => "Value defined as {} here": v.0.runtime_display(vm);
-        //     ]
-        // ]
-        // CannotIterate {
-        //     v: (ValueType, CodeArea),
-        //     area: CodeArea,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Cannot iterator", Note: match value.0 {
+                ValueType::Custom(..) => Some("Try overloading the `_iter_` method (`#[overload = _iter_]`)".into()),
+                _ => None,
+            };
+            Labels: [
+                area => "Cannot iterate over {}": value.0.runtime_display(vm);
+                value.1 => "Value defined as {} here": value.0.runtime_display(vm);
+            ]
+        ]
+        CannotIterate {
+            value: (ValueType, CodeArea),
+            area: CodeArea,
+            [call_stack]
+        },
 
         // ==================================================================
         #[
@@ -380,7 +384,7 @@ error_maker! {
         #[
             Message: "Thrown error", Note: None;
             Labels: [
-                area => "{}": vm.runtime_display(&ValueRef::new(value.clone()), false);
+                area => "{}": "69";
             ]
         ]
         ThrownError {

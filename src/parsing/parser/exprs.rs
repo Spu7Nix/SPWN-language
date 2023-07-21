@@ -2,11 +2,12 @@ use lasso::Spur;
 
 use super::{ParseResult, Parser};
 use crate::gd::ids::IDClass;
+use crate::gd::object_keys::OBJECT_KEYS;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{
     ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, Pattern, PatternNode,
-    StringContent, StringType,
+    StringContent, StringType, ObjKeyType, ObjectType,
 };
 use crate::parsing::attributes::{Attributes, IsValidOn};
 use crate::parsing::error::SyntaxError;
@@ -296,41 +297,41 @@ impl Parser<'_> {
 
                     Expression::Array(elems).spanned(start.extend(self.span()))
                 },
-                // typ @ (Token::Obj | Token::Trigger) => {
-                //     self.next()?;
+                typ @ (Token::Obj | Token::Trigger) => {
+                    self.next()?;
 
-                //     self.expect_tok(Token::LBracket)?;
+                    self.expect_tok(Token::LBracket)?;
 
-                //     let mut items: Vec<(Spanned<ObjKeyType>, ExprNode)> = vec![];
+                    let mut items: Vec<(Spanned<ObjKeyType>, ExprNode)> = vec![];
 
-                //     list_helper!(self, RBracket {
-                //         let key = match self.next() {
-                //             Token::Int => ObjKeyType::Num(self.parse_int(self.slice()) as u8),
-                //             Token::Ident => ObjKeyType::Name(OBJECT_KEYS[self.slice()]),
-                //             other => {
-                //                 return Err(SyntaxError::UnexpectedToken {
-                //                     expected: "key".into(),
-                //                     found: other,
-                //                     area: self.make_area(self.span()),
-                //                 })
-                //             }
-                //         };
+                    list_helper!(self, RBracket {
+                        let key = match self.next()? {
+                            Token::Int => ObjKeyType::Num(self.parse_int(self.slice(), 10) as u8),
+                            Token::Ident => ObjKeyType::Name(OBJECT_KEYS[self.slice()]),
+                            other => {
+                                return Err(SyntaxError::UnexpectedToken {
+                                    expected: "key".into(),
+                                    found: other,
+                                    area: self.make_area(self.span()),
+                                })
+                            }
+                        };
 
-                //         let key_span = self.span();
-                //         self.expect_tok(Token::Colon)?;
-                //         items.push((key.spanned(key_span), self.parse_expr(true)?));
-                //     });
+                        let key_span = self.span();
+                        self.expect_tok(Token::Colon)?;
+                        items.push((key.spanned(key_span), self.parse_expr(true)?));
+                    });
 
-                //     Expression::Obj(
-                //         match typ {
-                //             Token::Obj => ObjectType::Object,
-                //             Token::Trigger => ObjectType::Trigger,
-                //             _ => unreachable!(),
-                //         },
-                //         items,
-                //     )
-                //     .spanned(start.extend(self.span()))
-                // },
+                    Expression::Obj(
+                        match typ {
+                            Token::Obj => ObjectType::Object,
+                            Token::Trigger => ObjectType::Trigger,
+                            _ => unreachable!(),
+                        },
+                        items,
+                    )
+                    .spanned(start.extend(self.span()))
+                },
                 Token::LBracket => {
                     self.next()?;
 

@@ -29,6 +29,15 @@ pub struct BuiltinClosure(
     pub Rc<RefCell<dyn FnMut(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<()>>>,
 );
 
+impl BuiltinClosure {
+    pub fn new<F>(f: F) -> Self
+    where
+        F: FnMut(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<()> + 'static,
+    {
+        Self(Rc::new(RefCell::new(f)))
+    }
+}
+
 impl Debug for BuiltinClosure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "BuiltinClosure at {:?}", Rc::as_ptr(&self.0))
@@ -128,7 +137,6 @@ macro_rules! value {
                     (self.getter_mut)(self.value_ref)
                 }
             } 
-
 
 
             paste::paste! {
@@ -271,7 +279,7 @@ macro_rules! value {
                         $(
                             Self::$name => type_aliases::$name.get_override_fn(name),
                         )*
-                        _ => unreachable!(),
+                        _ => None,
                     }
                 }
             }

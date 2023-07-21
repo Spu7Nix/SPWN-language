@@ -3,10 +3,38 @@
 import "libraries/core/array.spwn"
 
 
+// impl @float {
+//     _display_: (self) {
+//         -> return "penis"
+//         return "fart"
+//     }
+// }
 
 
-biddy = @array::boinky(7)
-biddy("sexo");
-biddy("billy");
-biddy("fartman");
-biddy("dicker");
+// dbg f"{[1, 2.5, 3]}";
+
+type @fuck
+
+impl @fuck {
+    _iter_: (mut self) {
+        return () {
+            if self.a > 300 {
+                return ?
+            }
+            ret = self.a?;
+            mut c = self.a + self.b
+            self.a = self.b;
+            self.b = c;
+            return ret
+        } as @iterator
+    }
+}
+
+
+for i in @fuck::{ a: 0, b: 1 } {
+    dbg i;
+}
+
+// a = @array::boinky
+
+

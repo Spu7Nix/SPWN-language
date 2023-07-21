@@ -135,7 +135,7 @@ impl<'a> Compiler<'a> {
                 let iter_exec = self.compile_expr(iterator, scope, builder)?;
                 let iter_reg = builder.next_reg();
                 builder.push_raw_opcode(
-                    Opcode::WrapIterator {
+                    Opcode::IntoIterator {
                         src: iter_exec,
                         dest: iter_reg,
                     },

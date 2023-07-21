@@ -1,9 +1,8 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{BTreeMap, BinaryHeap};
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
-use std::io::{self, Write};
 use std::mem::{self};
 use std::rc::Rc;
 
@@ -22,13 +21,12 @@ use crate::compiling::opcodes::{CallExprID, ConstID, Opcode, RuntimeStringFlag};
 use crate::gd::gd_object::{make_spawn_trigger, TriggerObject, TriggerOrder};
 use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::OBJECT_KEYS;
+use crate::interpreting::builtins::core::runtime_display;
 use crate::interpreting::context::{ReturnDest, TryCatch};
 use crate::interpreting::error::RuntimeError;
 use crate::interpreting::value::MacroData;
-use crate::parsing::ast::{MacroArg, Vis, VisSource, VisTrait};
-use crate::sources::{
-    BytecodeMap, CodeArea, CodeSpan, Spannable, Spanned, SpwnSource, TypeDefMap, ZEROSPAN,
-};
+use crate::parsing::ast::{Vis, VisSource, VisTrait};
+use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap, ZEROSPAN};
 use crate::util::{ImmutCloneVec, ImmutStr};
 
 const RECURSION_LIMIT: usize = 256;
@@ -311,7 +309,7 @@ impl Vm {
     pub fn run_rust_instrs(
         &mut self,
         // mut context: Context,
-        call_info: CallInfo,
+        program: &Rc<Program>,
         instrs: &[RustFnInstr<'_>],
     ) -> RuntimeResult<SplitFnRet> {
         let mut context = self.context_stack.last_mut().yeet_current().unwrap();
@@ -319,8 +317,18 @@ impl Vm {
         let original_ip = context.ip;
         context.ip = 0;
 
-        self.context_stack
-            .push(FullContext::new(context, call_info));
+        self.context_stack.push(FullContext::new(
+            context,
+            CallInfo {
+                func: FuncCoord {
+                    program: program.clone(),
+                    func: 0,
+                },
+                return_dest: None,
+                call_area: None,
+                is_builtin: None,
+            },
+        ));
 
         let mut finished_contexts = vec![];
 
@@ -398,13 +406,18 @@ impl Vm {
 
             context.stack.push(StackItem {
                 registers: regs.into_boxed_slice(),
-                store_extra: None,
             });
         }
 
         self.context_stack
             .push(FullContext::new(context, call_info));
-        cb(self)?;
+        match cb(self) {
+            Ok(v) => {},
+            Err(e) => {
+                // println!("ungadaby");
+                Err(e)?
+            },
+        }
 
         let opcodes = &program.get_function(func).opcodes;
 
@@ -417,26 +430,26 @@ impl Vm {
         };
 
         while self.context_stack.last().valid() {
-            {
-                if let Some(r) = self
-                    .context_stack
-                    .current()
-                    .stack
-                    .last()
-                    .unwrap()
-                    .store_extra
-                {
-                    let v = self.context_stack.current_mut().extra_stack.pop().unwrap();
-                    // println!("jabba {:?}", v.value);
-                    self.set_reg(r, v);
-                    self.context_stack
-                        .current_mut()
-                        .stack
-                        .last_mut()
-                        .unwrap()
-                        .store_extra = None;
-                }
-            }
+            // {
+            //     if let Some(r) = self
+            //         .context_stack
+            //         .current()
+            //         .stack
+            //         .last()
+            //         .unwrap()
+            //         .store_extra
+            //     {
+            //         let v = self.context_stack.current_mut().extra_stack.pop().unwrap();
+            //         // println!("jabba {:?}", v.value);
+            //         self.set_reg(r, v);
+            //         self.context_stack
+            //             .current_mut()
+            //             .stack
+            //             .last_mut()
+            //             .unwrap()
+            //             .store_extra = None;
+            //     }
+            // }
 
             let ip = self.context_stack.last().current_ip();
 
@@ -671,19 +684,25 @@ impl Vm {
                         }
                     },
                     Opcode::UnwrapOrJump { check, to } => {
-                        match &self.get_reg_ref(check).clone().borrow().value {
+                        let v = self.get_reg_ref(check).clone();
+                        let vref = v.borrow();
+
+                        match &vref.value {
                             Value::Maybe(v) => match v {
                                 Some(k) => {
                                     let val = self.deep_clone(k);
 
+                                    mem::drop(vref);
+
                                     self.set_reg(check, val);
                                 },
                                 None => {
+                                    mem::drop(vref);
                                     self.context_stack.last_mut().jump_current(*to as usize);
                                     return Ok(LoopFlow::ContinueLoop);
                                 },
                             },
-                            _ => unreachable!(),
+                            v => unreachable!("{:?}", v),
                         };
                     },
                     Opcode::AllocArray { dest, len } => self.set_reg(
@@ -735,8 +754,51 @@ impl Vm {
                             _ => unreachable!(),
                         };
                     },
-                    Opcode::WrapIterator { src, dest } => todo!(),
-                    Opcode::IterNext { src, dest } => todo!(),
+                    Opcode::IntoIterator { src, dest } => {
+                        let value = self.get_reg_ref(src).borrow();
+
+                        let Some(f) = self
+                            .impls
+                            .get(&value.value.get_type())
+                            .and_then(|map| {
+                                map.get::<Rc<[char]>>(&"_iter_".chars().collect_vec().into())
+                            })
+                        else {
+                            return Err(RuntimeError::CannotIterate { 
+                                value: (value.value.get_type(), value.area.clone()), 
+                                area: self.make_area(opcode_span, &program), 
+                                call_stack: self.get_call_stack() 
+                            });
+                        };
+
+                        let iter = f.value().clone();
+                        mem::drop(value);
+
+                        self.call_macro(
+                            iter,
+                            &CallExpr {
+                                dest: Some(dest),
+                                positional: Box::new([self.get_reg_ref(src).clone()]),
+                                named: Box::new([]),
+                            },
+                            &program,
+                            self.make_area(opcode_span, &program)
+                        )?;
+                        return Ok(LoopFlow::ContinueLoop)
+                    },
+                    Opcode::IterNext { src, dest } => {
+                        self.call_macro(
+                            self.get_reg_ref(src).clone(),
+                            &CallExpr {
+                                dest: Some(dest),
+                                positional: Box::new([]),
+                                named: Box::new([]),
+                            },
+                            &program,
+                            self.make_area(opcode_span, &program)
+                        )?;
+                        return Ok(LoopFlow::ContinueLoop);
+                    },
                     Opcode::Return { src, module_ret } => {
                         let mut ret_val = self.deep_clone(src);
 
@@ -827,16 +889,44 @@ impl Vm {
                         return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::Dbg { reg, show_ptr } => {
-                        let value_ref = self.get_reg_ref(reg);
+                        let ptr = self.get_reg_ref(reg).as_ptr();
 
-                        println!(
-                            "{} {} {}, {:?}, {}",
-                            self.runtime_display(value_ref, show_ptr),
-                            "::".dimmed(),
-                            self.context_stack.last().current_group().fmt("g").green(),
-                            value_ref.as_ptr(),
-                            self.context_stack.last().current().stack.len(),
-                        )
+
+
+                        self.run_rust_instrs(
+                            &program,
+                            &[
+                                &|vm| {
+                                    runtime_display(
+                                        vec![vm.get_reg_ref(reg).clone()],
+                                        vm,
+                                        &program,
+                                        vm.make_area(opcode_span, &program),
+                                    )?;
+                                    Ok(LoopFlow::ContinueLoop)
+                                },
+                                &|vm| {
+                                    let Value::String(s) = vm
+                                        .context_stack
+                                        .current_mut()
+                                        .pop_extra_stack()
+                                        .unwrap().value else {
+                                            unreachable!()
+                                        };
+                                    
+                                    println!(
+                                        "{:?} {} {}, {:?}, {}",
+                                        s.iter().collect::<String>(),
+                                        "::".dimmed(),
+                                        vm.context_stack.last().current_group().fmt("g").green(),
+                                        ptr,
+                                        vm.context_stack.last().current().stack.len(),
+                                    );
+                                    Ok(LoopFlow::Normal)
+                                },
+                            ],
+                        )?;
+                        return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::Throw { reg } => {
                         let value = self.deep_clone(reg);
@@ -1174,7 +1264,8 @@ impl Vm {
                             },
                             _ => {
                                 return Err(RuntimeError::TypeMismatch {
-                                    v: (value.value.get_type(), value.area.clone()),
+                                    value_type: value.value.get_type(),
+                                    value_area: value.area.clone(),
                                     area: self.make_area(opcode_span, &program),
                                     expected: ValueType::Type,
                                     call_stack: self.get_call_stack(),
@@ -1277,7 +1368,8 @@ impl Vm {
                             },
                             v => {
                                 return Err(RuntimeError::TypeMismatch {
-                                    v: (v.get_type(), from.area.clone()),
+                                    value_type: v.get_type(),
+                                    value_area: from.area.clone(),
                                     area: self.make_area(opcode_span, &program),
                                     expected: ValueType::Module,
                                     call_stack: self.get_call_stack(),
@@ -1349,12 +1441,57 @@ impl Vm {
                         self.set_reg(reg, val.into_stored(area))
                     },
                     Opcode::ToString { from, dest } => {
-                        let s = self.runtime_display(self.get_reg_ref(from), false);
-                        self.set_reg(
-                            dest,
-                            Value::String(s.chars().collect())
-                                .into_stored(self.make_area(opcode_span, &program)),
-                        )
+                        // self.run_rust_instrs(
+                        //     CallInfo {
+                        //         func: FuncCoord {
+                        //             program: program.clone(),
+                        //             func: 0,
+                        //         },
+                        //         return_dest: None,
+                        //         call_area: None,
+                        //         is_builtin: None,
+                        //     },
+                        //     &[&|vm| {
+
+                        //         vm.context_stack
+                        //             .current_mut()
+                        //             .extra_stack
+                        //             .push(self.clone().into_stored(area.clone()));
+                        //         Ok(LoopFlow::Normal)
+                        //     }],
+                        // )?;
+
+                        self.run_rust_instrs(
+                            &program,
+                            &[
+                                &|vm| {
+                                    runtime_display(
+                                        vec![vm.get_reg_ref(from).clone()],
+                                        vm,
+                                        &program,
+                                        vm.make_area(opcode_span, &program),
+                                    )?;
+                                    Ok(LoopFlow::ContinueLoop)
+                                },
+                                &|vm| {
+                                    let v = vm
+                                        .context_stack
+                                        .current_mut()
+                                        .pop_extra_stack()
+                                        .unwrap();
+                                    vm.set_reg(dest, v);
+                                    Ok(LoopFlow::Normal)
+                                },
+                            ],
+                        )?;
+                        return Ok(LoopFlow::ContinueLoop);
+
+                        // let s = self.runtime_display(self.get_reg_ref(from), false);
+                        // self.set_reg(
+                        //     dest,
+                        //     Value::String(s.chars().collect())
+                        //         .into_stored(self.make_area(opcode_span, &program)),
+                        // )
                     },
                     Opcode::MakeInstance { base, items, dest } => {
                         let base = self.get_reg_ref(base).borrow();
@@ -1370,7 +1507,8 @@ impl Vm {
                             },
                             v => {
                                 return Err(RuntimeError::TypeMismatch {
-                                    v: (v.get_type(), base.area.clone()),
+                                    value_type: v.get_type(),
+                                    value_area: base.area.clone(),
                                     expected: ValueType::Type,
                                     area: self.make_area(opcode_span, &program),
                                     call_stack: self.get_call_stack(),
@@ -1517,20 +1655,30 @@ impl Vm {
                     },
                     Opcode::RunBuiltin { args, dest } => {
                         if let Some(f) = is_builtin {
-                            let area = self.make_area(opcode_span, &program);
-                            self.context_stack
-                                .current_mut()
-                                .stack
-                                .last_mut()
-                                .unwrap()
-                                .store_extra = Some(dest);
-                            f.0(
-                                (0..args)
-                                    .map(|r| self.get_reg_ref(Register(r)).clone())
-                                    .collect_vec(),
-                                self,
+                            self.run_rust_instrs(
                                 &program,
-                                area,
+                                &[
+                                    &|vm| {
+                                        f.0(
+                                            (0..args)
+                                                .map(|r| vm.get_reg_ref(Register(r)).clone())
+                                                .collect_vec(),
+                                            vm,
+                                            &program,
+                                            vm.make_area(opcode_span, &program),
+                                        )?;
+                                        Ok(LoopFlow::ContinueLoop)
+                                    },
+                                    &|vm| {
+                                        let v = vm
+                                            .context_stack
+                                            .current_mut()
+                                            .pop_extra_stack()
+                                            .unwrap();
+                                        vm.set_reg(dest, v);
+                                        Ok(LoopFlow::Normal)
+                                    },
+                                ],
                             )?;
                             return Ok(LoopFlow::ContinueLoop);
                         } else {
@@ -1559,7 +1707,8 @@ impl Vm {
                             Value::Group(g) => *g,
                             _ => {
                                 return Err(RuntimeError::TypeMismatch {
-                                    v: (v.value.get_type(), v.area.clone()),
+                                    value_type: v.value.get_type(),
+                                    value_area: v.area.clone(),
                                     area: self.make_area(opcode_span, &program),
                                     expected: ValueType::TriggerFunction, // OR group idk how to make this error do that
                                     call_stack: self.get_call_stack(),
@@ -1594,6 +1743,7 @@ impl Vm {
                     LoopFlow::Normal => {},
                 },
                 Err(err) => {
+                    println!("pichy");
                     let t = self.context_stack.current_mut().try_catches.pop();
                     if let Some(try_catch) = t {
                         assert_eq!(
@@ -1616,6 +1766,7 @@ impl Vm {
                             .jump_current(*try_catch.jump_pos as usize);
                         continue;
                     } else {
+                        println!("smiuchao");
                         Err(err)?;
                     }
                 },
@@ -1720,10 +1871,11 @@ impl Vm {
         let macro_area = base.area.clone();
 
         let data = match &base.value {
-            Value::Macro(data) => data,
+            Value::Macro(data) | Value::Iterator(data) => data,
             v => {
                 return Err(RuntimeError::TypeMismatch {
-                    v: (v.get_type(), macro_area),
+                    value_type: v.get_type(),
+                    value_area: macro_area,
                     expected: ValueType::Macro,
                     area: area.clone(),
                     call_stack: self.get_call_stack(),
@@ -1752,7 +1904,8 @@ impl Vm {
             };
 
         // let func = data.func.get_func();
-
+        
+        #[derive(Clone)]
         enum ArgFill {
             Single(Option<ValueRef>, Option<ImmutStr>),
             Spread(Vec<ValueRef>),
@@ -1777,7 +1930,7 @@ impl Vm {
 
         let mut next_arg_idx = 0;
 
-        if data.is_method {
+        if data.is_method && data.self_arg.is_some() {
             match fill.get_mut(next_arg_idx) {
                 Some(ArgFill::Single(v, _)) => {
                     *v = data.self_arg.clone();
@@ -1858,13 +2011,17 @@ impl Vm {
                         is_builtin,
                     },
                     Box::new(move |vm| {
+                        // println!("babagaga1");
                         let arg_amount = fill.len();
+                        // println!("babagaga2");
                         for (i, arg) in fill.into_iter().enumerate() {
                             match arg {
                                 ArgFill::Single(Some(r), ..) => {
                                     vm.change_reg_ref(Register(i as u8), r);
+                                    // println!("babagaga66");
                                 },
                                 ArgFill::Spread(v) => {
+                                    // println!("babagaga77");
                                     vm.set_reg(
                                         Register(i as u8),
                                         StoredValue {
@@ -1874,6 +2031,7 @@ impl Vm {
                                     );
                                 },
                                 ArgFill::Single(None, name) => {
+                                    // println!("babagaga88");
                                     return Err(RuntimeError::ArgumentNotSatisfied {
                                         call_area: area.clone(),
                                         macro_def_area: macro_area,
@@ -1883,14 +2041,16 @@ impl Vm {
                                             Either::Right(i)
                                         },
                                         call_stack: vm.get_call_stack(),
-                                    })
+                                    });
                                 },
                             }
                         }
+                        // println!("babagaga3");
 
                         for (i, v) in captured.iter().enumerate() {
                             vm.change_reg_ref(Register((arg_amount + i) as u8), v.clone());
                         }
+                        // println!("babagaga4");
 
                         Ok(())
                     }),
@@ -1901,36 +2061,52 @@ impl Vm {
                 let fn_ptr = fn_ptr.clone();
                 mem::drop(base);
 
-                fn_ptr.0.borrow_mut()(
-                    {
-                        let mut out = Vec::with_capacity(fill.len());
-                        for (i, arg) in fill.into_iter().enumerate() {
-                            out.push(match arg {
-                                ArgFill::Single(Some(r), ..) => r,
-                                ArgFill::Spread(v) => ValueRef::new(StoredValue {
-                                    value: Value::Array(v),
-                                    area: area.clone(),
-                                }),
-                                ArgFill::Single(None, name) => {
-                                    return Err(RuntimeError::ArgumentNotSatisfied {
-                                        call_area: area.clone(),
-                                        macro_def_area: macro_area,
-                                        arg: if let Some(name) = name {
-                                            Either::Left(name.to_string())
-                                        } else {
-                                            Either::Right(i)
+                self.run_rust_instrs(program, &[
+                    &|vm| {
+                        fn_ptr.0.borrow_mut()(
+                            {
+                                let mut out = Vec::with_capacity(fill.len());
+                                for (i, arg) in fill.clone().into_iter().enumerate() {
+                                    out.push(match arg {
+                                        ArgFill::Single(Some(r), ..) => r,
+                                        ArgFill::Spread(v) => ValueRef::new(StoredValue {
+                                            value: Value::Array(v),
+                                            area: area.clone(),
+                                        }),
+                                        ArgFill::Single(None, name) => {
+                                            return Err(RuntimeError::ArgumentNotSatisfied {
+                                                call_area: area.clone(),
+                                                macro_def_area: macro_area.clone(),
+                                                arg: if let Some(name) = name {
+                                                    Either::Left(name.to_string())
+                                                } else {
+                                                    Either::Right(i)
+                                                },
+                                                call_stack: vm.get_call_stack(),
+                                            })
                                         },
-                                        call_stack: self.get_call_stack(),
                                     })
-                                },
-                            })
-                        }
-                        out
+                                }
+                                out
+                            },
+                            vm,
+                            program,
+                            area.clone(),
+                        )?;
+                        Ok(LoopFlow::ContinueLoop)
                     },
-                    self,
-                    program,
-                    area,
-                )?;
+                    &|vm| {
+                        if let Some(r) = call_expr.dest {
+                            let v = vm
+                                .context_stack
+                                .current_mut()
+                                .pop_extra_stack()
+                                .unwrap();
+                            vm.set_reg(r, v);
+                        }
+                        Ok(LoopFlow::Normal)
+                    }
+                ])?;
             },
         }
 
@@ -2042,6 +2218,9 @@ impl Vm {
         }
 
         Ok(match (&v.value, b) {
+            (Value::Macro(data), ValueType::Iterator) => {
+                Value::Iterator(data.clone())
+            }
             _ => todo!("error"),
         })
     }
@@ -2154,122 +2333,122 @@ impl Vm {
         }
     }
 
-    pub fn runtime_display(&self, value: &ValueRef, with_ptr: bool) -> String {
-        let mut out = if with_ptr {
-            format!("{:?}: ", value.as_ptr()).dimmed().to_string()
-        } else {
-            "".to_string()
-        };
+    // pub fn runtime_display(&self, value: &ValueRef, with_ptr: bool) -> String {
+    //     let mut out = if with_ptr {
+    //         format!("{:?}: ", value.as_ptr()).dimmed().to_string()
+    //     } else {
+    //         "".to_string()
+    //     };
 
-        out += &match &value.borrow().value {
-            Value::Int(n) => n.to_string(),
-            Value::Float(n) => n.to_string(),
-            Value::Bool(b) => b.to_string(),
-            Value::String(s) => format!("{:?}", s.iter().collect::<String>()),
-            Value::Array(arr) => format!(
-                "[{}]",
-                arr.iter()
-                    .map(|k| self.runtime_display(k, with_ptr))
-                    .join(", ")
-            ),
-            Value::Dict(d) => format!(
-                "{{ {} }}",
-                d.iter()
-                    .map(|(s, v)| format!(
-                        "{}: {}",
-                        s.iter().collect::<String>(),
-                        self.runtime_display(v.value(), with_ptr)
-                    ))
-                    .join(", ")
-            ),
-            Value::Group(id) => id.fmt("g"),
-            Value::Channel(id) => id.fmt("c"),
-            Value::Block(id) => id.fmt("b"),
-            Value::Item(id) => id.fmt("i"),
-            Value::Builtins => "$".to_string(),
-            Value::Chroma { r, g, b, a } => format!("@chroma::rgb8({r}, {g}, {b}, {a})"),
-            Value::Range { start, end, step } => {
-                if *step == 1 {
-                    format!("{start}..{end}")
-                } else {
-                    format!("{start}..{step}..{end}")
-                }
-            },
-            Value::Maybe(o) => match o {
-                Some(k) => format!("({})?", self.runtime_display(k, with_ptr)),
-                None => "?".into(),
-            },
-            Value::Empty => "()".into(),
+    //     out += &match &value.borrow().value {
+    //         Value::Int(n) => n.to_string(),
+    //         Value::Float(n) => n.to_string(),
+    //         Value::Bool(b) => b.to_string(),
+    //         Value::String(s) => format!("{:?}", s.iter().collect::<String>()),
+    //         Value::Array(arr) => format!(
+    //             "[{}]",
+    //             arr.iter()
+    //                 .map(|k| self.runtime_display(k, with_ptr))
+    //                 .join(", ")
+    //         ),
+    //         Value::Dict(d) => format!(
+    //             "{{ {} }}",
+    //             d.iter()
+    //                 .map(|(s, v)| format!(
+    //                     "{}: {}",
+    //                     s.iter().collect::<String>(),
+    //                     self.runtime_display(v.value(), with_ptr)
+    //                 ))
+    //                 .join(", ")
+    //         ),
+    //         Value::Group(id) => id.fmt("g"),
+    //         Value::Channel(id) => id.fmt("c"),
+    //         Value::Block(id) => id.fmt("b"),
+    //         Value::Item(id) => id.fmt("i"),
+    //         Value::Builtins => "$".to_string(),
+    //         Value::Chroma { r, g, b, a } => format!("@chroma::rgb8({r}, {g}, {b}, {a})"),
+    //         Value::Range { start, end, step } => {
+    //             if *step == 1 {
+    //                 format!("{start}..{end}")
+    //             } else {
+    //                 format!("{start}..{step}..{end}")
+    //             }
+    //         },
+    //         Value::Maybe(o) => match o {
+    //             Some(k) => format!("({})?", self.runtime_display(k, with_ptr)),
+    //             None => "?".into(),
+    //         },
+    //         Value::Empty => "()".into(),
 
-            Value::Macro(MacroData { defaults, .. }) => {
-                format!("<{}-arg macro at {:?}>", defaults.len(), value.as_ptr())
-            },
-            Value::Iterator(_) => {
-                format!("<iterator at {:?}>", value.as_ptr())
-            },
-            Value::TriggerFunction { .. } => "!{...}".to_string(),
-            Value::Type(t) => t.runtime_display(self),
-            // Value::Object(map, typ) => format!(
-            //     "{} {{ {} }}",
-            //     match typ {
-            //         ObjectType::Object => "obj",
-            //         ObjectType::Trigger => "trigger",
-            //     },
-            //     map.iter()
-            //         .map(|(s, k)| format!("{s}: {k:?}"))
-            //         .collect::<Vec<_>>()
-            //         .join(", ")
-            // ),
-            Value::Epsilon => "$.epsilon()".to_string(),
-            Value::Module { exports, types } => format!(
-                "module {{ {}{} }}",
-                exports
-                    .iter()
-                    .map(|(s, k)| format!(
-                        "{}: {}",
-                        s.iter().collect::<String>(),
-                        self.runtime_display(k, with_ptr)
-                    ))
-                    .join(", "),
-                if types.iter().any(|p| p.is_pub()) {
-                    format!(
-                        "; {}",
-                        types
-                            .iter()
-                            .filter(|p| p.is_pub())
-                            .map(|p| ValueType::Custom(*p.value()).runtime_display(self))
-                            .join(", ")
-                    )
-                } else {
-                    "".into()
-                }
-            ),
+    //         Value::Macro(MacroData { defaults, .. }) => {
+    //             format!("<{}-arg macro at {:?}>", defaults.len(), value.as_ptr())
+    //         },
+    //         Value::Iterator(_) => {
+    //             format!("<iterator at {:?}>", value.as_ptr())
+    //         },
+    //         Value::TriggerFunction { .. } => "!{...}".to_string(),
+    //         Value::Type(t) => t.runtime_display(self),
+    //         // Value::Object(map, typ) => format!(
+    //         //     "{} {{ {} }}",
+    //         //     match typ {
+    //         //         ObjectType::Object => "obj",
+    //         //         ObjectType::Trigger => "trigger",
+    //         //     },
+    //         //     map.iter()
+    //         //         .map(|(s, k)| format!("{s}: {k:?}"))
+    //         //         .collect::<Vec<_>>()
+    //         //         .join(", ")
+    //         // ),
+    //         Value::Epsilon => "$.epsilon()".to_string(),
+    //         Value::Module { exports, types } => format!(
+    //             "module {{ {}{} }}",
+    //             exports
+    //                 .iter()
+    //                 .map(|(s, k)| format!(
+    //                     "{}: {}",
+    //                     s.iter().collect::<String>(),
+    //                     self.runtime_display(k, with_ptr)
+    //                 ))
+    //                 .join(", "),
+    //             if types.iter().any(|p| p.is_pub()) {
+    //                 format!(
+    //                     "; {}",
+    //                     types
+    //                         .iter()
+    //                         .filter(|p| p.is_pub())
+    //                         .map(|p| ValueType::Custom(*p.value()).runtime_display(self))
+    //                         .join(", ")
+    //                 )
+    //             } else {
+    //                 "".into()
+    //             }
+    //         ),
 
-            // Value::Iterator(_) => "<iterator>".into(),
-            // Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
-            Value::Error(id) => {
-                use delve::VariantNames;
-                format!(
-                    "{} {{...}}",
-                    crate::interpreting::error::ErrorDiscriminants::VARIANT_NAMES[*id]
-                )
-            },
+    //         // Value::Iterator(_) => "<iterator>".into(),
+    //         // Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
+    //         Value::Error(id) => {
+    //             use delve::VariantNames;
+    //             format!(
+    //                 "{} {{...}}",
+    //                 crate::interpreting::error::ErrorDiscriminants::VARIANT_NAMES[*id]
+    //             )
+    //         },
 
-            Value::Instance { typ, items } => format!(
-                "@{}::{{ {} }}",
-                self.type_def_map[&typ].name.iter().collect::<String>(),
-                items
-                    .iter()
-                    .map(|(s, v)| format!(
-                        "{}: {}",
-                        s.iter().collect::<String>(),
-                        self.runtime_display(v.value(), with_ptr)
-                    ))
-                    .join(", ")
-            ),
-            Value::ObjectKey(_) => todo!(),
-            // todo: iterator, object
-        };
-        out
-    }
+    //         Value::Instance { typ, items } => format!(
+    //             "@{}::{{ {} }}",
+    //             self.type_def_map[typ].name.iter().collect::<String>(),
+    //             items
+    //                 .iter()
+    //                 .map(|(s, v)| format!(
+    //                     "{}: {}",
+    //                     s.iter().collect::<String>(),
+    //                     self.runtime_display(v.value(), with_ptr)
+    //                 ))
+    //                 .join(", ")
+    //         ),
+    //         Value::ObjectKey(_) => todo!(),
+    //         // todo: iterator, object
+    //     };
+    //     out
+    // }
 }

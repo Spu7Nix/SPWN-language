@@ -20,8 +20,18 @@ impl @array {
 		f: @macro,
 	) {},
 	
+	#[doc("\ndisplay")]
+	_display_: #[builtin] (
+		self: @array,
+	) -> @string {},
+	
 	#[doc("\npanic")]
 	boinky: #[builtin] (
 		boinke: @int,
+	) {},
+	
+	#[doc("\ndghdfgjfhgdfhgjhfd")]
+	_iter_: #[builtin] (
+		self: @array,
 	) {},
 }
