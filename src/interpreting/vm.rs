@@ -31,6 +31,7 @@ use crate::util::{ImmutCloneVec, ImmutStr, ImmutVec};
 const RECURSION_LIMIT: usize = 256;
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
+pub type RuntimeCtxResult<T> = Result<T, (Context, RuntimeError)>;
 
 pub trait DeepClone<I> {
     fn deep_clone_map(&self, input: I, map: &mut Option<&mut CloneMap>) -> StoredValue;
@@ -1115,8 +1116,18 @@ impl Vm {
                         check_reg,
                         value_reg,
                     } => {},
-                    Opcode::PushTryCatch { reg, to } => todo!(),
-                    Opcode::PopTryCatch => todo!(),
+                    Opcode::PushTryCatch { reg, to } => {
+                        let mut ctx = self.context_stack.current_mut();
+                        let len = ctx.stack.len();
+                        ctx.try_catches.push(TryCatch {
+                            jump_pos: to,
+                            reg,
+                            stack_len: len,
+                        });
+                    },
+                    Opcode::PopTryCatch => {
+                        self.context_stack.current_mut().try_catches.pop();
+                    },
                     Opcode::CreateMacro { func, dest } => {
                         let func: usize = func.into();
                         let func_coord = FuncCoord {
@@ -1302,14 +1313,27 @@ impl Vm {
                         let val = match err {
                             RuntimeError::ThrownError { value, .. } => value,
                             _ => Value::Error(unsafe {
-                                std::mem::transmute::<_, u64>(std::mem::discriminant(&err)) as usize
+                                mem::transmute::<_, u64>(mem::discriminant(&err)) as usize
                             })
                             .into_stored(self.make_area(ZEROSPAN, &program)),
                         };
 
-                        self.write_pointee(try_catch.reg, val);
-
                         self.context_stack.current_mut().ip = *try_catch.jump_pos as usize;
+                        // let dist = self.context_stack.current().stack.len() - try_catch.stack_len;
+                        // for _ in 0..dist {
+                        //     self.context_stack.current_mut().stack.pop();
+                        // }
+                        self.context_stack
+                            .current_mut()
+                            .stack
+                            .last_mut()
+                            .unwrap()
+                            .registers[*try_catch.reg as usize] = val.into();
+                        // if dist > 0 {
+                        //     let ctx = self.context_stack.last_mut().yeet_current().unwrap();
+                        //     let last = self.context_stack.len() - 1;
+                        //     self.context_stack[last - dist].contexts.push(ctx);
+                        // }
                         continue;
                     } else {
                         println!("smiuchao");
@@ -1905,19 +1929,29 @@ impl Vm {
                 group,
                 prev_context,
             } => todo!(),
-            Value::Error(_) => todo!(),
+            Value::Error(id) => {
+                use delve::VariantNames;
+                Multi::new_single(
+                    ctx,
+                    format!(
+                        "{} {{...}}",
+                        crate::interpreting::error::ErrorDiscriminants::VARIANT_NAMES[*id]
+                    ),
+                )
+            },
             Value::ObjectKey(_) => todo!(),
             Value::Epsilon => todo!(),
             Value::Chroma { r, g, b, a } => todo!(),
             Value::Instance { typ, items } => {
                 if let Some(v) = self.get_impl(ValueType::Custom(*typ), "_display_") {
-                    let ret = self.call_value(
-                        ctx,
-                        v.value().clone(),
-                        &[value.clone()],
-                        &[],
-                        area.clone(),
-                    )?;
+                    let ret = self
+                        .call_value(ctx, v.value().clone(), &[value.clone()], &[], area.clone())
+                        .map_err(|e| RuntimeError::WhileCallingOverload {
+                            area: area.clone(),
+                            error: Box::new(e),
+                            builtin: "_display_",
+                        })?;
+
                     return Ok(ret.map(|ctx, v| match &v.borrow().value {
                         Value::String(v) => (ctx, v.iter().collect()),
                         _ => todo!(),
@@ -2001,15 +2035,22 @@ impl Vm {
                     })
                 },
             },
-            (other, idx) => {
+            (other, _) => {
                 if let Some(v) = self.get_impl(other.get_type(), "_index_") {
-                    let ret = self.call_value(
-                        ctx,
-                        v.value().clone(),
-                        &[base.clone(), index.clone()],
-                        &[],
-                        area.clone(),
-                    )?;
+                    let ret = self
+                        .call_value(
+                            ctx,
+                            v.value().clone(),
+                            &[base.clone(), index.clone()],
+                            &[],
+                            area.clone(),
+                        )
+                        .map_err(|e| RuntimeError::WhileCallingOverload {
+                            area: area.clone(),
+                            error: Box::new(e),
+                            builtin: "_index_",
+                        })?;
+
                     return Ok(ret);
                 }
                 return Err(RuntimeError::InvalidIndex {

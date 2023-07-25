@@ -28,6 +28,7 @@ pub struct CallInfo {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TryCatch {
     pub jump_pos: OpcodePos,
+    pub stack_len: usize,
     pub reg: OptRegister,
 }
 

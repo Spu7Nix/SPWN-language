@@ -1,22 +1,40 @@
 
 
+blib = () {
+    1 + "fgfgf"
+}
+
+gog = () {
+    blib()
+}
+
+try {
+    gog()
+} catch e {
+    dbg e;
+}
 
 
 
-type @fuck
+
+// type @fuck
 
 
 // impl @fuck {
 //     _index_: (&self, idx) {
-//         return self.bob;
+//         return self.biddy[idx]
+//     },
+//     _display_: (self) {
+//         return f"biddle: {self.biddy}"
 //     }
 // }
-// mut a = @fuck::{bob: 5}
-// dbg a;
-// dbg a[0];
-// a[0] += 5;
-// dbg a;
-// dbg a[0];
 
 
-[1,2,3][8]
+// mut a = @fuck::{
+//     dog: 5,
+//     biddy: [1, 2, 3]
+// };
+// dbg a;
+// a[2] += 69
+// dbg a;
+

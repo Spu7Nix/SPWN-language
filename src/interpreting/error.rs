@@ -452,6 +452,20 @@ error_maker! {
             [call_stack]
         },
 
+        // ==================================================================
+        #[
+            Message: format!("Error `{}` occurred while running an overload", error.to_report(vm).message), Note: None;
+            Labels: [
+                area => "Call of `{}` occurrs here": builtin;
+                -> error.to_report(vm).labels
+            ]
+        ]
+        WhileCallingOverload {
+            area: CodeArea,
+            error: Box<RuntimeError>,
+            builtin: &'static str,
+        },
+
 
         // // ============================ BUILTIN FUNC ERRORS ============================
 
