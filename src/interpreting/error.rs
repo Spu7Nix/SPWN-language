@@ -55,7 +55,17 @@ error_maker! {
         #[
             Message: "Type mismatch", Note: None;
             Labels: [
-                area => "Expected {}, found {}": expected.runtime_display(vm), value_type.runtime_display(vm);
+                area => "Expected {}, found {}": {
+                    use itertools::Itertools;
+                    let len = expected.len();
+                    expected.iter().enumerate().map(|(i, t)| {
+                        if len > 1 && i == len - 1 {
+                            format!("or {}", t.runtime_display(vm))
+                        } else {
+                            t.runtime_display(vm)
+                        }
+                    }).join(if len > 2 { ", " } else { " " })
+                }, value_type.runtime_display(vm);
                 value_area => "Value defined as {} here": value_type.runtime_display(vm);
             ]
         ]
@@ -63,7 +73,7 @@ error_maker! {
             value_type: ValueType,
             value_area: CodeArea,
             area: CodeArea,
-            expected: ValueType,
+            expected: &'static [ValueType],
             [call_stack]
         },
 

@@ -73,23 +73,18 @@ impl Compiler<'_> {
 
         if !path.is_empty() {
             let path_reg = builder.next_reg();
-            builder.copy_mem(var_reg, path_reg, span);
+            builder.copy_ref(var_reg, path_reg, span);
             for i in path {
                 match i {
                     AssignPath::Index(v) => {
                         let v = self.compile_expr(v, scope, builder)?;
-                        builder.index_mem(path_reg, path_reg, v, span);
+                        builder.index(path_reg, path_reg, v, span);
                     },
                     AssignPath::Member(v) => {
-                        builder.member_mem(
-                            path_reg,
-                            path_reg,
-                            self.resolve_arr(v).spanned(span),
-                            span,
-                        );
+                        builder.member(path_reg, path_reg, self.resolve_arr(v).spanned(span), span);
                     },
                     AssignPath::Associated(v) => {
-                        builder.associated_mem(
+                        builder.associated(
                             path_reg,
                             path_reg,
                             self.resolve_arr(v).spanned(span),
@@ -251,7 +246,7 @@ impl Compiler<'_> {
                                     builder.jump(None, JumpType::EndIfFalse(gt_reg), pattern.span);
 
                                     let elem = builder.next_reg();
-                                    builder.index_mem(expr_reg, elem, i_reg, pattern.span);
+                                    builder.index(expr_reg, elem, i_reg, pattern.span);
                                     let elem_match = compiler.compile_pattern_check(
                                         elem,
                                         elem_pat,
@@ -332,7 +327,7 @@ impl Compiler<'_> {
                                     builder.load_const(i as i64, idx, pattern.span);
 
                                     let elem_reg = builder.next_reg();
-                                    builder.index_mem(expr_reg, elem_reg, idx, pattern.span);
+                                    builder.index(expr_reg, elem_reg, idx, pattern.span);
 
                                     compiler.compile_pattern_check(
                                         elem_reg,
@@ -377,9 +372,9 @@ impl Compiler<'_> {
                     self.get_path_reg(*var, try_new_var, path, scope, builder, pattern.span)?;
 
                 if *is_ref {
-                    builder.copy_mem(expr_reg, path_reg, pattern.span);
+                    builder.copy_ref(expr_reg, path_reg, pattern.span);
                 } else {
-                    builder.copy_deep(expr_reg, path_reg, pattern.span);
+                    builder.write_deep(expr_reg, path_reg, pattern.span);
                 }
                 builder.load_const(true, out_reg, pattern.span);
             },
@@ -394,9 +389,9 @@ impl Compiler<'_> {
                     },
                 );
                 if *is_ref {
-                    builder.copy_mem(expr_reg, var_reg, pattern.span);
+                    builder.copy_ref(expr_reg, var_reg, pattern.span);
                 } else {
-                    builder.copy_deep(expr_reg, var_reg, pattern.span);
+                    builder.write_deep(expr_reg, var_reg, pattern.span);
                 }
                 builder.load_const(true, out_reg, pattern.span);
             },

@@ -94,10 +94,9 @@ fn run_spwn(
     let t = Instant::now();
 
     vm.run_function(
-        Context::new(&start.program.src),
+        Context::new(),
         CallInfo {
             func: start,
-            return_dest: None,
             call_area: None,
             is_builtin: None,
         },

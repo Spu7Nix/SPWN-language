@@ -1,4 +1,4 @@
-pub mod core;
+// mod core;
 
 use std::rc::Rc;
 
@@ -6,51 +6,6 @@ use super::context::CallInfo;
 use super::value::Value;
 use super::vm::{FuncCoord, LoopFlow, Program, RuntimeResult, Vm};
 use crate::sources::CodeArea;
-
-pub type RustFnInstr<'a> = &'a dyn Fn(&mut Vm) -> RuntimeResult<LoopFlow>;
-
-pub struct Instrs<'a>(&'a [RustFnInstr<'a>]);
-
-pub trait RustFnReturn {
-    fn rust_fn_return(
-        self,
-        vm: &mut Vm,
-        area: &CodeArea,
-        program: &std::rc::Rc<Program>,
-    ) -> RuntimeResult<()>;
-}
-
-impl RustFnReturn for Value {
-    fn rust_fn_return(
-        self,
-        vm: &mut Vm,
-        area: &CodeArea,
-        program: &Rc<Program>,
-    ) -> RuntimeResult<()> {
-        vm.run_rust_instrs(
-            program,
-            &[&|vm| {
-                vm.context_stack
-                    .current_mut()
-                    .extra_stack
-                    .push(self.clone().into_stored(area.clone()));
-                Ok(LoopFlow::Normal)
-            }],
-        )?;
-        Ok(())
-    }
-}
-impl RustFnReturn for Instrs<'_> {
-    fn rust_fn_return(
-        self,
-        vm: &mut Vm,
-        area: &CodeArea,
-        program: &std::rc::Rc<Program>,
-    ) -> RuntimeResult<()> {
-        vm.run_rust_instrs(program, self.0)?;
-        Ok(())
-    }
-}
 
 #[rustfmt::skip]
 #[macro_export]

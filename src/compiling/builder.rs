@@ -490,8 +490,16 @@ impl<'a> CodeBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(Opcode::CopyShallow { from, to }), span)
     }
 
-    pub fn copy_mem(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
-        self.push_opcode(ProtoOpcode::Raw(Opcode::CopyMem { from, to }), span)
+    pub fn copy_ref(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::CopyRef { from, to }), span)
+    }
+
+    pub fn write(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::Write { from, to }), span)
+    }
+
+    pub fn write_deep(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::WriteDeep { from, to }), span)
     }
 
     pub fn iter_next(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
@@ -712,61 +720,6 @@ impl<'a> CodeBuilder<'a> {
 
     pub fn len(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
         self.push_opcode(ProtoOpcode::Raw(Opcode::Len { src, dest }), span)
-    }
-
-    pub fn associated_mem(
-        &mut self,
-        from: UnoptRegister,
-        dest: UnoptRegister,
-        member: Spanned<ImmutVec<char>>,
-        span: CodeSpan,
-    ) {
-        let next_reg = self.next_reg();
-        self.load_const(member.value, next_reg, member.span);
-        self.push_opcode(
-            ProtoOpcode::Raw(UnoptOpcode::AssociatedMem {
-                from,
-                dest,
-                member: next_reg,
-            }),
-            span,
-        )
-    }
-
-    pub fn member_mem(
-        &mut self,
-        from: UnoptRegister,
-        dest: UnoptRegister,
-        member: Spanned<ImmutVec<char>>,
-        span: CodeSpan,
-    ) {
-        let next_reg = self.next_reg();
-        self.load_const(member.value, next_reg, member.span);
-        self.push_opcode(
-            ProtoOpcode::Raw(UnoptOpcode::MemberMem {
-                from,
-                dest,
-                member: next_reg,
-            }),
-            span,
-        )
-    }
-
-    pub fn index_mem(
-        &mut self,
-        from: UnoptRegister,
-        dest: UnoptRegister,
-        index: UnoptRegister,
-        span: CodeSpan,
-    ) {
-        self.push_opcode(
-            ProtoOpcode::Raw(UnoptOpcode::IndexMem {
-                base: from,
-                dest,
-                index,
-            }),
-            span,
-        )
     }
 
     pub fn call(

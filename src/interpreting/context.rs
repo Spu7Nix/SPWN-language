@@ -1,19 +1,16 @@
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
-use std::mem::ManuallyDrop;
-use std::rc::Rc;
 
 use ahash::AHashMap;
 use derive_more::{Deref, DerefMut};
 
-use super::value::{BuiltinFn, StoredValue, Value};
-use super::vm::{DeepClone, FuncCoord, ValueRef, Vm};
+use super::value::BuiltinFn;
+use super::vm::{FuncCoord, ValueRef, Vm};
 use crate::compiling::bytecode::OptRegister;
 use crate::compiling::opcodes::OpcodePos;
 use crate::gd::ids::Id;
-use crate::sources::{CodeArea, SpwnSource, ZEROSPAN};
+use crate::sources::CodeArea;
 use crate::util::ImmutVec;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -21,16 +18,9 @@ pub struct StackItem {
     pub registers: ImmutVec<ValueRef>,
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub enum ReturnDest {
-    Reg(OptRegister),
-    Extra,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct CallInfo {
     pub func: FuncCoord,
-    pub return_dest: Option<ReturnDest>,
     pub call_area: Option<CodeArea>,
     pub is_builtin: Option<BuiltinFn>,
 }
@@ -52,8 +42,6 @@ pub struct Context {
     pub group: Id,
     pub stack: Vec<StackItem>,
 
-    pub extra_stack: Vec<StoredValue>,
-
     pub returned: Option<ValueRef>,
 }
 
@@ -67,40 +55,25 @@ impl Eq for Context {
 //     Disallow,
 // }
 
-static mut CONTEXT_DBG_ID: usize = 0;
-
 #[allow(clippy::new_without_default)]
 impl Context {
-    pub fn new(src: &Rc<SpwnSource>) -> Self {
+    pub fn new_id() -> usize {
+        static mut CONTEXT_DBG_ID: usize = 0;
+        unsafe {
+            CONTEXT_DBG_ID += 1;
+            CONTEXT_DBG_ID - 1
+        }
+    }
+
+    pub fn new() -> Self {
         Self {
-            unique_id: unsafe {
-                CONTEXT_DBG_ID += 1;
-                CONTEXT_DBG_ID - 1
-            },
+            unique_id: Self::new_id(),
             ip: 0,
             group: Id::Specific(0),
             stack: vec![],
             try_catches: vec![],
             returned: None,
-            extra_stack: vec![],
         }
-    }
-
-    pub fn extra_stack_top(&self, pos: usize) -> &StoredValue {
-        &self.extra_stack[self.extra_stack.len() - pos - 1]
-    }
-
-    pub fn extra_stack_top_mut(&mut self, pos: usize) -> &mut StoredValue {
-        let len = self.extra_stack.len();
-        &mut self.extra_stack[len - pos - 1]
-    }
-
-    pub fn push_extra_stack(&mut self, v: StoredValue) {
-        self.extra_stack.push(v)
-    }
-
-    pub fn pop_extra_stack(&mut self) -> Option<StoredValue> {
-        self.extra_stack.pop()
     }
 }
 
@@ -144,29 +117,12 @@ impl FullContext {
         self.contexts.peek_mut().expect("BUG: no current context")
     }
 
-    pub fn jump_current(&mut self, pos: usize) {
-        self.current_mut().ip = pos
-    }
-
-    pub fn current_ip(&self) -> usize {
-        self.current().ip
-    }
-
     pub fn valid(&self) -> bool {
         !self.contexts.is_empty()
     }
 
     pub fn yeet_current(&mut self) -> Option<Context> {
         self.contexts.pop()
-    }
-
-    pub fn set_group(&mut self, group: Id) {
-        let mut current = self.current_mut();
-        current.group = group;
-    }
-
-    pub fn current_group(&self) -> Id {
-        self.current().group
     }
 }
 
@@ -201,10 +157,7 @@ impl Vm {
         let current = self.context_stack.current();
         let mut new = current.clone();
 
-        new.unique_id = unsafe {
-            CONTEXT_DBG_ID += 1;
-            CONTEXT_DBG_ID - 1
-        };
+        new.unique_id = Context::new_id();
 
         // lord forgive me for what i am about to do
 
@@ -214,10 +167,6 @@ impl Vm {
             for reg in stack_item.registers.iter_mut() {
                 *reg = reg.deep_clone_checked(self, &mut Some(&mut clone_map));
             }
-        }
-
-        for v in &mut new.extra_stack {
-            *v = self.deep_clone_map(&*v, &mut Some(&mut clone_map))
         }
 
         self.context_stack.last_mut().contexts.push(new);

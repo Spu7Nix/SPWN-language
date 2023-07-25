@@ -1,5 +1,22 @@
-impl @int {
-    #[overload = _iter_]
-    #[overload = _iter_]
-    iter: () {}
-}
+
+
+
+
+
+type @fuck
+
+
+// impl @fuck {
+//     _index_: (&self, idx) {
+//         return self.bob;
+//     }
+// }
+// mut a = @fuck::{bob: 5}
+// dbg a;
+// dbg a[0];
+// a[0] += 5;
+// dbg a;
+// dbg a[0];
+
+
+[1,2,3][8]

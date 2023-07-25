@@ -19,7 +19,7 @@ pub fn to_bool(
             return Err(RuntimeError::TypeMismatch {
                 value_type: v.value.get_type(),
                 value_area: v.area.clone(),
-                expected: ValueType::Bool,
+                expected: &[ValueType::Bool],
                 area: vm.make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
@@ -81,7 +81,7 @@ pub fn as_op(
             value_type: b.value.get_type(),
             value_area: b.area.clone(),
             area: vm.make_area(span, program),
-            expected: ValueType::Type,
+            expected: &[ValueType::Type],
             call_stack: vm.get_call_stack(),
         });
     })

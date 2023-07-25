@@ -265,7 +265,7 @@ impl Compiler<'_> {
                 let base = self.compile_expr(base, scope, builder)?;
                 let index = self.compile_expr(index, scope, builder)?;
                 let out = builder.next_reg();
-                builder.index_mem(base, out, index, expr.span);
+                builder.index(base, out, index, expr.span);
                 Ok(out)
             },
             Expression::Member { base, name } => {

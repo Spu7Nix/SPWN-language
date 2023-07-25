@@ -87,9 +87,13 @@ opcodes! {
     CopyDeep { [from], [to] },
     #[delve(display = |from, to| format!("{from} shallow -> {to}"))]
     CopyShallow { [from], [to] },
+    #[delve(display = |from, to| format!("{from} ref -> {to}"))]
+    CopyRef { [from], [to] },
 
-    #[delve(display = |from, to| format!("{from} ~> {to}"))]
-    CopyMem { [from], [to] },
+    #[delve(display = |from, to| format!("write {from} ~> {to}"))]
+    Write { [from], [to] },
+    #[delve(display = |from, to| format!("write {from} deep ~> {to}"))]
+    WriteDeep { [from], [to] },
 
     #[delve(display = |a, b, to| format!("{a} + {b} -> {to}"))]
     Plus { [a], [b], [to] },
@@ -245,13 +249,6 @@ opcodes! {
 
     #[delve(display = |s, d| format!("{s}.len() -> {d}"))]
     Len { [src], [dest] },
-
-    #[delve(display = |b, d, i| format!("{b}[{i}] ~> {d}"))]
-    IndexMem { [base], [dest], [index] },
-    #[delve(display = |f, d, i| format!("{f}.{i} ~> {d}"))]
-    MemberMem { [from], [dest], [member] },
-    #[delve(display = |f, d, i| format!("{f}::{i} ~> {d}"))]
-    AssociatedMem { [from], [dest], [member] },
 
 
     #[delve(display = |r, v| format!("if not {r}, throw mismatch"))]

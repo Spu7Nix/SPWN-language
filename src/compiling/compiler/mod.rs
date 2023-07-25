@@ -10,14 +10,13 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use ahash::AHashMap;
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::builder::BlockID;
 use super::bytecode::UnoptRegister;
 use super::error::CompileError;
-use super::opcodes::FuncID;
 use crate::cli::{BuildSettings, DocSettings};
 use crate::compiling::builder::ProtoBytecode;
 use crate::new_id_wrapper;

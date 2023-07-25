@@ -24,17 +24,21 @@ impl<'a> Compiler<'a> {
                 self.compile_expr(e, scope, builder)?;
             },
             Statement::Assign(left, right) => {
-                let temp_reg = builder.next_reg();
-
-                let marker = builder.mark_insert();
-
+                let right_reg = self.compile_expr(right, scope, builder)?;
                 let match_reg =
-                    self.compile_pattern_check(temp_reg, left, false, scope, builder)?;
+                    self.compile_pattern_check(right_reg, left, false, scope, builder)?;
 
-                let right_reg = self.compile_expr(right, scope, &mut marker.with(builder))?;
-                marker
-                    .with(builder)
-                    .copy_mem(right_reg, temp_reg, right.span);
+                // let temp_reg = builder.next_reg();
+
+                // let marker = builder.mark_insert();
+
+                // let match_reg =
+                //     self.compile_pattern_check(temp_reg, left, false, scope, builder)?;
+
+                // let right_reg = self.compile_expr(right, scope, &mut marker.with(builder))?;
+                // marker
+                //     .with(builder)
+                //     .copy_mem(right_reg, temp_reg, right.span);
 
                 builder.mismatch_throw_if_false(match_reg, right_reg, left.span);
             },

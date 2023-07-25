@@ -258,8 +258,7 @@ mod debug_bytecode {
                         opcode_name: Into::<&str>::into(opcode).bright_white().to_string(),
                         opcode_str: {
                             let c: Cow<'_, str> = format!("{opcode}").into();
-                            let c =
-                                mem_arrow_regex.replace_all(&c, "~>".bright_green().to_string());
+                            let c = mem_arrow_regex.replace_all(&c, "~>".yellow().to_string());
                             let c = reg_regex.replace_all(&c, "$1".bright_red().to_string());
                             let c =
                                 opcode_pos_regex.replace_all(&c, "$1".bright_blue().to_string());
@@ -410,13 +409,7 @@ mod debug_bytecode {
                     (
                         "arg regs",
                         (0..func.args.len())
-                            .map(|i| {
-                                format!(
-                                    "{} {}",
-                                    "~>".bright_green(),
-                                    Register(i as u8).to_string().bright_red()
-                                )
-                            })
+                            .map(|i| format!("-> {}", Register(i as u8).to_string().bright_red()))
                             .join(", "),
                     ),
                     (
@@ -425,9 +418,8 @@ mod debug_bytecode {
                             .iter()
                             .map(|(from, to)| {
                                 format!(
-                                    "{} {} {}",
+                                    "{} -> {}",
                                     from.to_string().bright_red().to_string(),
-                                    "~>".bright_green(),
                                     to.to_string().bright_red().to_string(),
                                 )
                             })
