@@ -5,6 +5,7 @@ use std::collections::BinaryHeap;
 use ahash::AHashMap;
 use derive_more::{Deref, DerefMut};
 
+use super::error::RuntimeError;
 use super::value::BuiltinFn;
 use super::vm::{FuncCoord, ValueRef, Vm};
 use crate::compiling::bytecode::OptRegister;
@@ -16,9 +17,10 @@ use crate::util::ImmutVec;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StackItem {
     pub registers: ImmutVec<ValueRef>,
+    pub try_catches: Vec<TryCatch>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub struct CallInfo {
     pub func: FuncCoord,
     pub call_area: Option<CodeArea>,
@@ -28,7 +30,6 @@ pub struct CallInfo {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TryCatch {
     pub jump_pos: OpcodePos,
-    pub stack_len: usize,
     pub reg: OptRegister,
 }
 
@@ -38,12 +39,11 @@ pub struct Context {
 
     pub ip: usize,
 
-    pub try_catches: Vec<TryCatch>,
-
     pub group: Id,
     pub stack: Vec<StackItem>,
 
     pub returned: Option<ValueRef>,
+    pub errored: Option<RuntimeError>,
 }
 
 impl Eq for Context {
@@ -72,9 +72,13 @@ impl Context {
             ip: 0,
             group: Id::Specific(0),
             stack: vec![],
-            try_catches: vec![],
             returned: None,
+            errored: None,
         }
+    }
+
+    pub fn set_error(&mut self, v: RuntimeError) {
+        self.errored.get_or_insert(v);
     }
 }
 

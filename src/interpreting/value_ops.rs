@@ -20,7 +20,7 @@ pub fn to_bool(
                 value_type: v.value.get_type(),
                 value_area: v.area.clone(),
                 expected: &[ValueType::Bool],
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -80,7 +80,7 @@ pub fn as_op(
         return Err(RuntimeError::TypeMismatch {
             value_type: b.value.get_type(),
             value_area: b.area.clone(),
-            area: vm.make_area(span, program),
+            area: Vm::make_area(span, program),
             expected: &[ValueType::Type],
             call_stack: vm.get_call_stack(),
         });
@@ -106,7 +106,7 @@ pub fn in_op(
                 op: BinOp::In,
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -133,7 +133,7 @@ pub fn plus(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Plus,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -157,7 +157,7 @@ pub fn minus(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Minus,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -190,7 +190,7 @@ pub fn mult(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Mult,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -208,7 +208,7 @@ pub fn div(
         (Value::Int(a), Value::Int(b)) => {
             if *b == 0 {
                 return Err(RuntimeError::DivisionByZero {
-                    area: vm.make_area(span, program),
+                    area: Vm::make_area(span, program),
                     call_stack: vm.get_call_stack(),
                 });
             }
@@ -222,7 +222,7 @@ pub fn div(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Div,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -246,7 +246,7 @@ pub fn modulo(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Mod,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -270,7 +270,7 @@ pub fn pow(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Pow,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -291,7 +291,7 @@ pub fn unary_not(
             return Err(RuntimeError::InvalidUnaryOperand {
                 v: (v.value.get_type(), v.area.clone()),
                 op: UnaryOp::ExclMark,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -311,7 +311,7 @@ pub fn unary_negate(
             return Err(RuntimeError::InvalidUnaryOperand {
                 v: (v.value.get_type(), v.area.clone()),
                 op: UnaryOp::Minus,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -336,7 +336,7 @@ pub fn gt(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Gt,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -361,7 +361,7 @@ pub fn lt(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Lt,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -386,7 +386,7 @@ pub fn gte(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Gte,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -411,7 +411,7 @@ pub fn lte(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Lte,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -452,7 +452,7 @@ pub fn range(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Range,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -475,7 +475,7 @@ pub fn bin_and(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinAnd,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -498,7 +498,7 @@ pub fn bin_or(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -520,7 +520,7 @@ pub fn shift_left(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },
@@ -542,7 +542,7 @@ pub fn shift_right(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
-                area: vm.make_area(span, program),
+                area: Vm::make_area(span, program),
                 call_stack: vm.get_call_stack(),
             })
         },

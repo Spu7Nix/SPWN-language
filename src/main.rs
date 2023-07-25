@@ -93,17 +93,24 @@ fn run_spwn(
 
     let t = Instant::now();
 
-    vm.run_function(
+    let out = vm.run_function(
         Context::new(),
         CallInfo {
             func: start,
             call_area: None,
             is_builtin: None,
         },
-        Box::new(|_| Ok(())),
+        Box::new(|_| {}),
         // ContextSplitMode::Allow,
-    )
-    .map_err(|e| e.to_report(&vm))?;
+    );
+
+    for (ctx, _) in out {
+        if let Some(e) = ctx.errored {
+            Err(e.to_report(&vm))?
+        }
+    }
+
+    // .map_err(|e| e.to_report(&vm))?;
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());
     println!("{}", t.elapsed().as_secs_f64());

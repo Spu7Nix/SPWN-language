@@ -9,7 +9,6 @@ use itertools::Itertools;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
-use super::error::ErrorDiscriminants;
 use super::vm::{FuncCoord, Program, RuntimeResult, Vm};
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::{CustomTypeID, LocalTypeID};
@@ -394,7 +393,7 @@ value! {
         prev_context: Id,
     },
 
-    Error(usize),
+    Error(crate::interpreting::error::RuntimeError),
 
     //Object(AHashMap<u8, ObjParam>, ObjectType),
     ObjectKey(ObjectKey),

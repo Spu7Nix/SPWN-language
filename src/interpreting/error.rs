@@ -15,8 +15,8 @@ error_maker! {
     Extra: {
         vm: &Vm,
     }
-    #[derive(strum::EnumDiscriminants)]
-    #[strum_discriminants(name(ErrorDiscriminants), derive(delve::EnumVariantNames), delve(rename_variants = "SCREAMING_SNAKE_CASE"))]
+    #[derive(delve::EnumVariantNames, PartialEq, Hash)]
+    #[delve(rename_variants = "SCREAMING_SNAKE_CASE")]
     pub enum RuntimeError {
 
         // ==================================================================
@@ -399,7 +399,7 @@ error_maker! {
         ]
         ThrownError {
             area: CodeArea,
-            value: StoredValue,
+            value: ValueRef,
             [call_stack]
         },
 
@@ -451,6 +451,21 @@ error_maker! {
             area: CodeArea,
             [call_stack]
         },
+
+        // ==================================================================
+        #[
+            Message: "Invalid type for overload", Note: None;
+            Labels: [
+                area => "Call of `{}` occurrs here": builtin;
+                // -> error.to_report(vm).labels
+            ]
+        ]
+        InvalidTypeForOverload {
+            area: CodeArea,
+            // error: Box<RuntimeError>,
+            // builtin: &'static str,
+        },
+
 
         // ==================================================================
         #[
