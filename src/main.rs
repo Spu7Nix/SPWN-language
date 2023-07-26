@@ -103,13 +103,11 @@ fn run_spwn(
         Box::new(|_| {}),
         // ContextSplitMode::Allow,
     );
-
-    for (ctx, _) in out {
-        if let Some(e) = ctx.errored {
+    for (c, v) in out {
+        if let Err(e) = v {
             Err(e.to_report(&vm))?
         }
     }
-
     // .map_err(|e| e.to_report(&vm))?;
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());

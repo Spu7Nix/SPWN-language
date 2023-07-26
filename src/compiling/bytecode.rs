@@ -243,7 +243,13 @@ mod debug_bytecode {
                         continue;
                     }
                 }
-                let mut max = TableRowMax::default();
+                let mut max = TableRowMax {
+                    idx: 2,
+                    opcode_name: 5,
+                    opcode_str: 5,
+                    span: 0,
+                    snippet: 0,
+                };
                 let mut rows = vec![];
                 for (
                     i,

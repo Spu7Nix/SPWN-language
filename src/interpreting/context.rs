@@ -7,7 +7,7 @@ use derive_more::{Deref, DerefMut};
 
 use super::error::RuntimeError;
 use super::value::BuiltinFn;
-use super::vm::{FuncCoord, ValueRef, Vm};
+use super::vm::{FuncCoord, RuntimeResult, ValueRef, Vm};
 use crate::compiling::bytecode::OptRegister;
 use crate::compiling::opcodes::OpcodePos;
 use crate::gd::ids::Id;
@@ -20,7 +20,7 @@ pub struct StackItem {
     pub try_catches: Vec<TryCatch>,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CallInfo {
     pub func: FuncCoord,
     pub call_area: Option<CodeArea>,
@@ -42,8 +42,7 @@ pub struct Context {
     pub group: Id,
     pub stack: Vec<StackItem>,
 
-    pub returned: Option<ValueRef>,
-    pub errored: Option<RuntimeError>,
+    pub returned: RuntimeResult<Option<ValueRef>>,
 }
 
 impl Eq for Context {
@@ -72,13 +71,14 @@ impl Context {
             ip: 0,
             group: Id::Specific(0),
             stack: vec![],
-            returned: None,
-            errored: None,
+            returned: Ok(None),
         }
     }
 
-    pub fn set_error(&mut self, v: RuntimeError) {
-        self.errored.get_or_insert(v);
+    pub fn ret_error(&mut self, err: RuntimeError) {
+        if self.returned.is_ok() {
+            self.returned = Err(err);
+        }
     }
 }
 

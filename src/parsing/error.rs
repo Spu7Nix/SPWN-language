@@ -20,6 +20,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unexpected token", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Expected `{}`, found `{}`": expected, found.to_str();
             ]
@@ -33,6 +34,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unmatched token", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Couldn't find matching `{}` for this `{}`": not_found.to_str(), for_char.to_str();
             ]
@@ -46,6 +48,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unexpected character", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Expected `{}`, found `{}`": expected.to_str(), found;
             ]
@@ -59,6 +62,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unexpected string flag", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Expected valid string flag, found `{}`": flag;
             ]
@@ -71,6 +75,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Error parsing escape sequence", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Unknown escape sequence \\`{}`": character;
             ]
@@ -83,6 +88,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Error parsing unicode escape sequence", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Invalid unicode sequence `{}`": sequence;
             ]
@@ -95,6 +101,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Cannot have multiple spread arguments", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Second spread argument provided here";
                 prev_area => "First spread argument provided here";
@@ -108,6 +115,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Positional argument after keyword argument", Note: None;
+            Main Area: area;
             Labels: [
                 area => "This positional argument was provided after keyword arguments";
                 keyword_area => "First keyword argument provided here";
@@ -121,6 +129,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Duplicate keyword argument", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Keyword argument `{}` was provided twice": name;
                 prev_area => "Argument previously provided here";
@@ -135,6 +144,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Duplicate attribute field", Note: None;
+            Main Area: used_again;
             Labels: [
                 first_used => "Field `{}` first used here": field;
                 used_again => "Used again here";
@@ -223,6 +233,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Lexer error", Note: None;
+            Main Area: area;
             Labels: [
                 area => "{}": =>(err);
             ]
@@ -235,6 +246,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Invalid string type used for dictionary key", Note: Some("f-strings and byte strings are not allowed as keys".into());
+            Main Area: area;
             Labels: [
                 area => "Invalid string here";
             ]
@@ -246,6 +258,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unbalanced block in format string", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Expected `{}`": expected;
             ]
@@ -258,6 +271,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Invalid `self` argument position", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Argument is at position {}": pos;
             ]
@@ -270,6 +284,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "`self` argument cannot be spread", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Spread occurs on this `self`";
             ]
@@ -284,6 +299,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unknown attribute namespace", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Namespace `{}` does not exist": namespace;
             ]
@@ -296,6 +312,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unknown attribute", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Attribute `{}` does not exist": attribute;
             ]
@@ -308,6 +325,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Mismatched attribute style", Note: Some("`#![...]` in an inner attribute and `#[...]` is an outer attribute".into());
+            Main Area: area;
             Labels: [
                 area => "Attribute does not exist as an {} attribute": =>(style);
             ]
@@ -320,6 +338,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Duplicate attribute", Note: None;
+            Main Area: current_area;
             Labels: [
                 old_area => "Attribute `{}` originally specified here": attribute;
                 current_area => "Attribute also specified here";
@@ -334,6 +353,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "No arguments provided to attribute", Note: Some("A `word` attribute is an attribute without values (E.G. `#[debug_bytecode]`)".into());
+            Main Area: attribute_area;
             Labels: [
                 attribute_area => "Attribute `{}` expected to take value(s)": attribute;
                 attribute_area => "Attribute used as a word here";
@@ -347,6 +367,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unknown argument in attribute", Note: None;
+            Main Area: attribute_area;
             Labels: [
                 attribute_area => "Unknown argument for attribute `{}`": attribute;
                 arg_area => "Argument provided here";
@@ -361,6 +382,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unexpected value for attribute", Note: None;
+            Main Area: attribute_area;
             Labels: [
                 attribute_area => "Unexpected value provided to attribute `{}`": attribute;
                 value_area => "Argument provided here";
@@ -375,6 +397,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Missing required arguments for attribute", Note: Some(format!("The missing arguments may be: {}", list_join(missing)));
+            Main Area: attribute_area;
             Labels: [
                 attribute_area => "Expected {} required arguments for attribute `{}`": expected, attribute;
                 args_area => "Found only {} args here": found;
@@ -392,6 +415,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Mismatched attribute target", Note: None;
+            Main Area: target_area;
             Labels: [
                 target_area => "Attribute `{}` cannot be added to this element": attribute;
             ]

@@ -48,12 +48,12 @@ impl<T> Multi<T> {
         self.into_iter().map(|(c, v)| f(c, v)).collect()
     }
 
-    pub fn try_map<F, R, E>(self, mut f: F) -> Result<Multi<R>, E>
-    where
-        F: FnMut(Context, T) -> Result<(Context, R), E>,
-    {
-        self.into_iter().map(|(c, v)| f(c, v)).collect()
-    }
+    // pub fn try_map<F, R, E>(self, mut f: F) -> Result<Multi<R>, E>
+    // where
+    //     F: FnMut(Context, T) -> Result<(Context, R), E>,
+    // {
+    //     self.into_iter().map(|(c, v)| f(c, v)).collect()
+    // }
 
     pub fn flat_map<F, R>(self, mut f: F) -> Multi<R>
     where
@@ -62,20 +62,20 @@ impl<T> Multi<T> {
         self.into_iter().flat_map(|(c, v)| f(c, v)).collect()
     }
 
-    pub fn try_flat_map<F, R, E>(self, mut f: F) -> Result<Multi<R>, E>
-    where
-        F: FnMut(Context, T) -> Result<Multi<R>, E>,
-    {
-        let mut vec = vec![];
+    // pub fn try_flat_map<F, R, E>(self, mut f: F) -> Result<Multi<R>, E>
+    // where
+    //     F: FnMut(Context, T) -> Result<Multi<R>, E>,
+    // {
+    //     let mut vec = vec![];
 
-        for (c, v) in self {
-            for (c, v) in f(c, v)? {
-                vec.push((c, v))
-            }
-        }
+    //     for (c, v) in self {
+    //         for (c, v) in f(c, v)? {
+    //             vec.push((c, v))
+    //         }
+    //     }
 
-        Ok(Multi { vec })
-    }
+    //     Ok(Multi { vec })
+    // }
 }
 
 impl<T> Multi<Multi<T>> {
@@ -91,43 +91,36 @@ impl<T> Multi<Multi<T>> {
 }
 
 impl<T, E> Multi<Result<T, E>> {
-    // pub fn try_map<F, R>(self, mut f: F) -> Multi<Result<R, E>>
-    // where
-    //     F: FnMut(Context, T) -> (Context, R),
-    // {
-    //     self.map(|ctx, v| match v {
-    //         Ok(v) => {
-    //             let (ctx, out) = f(ctx, v);
-    //             (ctx, Ok(out))
-    //         },
-    //         Err(err) => (ctx, Err(err)),
-    //     })
-    // }
+    pub fn try_map<F, R>(self, mut f: F) -> Multi<Result<R, E>>
+    where
+        F: FnMut(Context, T) -> (Context, Result<R, E>),
+    {
+        self.map(|ctx, v| match v {
+            Ok(v) => {
+                let (ctx, out) = f(ctx, v);
+                (ctx, out)
+            },
+            Err(err) => (ctx, Err(err)),
+        })
+    }
 
-    // pub fn try_flat_map<F, R>(self, mut f: F) -> Multi<Result<R, E>>
-    // where
-    //     F: FnMut(Context, T) -> Multi<R>,
-    // {
-    //     let mut out = Multi { vec: vec![] };
+    pub fn try_flat_map<F, R>(self, mut f: F) -> Multi<Result<R, E>>
+    where
+        F: FnMut(Context, T) -> Multi<Result<R, E>>,
+    {
+        let mut out = Multi { vec: vec![] };
 
-    //     for (ctx, v) in self {
-    //         match v {
-    //             Ok(v) => {
-    //                 for (ctx, v) in f(ctx, v) {
-    //                     out.vec.push((ctx, Ok(v)))
-    //                 }
-    //             },
-    //             Err(err) => out.vec.push((ctx, Err(err))),
-    //         }
-    //     }
+        for (ctx, v) in self {
+            match v {
+                Ok(v) => {
+                    for (ctx, v) in f(ctx, v) {
+                        out.vec.push((ctx, v))
+                    }
+                },
+                Err(err) => out.vec.push((ctx, Err(err))),
+            }
+        }
 
-    //     out
-    // }
-
-    // pub fn try_map<F, R, E>(self, mut f: F) -> Result<Multi<R>, E>
-    // where
-    //     F: FnMut(Context, T) -> Result<(Context, R), E>,
-    // {
-    //     self.into_iter().map(|(c, v)| f(c, v)).collect()
-    // }
+        out
+    }
 }

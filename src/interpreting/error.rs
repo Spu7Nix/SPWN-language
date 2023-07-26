@@ -15,13 +15,14 @@ error_maker! {
     Extra: {
         vm: &Vm,
     }
-    #[derive(delve::EnumVariantNames, PartialEq, Hash)]
-    #[delve(rename_variants = "SCREAMING_SNAKE_CASE")]
+    #[derive(strum::EnumDiscriminants, PartialEq)]
+    #[strum_discriminants(name(ErrorDiscriminants), derive(delve::EnumVariantNames), delve(rename_variants = "SCREAMING_SNAKE_CASE"))]
     pub enum RuntimeError {
 
         // ==================================================================
         #[
             Message: "Invalid operands", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Invalid operands for `{}` operator": op.to_str();
                 a.1 => "This is of type {}": a.0.runtime_display(vm);
@@ -39,6 +40,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Invalid unary operand", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Invalid operand for `{}` unary operator": op.to_str();
                 v.1 => "This is of type {}": v.0.runtime_display(vm);
@@ -54,6 +56,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Type mismatch", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Expected {}, found {}": {
                     use itertools::Itertools;
@@ -98,6 +101,7 @@ error_maker! {
                 ValueType::Custom(..) => Some("Try overloading the `_iter_` method (`#[overload = _iter_]`)".into()),
                 _ => None,
             };
+            Main Area: area;
             Labels: [
                 area => "Cannot iterate over {}": value.0.runtime_display(vm);
                 value.1 => "Value defined as {} here": value.0.runtime_display(vm);
@@ -112,6 +116,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Cannot instance builtin type", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Cannot instance builtin type {}": typ.runtime_display(vm);
             ]
@@ -139,6 +144,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Too many arguments", Note: None;
+            Main Area: call_area;
             Labels: [
                 call_area => "Received {} arguments, expected {}": call_arg_amount, macro_arg_amount;
                 macro_def_area => "Macro defined to take {} arguments here": macro_arg_amount;
@@ -155,6 +161,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Unknown keyword argument", Note: None;
+            Main Area: call_area;
             Labels: [
                 macro_def_area => "Macro defined to take these arguments";
                 call_area => "Keyword argument `{}` received here": name;
@@ -185,6 +192,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Argument not satisfied", Note: None;
+            Main Area: call_area;
             Labels: [
                 macro_def_area => "Macro defined to take these arguments";
                 call_area => "Argument {} not satisfied": match arg {
@@ -204,6 +212,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Pattern mismatch", Note: None;
+            Main Area: pattern_area;
             Labels: [
                 pattern_area => "The {} doesn't match this pattern": v.0.runtime_display(vm);
                 v.1 => "Value defined as {} here": v.0.runtime_display(vm);
@@ -236,6 +245,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Nonexistent member", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Member `{}` does not exist on this {}": member, base_type.runtime_display(vm);
             ]
@@ -250,6 +260,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Tried to access private member", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Member `{}` is private": member;
             ]
@@ -263,6 +274,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Nonexistent associated member", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Associated member `{}` does not exist on {}": member, base_type.runtime_display(vm);
             ]
@@ -281,6 +293,7 @@ error_maker! {
             } else {
                 None
             };
+            Main Area: area;
             Labels: [
                 area => "Member `{}` implemented on type {} is not a method": member_name, base_type.runtime_display(vm);
                 def_area => "Member defined as {} here": member_type.runtime_display(vm);
@@ -298,6 +311,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Nonexistent type member", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Type {} does not exist in this module": format!("@{type_name}");
             ]
@@ -311,6 +325,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Tried to access private type", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Type {} is private": format!("@{type_name}");
             ]
@@ -324,6 +339,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Invalid index", Note: None;
+            Main Area: area;
             Labels: [
                 area => "{} cannot be indexed by {}": base.0.runtime_display(vm), index.0.runtime_display(vm);
                 base.1 => "This is of type {}": base.0.runtime_display(vm);
@@ -340,6 +356,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Index out of bounds", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Index {} is out of bounds for this {} of length {}": index, typ.runtime_display(vm), len;
             ]
@@ -393,6 +410,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Thrown error", Note: None;
+            Main Area: area;
             Labels: [
                 area => "{}": "69";
             ]
@@ -406,6 +424,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Cannot implement on a builtin type", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Implementation happens here";
             ]
@@ -418,6 +437,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Returning twice from this macro/module is not allowed", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Context split happens here";
             ]
@@ -430,6 +450,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Attempted to divide by zero", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Division occurs here";
             ]
@@ -443,6 +464,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Recursion limit", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Reached maximum recursion limit from this macro call";
             ]
@@ -454,22 +476,8 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: "Invalid type for overload", Note: None;
-            Labels: [
-                area => "Call of `{}` occurrs here": builtin;
-                // -> error.to_report(vm).labels
-            ]
-        ]
-        InvalidTypeForOverload {
-            area: CodeArea,
-            // error: Box<RuntimeError>,
-            // builtin: &'static str,
-        },
-
-
-        // ==================================================================
-        #[
             Message: format!("Error `{}` occurred while running an overload", error.to_report(vm).message), Note: None;
+            Main Area: area;
             Labels: [
                 area => "Call of `{}` occurrs here": builtin;
                 -> error.to_report(vm).labels
@@ -514,3 +522,5 @@ error_maker! {
 
 //     pub fn get
 // }
+
+// impl R

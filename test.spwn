@@ -1,43 +1,22 @@
 
 
-// bob = () {
-//     1 + "gaga";
-// }
 
 
-// try {
-//     bob()
-// } catch e {
-//     dbg e;
-// }
-
-
-// dick = () {
-
-// }
-
-// dick(3)
-
-
-type @fuck
-
-
-impl @fuck {
-    _index_: (&self, idx) {
-        return self.biddy[idx]
-    },
-    _display_: (self) {
-        1 + "fff"
-        // return f"biddle: {self.biddy}"
-    }
+m = () {
+    throw "you are dynb"
 }
 
+mut a = [(() {
+    -> return 0
+    return 10
+})(), 2]
 
-mut a = @fuck::{
-    dog: 5,
-    biddy: [1, 2, 3]
-};
-dbg a;
-a[2] += 69
 dbg a;
 
+try {
+    throw a
+} catch &mut e {
+    e[0] += 7;    
+}
+
+dbg a;

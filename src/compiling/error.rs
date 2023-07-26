@@ -13,6 +13,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Nonexistent variable", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Variable `{}` does not exist": var;
             ]
@@ -26,6 +27,7 @@ error_maker! {
         #[
             Message: "Tried to modify an immutable variable",
             Note: Some(format!("Use `{}` to define a variable as mutable: `mut {var} = ...`", hyperlink("https://spu7nix.net/spwn/#/triggerlanguage/1variables?id=variables", Some("mut"))));
+            Main Area: area;
             Labels: [
                 def_area => "Variable `{}` defined as immutable here": var;
                 area => "Tried to modify it here";
@@ -40,6 +42,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Illegal action inside trigger function", Note: None;
+            Main Area: area;
             Labels: [
                 def => "Trigger function defined here";
                 area => "This is not allowed inside a trigger function";
@@ -53,6 +56,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Illegal action inside arrow statement", Note: None;
+            Main Area: area;
             Labels: [
                 def => "Arrow statement defined here";
                 area => "This is not allowed inside an arrow statement";
@@ -66,6 +70,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Return used outside of macro", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Return used here";
             ]
@@ -77,6 +82,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Invalid module return", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Module return expects a dictionary value";
             ]
@@ -88,6 +94,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Duplicate module return", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Invalid second module return found here";
                 prev_area => "Previous module return used here";
@@ -101,6 +108,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Break used outside of loop", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Break used here";
             ]
@@ -112,6 +120,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Continue used outside of loop", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Continue used here";
             ]
@@ -123,6 +132,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Type definition outside global scope", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Type definitions can only be used on the top level";
             ]
@@ -134,6 +144,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Duplicate type definition", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Duplicate type defined here";
                 prev_area => "Previously defined here";
@@ -147,6 +158,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Duplicate imported type name", Note: None;
+            Main Area: area;
             Labels: [
                 area => "This type definition has the same name as a type from within a previous `extract import`";
             ]
@@ -158,6 +170,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Import could not be resolved", Note: None;
+            Main Area: area;
             Labels: [
                 area => "{} `{}` could not be found": => (if *is_file { "File" } else { "Library" }), name;
             ]
@@ -171,6 +184,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Cannot override builtin type", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Tried to override a builtin type here";
             ]
@@ -182,6 +196,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Syntax error in import", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Syntax error occured while importing this {}": => (if *is_file { "file" } else { "library" });
                 -> err.to_report().labels
@@ -196,6 +211,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Nonexistent type", Note: None;
+            Main Area: area;
             Labels: [
                 area => "Type {} does not exist or has not been imported and extracted": format!("@{type_name}");
             ]
@@ -208,6 +224,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Illegal pattern for augmented assigment", Note: None;
+            Main Area: area;
             Labels: [
                 area => "This pattern cannot be assigned to";
             ]
@@ -219,6 +236,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Illegal pattern for assigment", Note: None;
+            Main Area: area;
             Labels: [
                 area => "This pattern cannot be assigned to";
             ]
@@ -230,6 +248,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "`builtin` attribute used outside of core", Note: None;
+            Main Area: area;
             Labels: [
                 area => "This attribute is only allowed inside the core";
             ]
@@ -241,6 +260,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Invalid type for attribute argument", Note: None;
+            Main Area: args_area;
             Labels: [
                 args_area => "Expected type `{}`": expected;
             ]

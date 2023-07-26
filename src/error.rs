@@ -77,6 +77,7 @@ macro_rules! error_maker {
             $(
                 #[
                     Message: $msg:expr, Note: $note:expr;
+                    Main Area: $main_area:expr;
                     Labels: [
                         $(
                             $l_area:expr => $fmt:literal $(: $( $($e:expr)? $(=>($e_no_col:expr))? ),+)?;
@@ -152,6 +153,14 @@ macro_rules! error_maker {
                             },
                             note: $note.map(|s: String| s.to_string()),
                         },
+                    )*
+                }
+            }
+
+            pub fn get_main_area(&self) -> &CodeArea {
+                match self {
+                    $(
+                        $enum::$err_name { $($field,)* $($call_stack)? } => $main_area,
                     )*
                 }
             }
