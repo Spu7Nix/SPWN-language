@@ -22,7 +22,7 @@ use crate::compiling::builder::ProtoBytecode;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Ast, PatternNode, Vis};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap};
-use crate::util::{ImmutStr, ImmutVec, Interner, SlabMap};
+use crate::util::{ImmutStr, ImmutStr32, ImmutVec, Interner, SlabMap, Str32, String32};
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
@@ -126,13 +126,8 @@ impl Compiler<'_> {
         self.interner.borrow().resolve(s).into()
     }
 
-    fn resolve_arr(&self, s: &Spur) -> ImmutVec<char> {
-        self.interner
-            .borrow()
-            .resolve(s)
-            .chars()
-            .collect_vec()
-            .into()
+    fn resolve_32(&self, s: &Spur) -> ImmutStr32 {
+        String32::from_chars(self.interner.borrow().resolve(s).chars().collect_vec()).into()
     }
 
     pub fn src_hash(&self) -> u32 {

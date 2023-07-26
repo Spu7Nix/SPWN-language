@@ -338,8 +338,8 @@ impl Compiler<'_> {
             };
             let k = builder.next_reg();
 
-            let chars = self.resolve_arr(&item.value().name.value);
-            builder.load_const::<ImmutVec<char>>(chars, k, item.value().name.span);
+            let chars = self.resolve_32(&item.value().name.value);
+            builder.load_const(chars, k, item.value().name.span);
 
             builder.insert_dict_elem(r, out, k, span, item.is_priv())
         }

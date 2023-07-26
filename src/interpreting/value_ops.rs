@@ -1,11 +1,14 @@
 use std::rc::Rc;
 
+use itertools::Itertools;
+
 use super::error::RuntimeError;
 use super::value::{StoredValue, Value, ValueType};
 use super::vm::{Program, RuntimeResult, Vm};
 use crate::parsing::ast::VisTrait;
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::CodeSpan;
+use crate::util::{Str32, String32};
 
 pub fn to_bool(
     v: &StoredValue,
@@ -67,25 +70,6 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
         _ => a == b,
     }
 }
-pub fn as_op(
-    a: &StoredValue,
-    b: &StoredValue,
-    span: CodeSpan,
-    vm: &Vm,
-    program: &Rc<Program>,
-) -> RuntimeResult<Value> {
-    Ok(if let Value::Type(b) = &b.value {
-        vm.convert_type(a, *b, span, program)?
-    } else {
-        return Err(RuntimeError::TypeMismatch {
-            value_type: b.value.get_type(),
-            value_area: b.area.clone(),
-            area: vm.make_area(span, program),
-            expected: &[ValueType::Type],
-            call_stack: vm.get_call_stack(),
-        });
-    })
-}
 
 pub fn in_op(
     a: &StoredValue,
@@ -126,7 +110,14 @@ pub fn plus(
         (Value::Float(a), Value::Int(b)) => Value::Float(*a + *b as f64),
 
         (Value::String(a), Value::String(b)) => {
-            Value::String(a.iter().chain(b.iter()).copied().collect())
+            let v = String32::from_chars(
+                a.as_char_slice()
+                    .iter()
+                    .chain(b.as_char_slice().iter())
+                    .copied()
+                    .collect_vec(),
+            );
+            Value::String(v.into())
         },
         _ => {
             return Err(RuntimeError::InvalidOperands {
@@ -177,13 +168,9 @@ pub fn mult(
         (Value::Int(a), Value::Float(b)) => Value::Float(*a as f64 * *b),
         (Value::Float(a), Value::Int(b)) => Value::Float(*a * *b as f64),
 
-        (Value::Int(n), Value::String(s)) | (Value::String(s), Value::Int(n)) => Value::String(
-            s.iter()
-                .copied()
-                .cycle()
-                .take(s.len() * (*n).max(0) as usize)
-                .collect(),
-        ),
+        (Value::Int(n), Value::String(s)) | (Value::String(s), Value::Int(n)) => {
+            Value::String(s.as_ref().repeat((*n).max(0) as usize).into())
+        },
 
         _ => {
             return Err(RuntimeError::InvalidOperands {

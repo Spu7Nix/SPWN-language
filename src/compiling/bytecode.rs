@@ -19,7 +19,7 @@ use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Vis, VisTrait};
 use crate::sources::{CodeSpan, Spanned, SpwnSource};
-use crate::util::{remove_quotes, Digest, ImmutStr, ImmutVec, SlabMap};
+use crate::util::{remove_quotes, Digest, ImmutStr, ImmutStr32, ImmutVec, SlabMap};
 
 #[derive(Clone, Debug, From, EnumDisplay, Serialize, Deserialize)]
 pub enum Constant {
@@ -29,8 +29,8 @@ pub enum Constant {
     Float(f64),
     #[delve(display = |i: &bool| format!("{i}"))]
     Bool(bool),
-    #[delve(display = |i: &ImmutVec<char>| format!("{:?}", String::from_iter(i.iter())))]
-    String(ImmutVec<char>),
+    #[delve(display = |i: &ImmutStr32| format!("{:?}", i))]
+    String(ImmutStr32),
     #[delve(display = |t: &ValueType| {
         format!(
             "@{}",
@@ -313,16 +313,21 @@ mod debug_bytecode {
                             .to_string(),
                         snippet: {
                             let mut s = code[span.start..span.end].to_string();
-                            if s.len() >= 15 {
+                            let chars = s.chars().collect_vec();
+                            if chars.len() >= 15 {
                                 s = format!(
                                     "{}{}{}",
                                     {
-                                        let s = format!("{:?}", &s[..7]);
+                                        let s =
+                                            format!("{:?}", chars[..7].iter().collect::<String>());
                                         remove_quotes(&s).to_string()
                                     },
                                     "...".dimmed(),
                                     {
-                                        let s = format!("{:?}", &s[s.len() - 7..]);
+                                        let s = format!(
+                                            "{:?}",
+                                            chars[chars.len() - 7..].iter().collect::<String>()
+                                        );
                                         remove_quotes(&s).to_string()
                                     }
                                 )

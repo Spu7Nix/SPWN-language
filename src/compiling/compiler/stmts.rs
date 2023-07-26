@@ -303,7 +303,7 @@ impl<'a> Compiler<'a> {
                     local: id,
                     source_hash: self.src_hash(),
                 };
-                let name_str = self.resolve_arr(name.value());
+                let name_str = self.resolve_32(name.value());
                 self.type_def_map.insert(
                     custom_id,
                     TypeDef {
@@ -336,7 +336,7 @@ impl<'a> Compiler<'a> {
                     builder.member(
                         import_reg,
                         var_reg,
-                        self.resolve_arr(&spur).spanned(stmt.span),
+                        self.resolve_32(&spur).spanned(stmt.span),
                         stmt.span,
                     )
                 }

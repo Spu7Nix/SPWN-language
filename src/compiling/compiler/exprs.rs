@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use base64::Engine;
 use itertools::{Either, Itertools};
+use widestring::utf32str;
 
 use super::{CompileResult, Compiler, ScopeID};
 use crate::compiling::builder::{CodeBuilder, JumpType};
@@ -17,7 +18,7 @@ use crate::parsing::ast::{
 };
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::{CodeSpan, Spannable, SpwnSource, ZEROSPAN};
-use crate::util::ImmutVec;
+use crate::util::{ImmutStr32, ImmutVec, Str32, String32};
 
 impl Compiler<'_> {
     pub fn compile_expr(
@@ -49,25 +50,21 @@ impl Compiler<'_> {
                         if content.flags.base64 {
                             s = base64::engine::general_purpose::URL_SAFE.encode(s)
                         }
-                        builder.load_const(
-                            s.chars().collect_vec().into_boxed_slice(),
+                        builder.load_const::<ImmutStr32>(
+                            String32::from_str(&s).into(),
                             out_reg,
                             expr.span,
                         )
                     },
                     StringType::FString(v) => {
-                        builder.load_const(
-                            "".chars().collect_vec().into_boxed_slice(),
-                            out_reg,
-                            expr.span,
-                        );
+                        builder.load_const::<ImmutStr32>(utf32str!("").into(), out_reg, expr.span);
                         for i in v {
                             let s_r = builder.next_reg();
                             match i {
                                 Either::Left(s) => {
                                     let s = self.resolve(s);
-                                    builder.load_const(
-                                        s.chars().collect_vec().into_boxed_slice(),
+                                    builder.load_const::<ImmutStr32>(
+                                        String32::from_str(&s).into(),
                                         s_r,
                                         expr.span,
                                     );
@@ -271,19 +268,19 @@ impl Compiler<'_> {
             Expression::Member { base, name } => {
                 let base = self.compile_expr(base, scope, builder)?;
                 let out = builder.next_reg();
-                builder.member(base, out, name.map(|v| self.resolve_arr(&v)), expr.span);
+                builder.member(base, out, name.map(|v| self.resolve_32(&v)), expr.span);
                 Ok(out)
             },
             Expression::TypeMember { base, name } => {
                 let base = self.compile_expr(base, scope, builder)?;
                 let out = builder.next_reg();
-                builder.type_member(base, out, name.map(|v| self.resolve_arr(&v)), expr.span);
+                builder.type_member(base, out, name.map(|v| self.resolve_32(&v)), expr.span);
                 Ok(out)
             },
             Expression::Associated { base, name } => {
                 let base = self.compile_expr(base, scope, builder)?;
                 let out = builder.next_reg();
-                builder.associated(base, out, name.map(|v| self.resolve_arr(&v)), expr.span);
+                builder.associated(base, out, name.map(|v| self.resolve_32(&v)), expr.span);
                 Ok(out)
             },
             Expression::Call {

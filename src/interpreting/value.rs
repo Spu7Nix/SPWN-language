@@ -9,7 +9,9 @@ use itertools::Itertools;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
+use super::context::Context;
 use super::error::ErrorDiscriminants;
+use super::multi::Multi;
 use super::vm::{FuncCoord, Program, RuntimeResult, Vm};
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::{CustomTypeID, LocalTypeID};
@@ -19,20 +21,45 @@ use crate::interpreting::vm::ValueRef;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{MacroArg, Vis, VisSource, VisTrait};
 use crate::sources::{CodeArea, Spanned};
-use crate::util::{ImmutCloneStr, ImmutCloneVec, ImmutStr, ImmutVec};
+use crate::util::{ImmutCloneStr, ImmutCloneStr32, ImmutCloneVec, ImmutStr, ImmutVec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
-pub struct BuiltinFn(pub fn(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<()>);
+pub struct BuiltinFn(
+    pub  fn(
+        Vec<ValueRef>,
+        Context,
+        &mut Vm,
+        &Rc<Program>,
+        CodeArea,
+    ) -> Multi<RuntimeResult<ValueRef>>,
+);
 
 #[derive(Clone)]
 pub struct BuiltinClosure(
-    pub Rc<RefCell<dyn FnMut(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<()>>>,
+    pub  Rc<
+        RefCell<
+            dyn FnMut(
+                Vec<ValueRef>,
+                Context,
+                &mut Vm,
+                &Rc<Program>,
+                CodeArea,
+            ) -> Multi<RuntimeResult<ValueRef>>,
+        >,
+    >,
 );
 
 impl BuiltinClosure {
     pub fn new<F>(f: F) -> Self
     where
-        F: FnMut(Vec<ValueRef>, &mut Vm, &Rc<Program>, CodeArea) -> RuntimeResult<()> + 'static,
+        F: FnMut(
+                Vec<ValueRef>,
+                Context,
+                &mut Vm,
+                &Rc<Program>,
+                CodeArea,
+            ) -> Multi<RuntimeResult<ValueRef>>
+            + 'static,
     {
         Self(Rc::new(RefCell::new(f)))
     }
@@ -336,7 +363,8 @@ pub enum MacroTarget {
         captured: ImmutVec<ValueRef>,
     },
     FullyRust {
-        fn_ptr: BuiltinClosure,
+        fn_ptr: BuiltinFn,
+        captured: ImmutVec<ValueRef>,
         args: ImmutVec<ImmutStr>,
         spread_arg: Option<u8>,
     },
@@ -356,10 +384,10 @@ value! {
     Int(i64),
     Float(f64),
     Bool(bool),
-    String(ImmutCloneVec<char>),
+    String(ImmutCloneStr32),
 
     Array(Vec<ValueRef>),
-    Dict(AHashMap<ImmutCloneVec<char>, VisSource<ValueRef>>),
+    Dict(AHashMap<ImmutCloneStr32, VisSource<ValueRef>>),
 
     Group(Id),
     Channel(Id),
@@ -385,7 +413,7 @@ value! {
     Type(ValueType),
 
     Module {
-        exports: AHashMap<ImmutCloneVec<char>, ValueRef>,
+        exports: AHashMap<ImmutCloneStr32, ValueRef>,
         types: Vec<Vis<CustomTypeID>>,
     },
 
@@ -408,7 +436,7 @@ value! {
 
     => Instance {
         typ: CustomTypeID,
-        items: AHashMap<ImmutCloneVec<char>, VisSource<ValueRef>>,
+        items: AHashMap<ImmutCloneStr32, VisSource<ValueRef>>,
     },
 }
 
@@ -417,7 +445,7 @@ impl ValueType {
         format!(
             "@{}",
             match self {
-                Self::Custom(t) => vm.type_def_map[&t].name.iter().collect::<String>(),
+                Self::Custom(t) => vm.type_def_map[&t].name.as_ref().to_string(),
                 _ => <ValueType as Into<&str>>::into(self).into(),
             }
         )

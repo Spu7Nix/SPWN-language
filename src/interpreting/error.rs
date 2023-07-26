@@ -489,6 +489,33 @@ error_maker! {
             builtin: &'static str,
         },
 
+        // ==================================================================
+        #[
+            Message: "Cannot convert type", Note: None;
+            Main Area: from_area;
+            Labels: [
+                from_area => "{} can't be converted to a {}": from_type.runtime_display(vm), to.runtime_display(vm);
+            ]
+        ]
+        CannotConvert {
+            from_type: ValueType,
+            from_area: CodeArea,
+            to: ValueType,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Invalid string for conversion", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "This string cannot be converted to {}": to.runtime_display(vm);
+            ]
+        ]
+        InvalidStringForConversion {
+            area: CodeArea,
+            to: ValueType,
+        },
+
 
         // // ============================ BUILTIN FUNC ERRORS ============================
 

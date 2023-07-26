@@ -10,12 +10,15 @@ use std::process::Output;
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use bincode::de;
 use colored::{ColoredString, Colorize};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use slab::Slab;
+use widestring::{Utf32Str, Utf32String};
 
 pub type RandomState = ahash::RandomState;
 pub type Interner = lasso::Rodeo<lasso::Spur, RandomState>;
@@ -205,8 +208,14 @@ lazy_static! {
 // something like String in the case of no mutability
 // specky are you reading this if you
 // a re reading this specky tag me on SPWN point server and say "Laaaaaaaa". Do it. please(it would be cool)_
+
+pub type Str32 = Utf32Str;
+pub type String32 = Utf32String;
+
 pub type ImmutCloneStr = Rc<str>;
 pub type ImmutStr = Box<str>;
+pub type ImmutCloneStr32 = Rc<Str32>;
+pub type ImmutStr32 = Box<Str32>;
 pub type ImmutCloneVec<T> = Rc<[T]>;
 pub type ImmutVec<T> = Box<[T]>;
 
@@ -324,16 +333,16 @@ pub fn remove_quotes(s: &str) -> &str {
     &s[1..(s.len() - 1)]
 }
 
-struct Dink {
-    gog: usize,
-    fuck: Vec<f64>,
-}
+// struct Dink {
+//     gog: usize,
+//     fuck: Vec<f64>,
+// }
 
-fn bink(v: &Rc<RefCell<Dink>>) -> std::cell::Ref<'_, Vec<f64>> {
-    std::cell::Ref::map(v.borrow(), |r| &r.fuck)
-}
+// fn bink(v: &Rc<RefCell<Dink>>) -> std::cell::Ref<'_, Vec<f64>> {
+//     std::cell::Ref::map(v.borrow(), |r| &r.fuck)
+// }
 
-enum Bunk {
-    Dig(u8),
-    Fuck(u8, u16),
-}
+// enum Bunk {
+//     Dig(u8),
+//     Fuck(u8, u16),
+// }

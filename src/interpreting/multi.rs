@@ -48,34 +48,12 @@ impl<T> Multi<T> {
         self.into_iter().map(|(c, v)| f(c, v)).collect()
     }
 
-    // pub fn try_map<F, R, E>(self, mut f: F) -> Result<Multi<R>, E>
-    // where
-    //     F: FnMut(Context, T) -> Result<(Context, R), E>,
-    // {
-    //     self.into_iter().map(|(c, v)| f(c, v)).collect()
-    // }
-
     pub fn flat_map<F, R>(self, mut f: F) -> Multi<R>
     where
         F: FnMut(Context, T) -> Multi<R>,
     {
         self.into_iter().flat_map(|(c, v)| f(c, v)).collect()
     }
-
-    // pub fn try_flat_map<F, R, E>(self, mut f: F) -> Result<Multi<R>, E>
-    // where
-    //     F: FnMut(Context, T) -> Result<Multi<R>, E>,
-    // {
-    //     let mut vec = vec![];
-
-    //     for (c, v) in self {
-    //         for (c, v) in f(c, v)? {
-    //             vec.push((c, v))
-    //         }
-    //     }
-
-    //     Ok(Multi { vec })
-    // }
 }
 
 impl<T> Multi<Multi<T>> {

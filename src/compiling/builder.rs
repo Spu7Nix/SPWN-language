@@ -15,7 +15,7 @@ use crate::compiling::opcodes::OptOpcode;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
-use crate::util::{ImmutStr, ImmutVec, SlabMap, UniqueRegister};
+use crate::util::{ImmutStr, ImmutStr32, ImmutVec, SlabMap, UniqueRegister};
 
 new_id_wrapper! {
     BlockID: u16;
@@ -548,7 +548,7 @@ impl<'a> CodeBuilder<'a> {
         &mut self,
         from: UnoptRegister,
         dest: UnoptRegister,
-        member: Spanned<ImmutVec<char>>,
+        member: Spanned<ImmutStr32>,
         span: CodeSpan,
     ) {
         let next_reg = self.next_reg();
@@ -567,7 +567,7 @@ impl<'a> CodeBuilder<'a> {
         &mut self,
         from: UnoptRegister,
         dest: UnoptRegister,
-        member: Spanned<ImmutVec<char>>,
+        member: Spanned<ImmutStr32>,
         span: CodeSpan,
     ) {
         let next_reg = self.next_reg();
@@ -586,7 +586,7 @@ impl<'a> CodeBuilder<'a> {
         &mut self,
         from: UnoptRegister,
         dest: UnoptRegister,
-        member: Spanned<ImmutVec<char>>,
+        member: Spanned<ImmutStr32>,
         span: CodeSpan,
     ) {
         let next_reg = self.next_reg();
@@ -641,7 +641,7 @@ impl<'a> CodeBuilder<'a> {
     //     self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::IndexSetMem { index }), span)
     // }
 
-    // pub fn member_set_mem(&mut self, member: Spanned<ImmutVec<char>>, span: CodeSpan) {
+    // pub fn member_set_mem(&mut self, member: Spanned<ImmutStr32>, span: CodeSpan) {
     //     let next_reg = self.next_reg();
     //     self.load_const(member.value, next_reg, member.span);
     //     self.push_opcode(

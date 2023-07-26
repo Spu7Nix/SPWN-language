@@ -1,4 +1,4 @@
-// mod core;
+mod core;
 
 use std::rc::Rc;
 
@@ -11,43 +11,51 @@ use crate::sources::CodeArea;
 #[macro_export]
 macro_rules! raw_macro {
     (
-        fn $fn_name:ident( $($args:tt)* ) { $($code:tt)*} $vm:ident $program:ident $area:ident
+        fn $fn_name:ident( $($args:tt)* ) { $($code:tt)*} $ctx:ident $vm:ident $program:ident $area:ident
     ) => {
         #[allow(unused)]
         pub fn $fn_name(
             mut args: Vec<$crate::interpreting::vm::ValueRef>,
+            $ctx: $crate::interpreting::context::Context,
             $vm: &mut $crate::Vm,
             $program: &std::rc::Rc<$crate::Program>,
             $area: $crate::sources::CodeArea,
-        ) -> $crate::interpreting::vm::RuntimeResult<()> {
+        ) -> $crate::interpreting::multi::Multi<
+            $crate::interpreting::vm::RuntimeResult<
+                $crate::interpreting::vm::ValueRef
+            >
+        > {
             // $crate::interpreting::value::Value
             use $crate::interpreting::value::value_structs::*;
             
             $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
             $crate::interpreting::builtins::impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
-            use $crate::interpreting::builtins::RustFnReturn;
-                $($code)* .rust_fn_return($vm, &$area, $program)?;
-            Ok(())
+            
+            $($code)*
         }
     };
     (
-        let $fn_name:ident = ( $($args:tt)* ) { $($code:tt)*} $vm:ident $program:ident $area:ident
+        let $fn_name:ident = ( $($args:tt)* ) { $($code:tt)*} $ctx:ident $vm:ident $program:ident $area:ident
     ) => {
         #[allow(unused)]
         let $fn_name = move |
             mut args: Vec<$crate::interpreting::vm::ValueRef>,
+            $ctx: $crate::interpreting::context::Context,
             $vm: &mut $crate::Vm,
             $program: &std::rc::Rc<$crate::Program>,
             $area: $crate::sources::CodeArea,
-        | -> $crate::interpreting::vm::RuntimeResult<()> {
+        | -> $crate::interpreting::multi::Multi<
+            $crate::interpreting::vm::RuntimeResult<
+                $crate::interpreting::vm::ValueRef
+            >
+        >  {
             // $crate::interpreting::value::Value
             use $crate::interpreting::value::value_structs::*;
             
             $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
             $crate::interpreting::builtins::impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
 
-                $($code)* .rust_fn_return($vm, &$area, $program);
-            Ok(())
+            $($code)*
         };
     }
 }
@@ -72,7 +80,7 @@ macro_rules! impl_type {
                                         $( { $( $c_n:ident: $c_val_s:expr ),* $(,)? } )?;
             )*
 
-            Functions($vm:ident, $program:ident, $area:ident):
+            Functions($ctx:ident, $vm:ident, $program:ident, $area:ident):
             $(
                 // temporary until 1.0
                 $(#[raw($fn_raw:literal)])?
@@ -90,7 +98,7 @@ macro_rules! impl_type {
                 
                 $(
 
-                    $crate::interpreting::builtins::raw_macro! { fn $func_name($($args)*){ $($code)* } $vm $program $area}
+                    $crate::interpreting::builtins::raw_macro! { fn $func_name($($args)*){ $($code)* } $ctx $vm $program $area}
                     // #[allow(unused)]
                     // fn $func_name(
                     //     mut args: Vec<$crate::interpreting::vm::ValueRef>,

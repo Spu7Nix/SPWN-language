@@ -4,34 +4,11 @@
 */
 
 impl @array {
+    
     	
-	#[doc(" tEst")]
-	A: 2,
-    	
-	#[doc("\ndsf \"fuck\"")]
+	#[doc("\nfghfddggfd")]
 	push: #[builtin] (
 		&mut self: @array,
-		bink: _,
-	) {},
-	
-	#[doc("\ndsf \"fuck\"")]
-	map: #[builtin] (
-		self: @array,
-		f: @macro,
-	) {},
-	
-	#[doc("\ndisplay")]
-	_display_: #[builtin] (
-		self: @array,
-	) -> @string {},
-	
-	#[doc("\npanic")]
-	boinky: #[builtin] (
-		boinke: @int,
-	) {},
-	
-	#[doc("\ndghdfgjfhgdfhgjhfd")]
-	_iter_: #[builtin] (
-		self: @array,
+		elem: _,
 	) {},
 }

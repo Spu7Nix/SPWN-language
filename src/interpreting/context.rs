@@ -34,6 +34,44 @@ pub struct TryCatch {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum ContextStorage {
+    Single(ValueRef),
+    Vec(Vec<ValueRef>),
+}
+
+impl ContextStorage {
+    pub fn single(&self) -> &ValueRef {
+        if let Self::Single(v) = self {
+            return v;
+        }
+        panic!("go fuck yourself")
+    }
+
+    pub fn vec(&self) -> &Vec<ValueRef> {
+        if let Self::Vec(v) = self {
+            return v;
+        }
+        panic!("go fuck yourself")
+    }
+
+    pub fn single_mut(&mut self) -> &mut ValueRef {
+        if let Self::Single(v) = self {
+            return v;
+        }
+        panic!("go fuck yourself")
+    }
+
+    pub fn vec_mut(&mut self) -> &mut Vec<ValueRef> {
+        if let Self::Vec(v) = self {
+            return v;
+        }
+        panic!("go fuck yourself")
+    }
+}
+
+/// <h1> HDMIEFHMSMSMAMAMAM GET MOLEY ON YOUR PHONEI AM GOING TO EAT this LITTLE CHINESE BOY!! </h1>
+/// I am going to Eat this LIttle CHINESE BOY how old are you 18 LOUDER 18 I have have him absolutely giftwrapped in my signature details single button narrow peak lapelle
+#[derive(Debug, Clone, PartialEq)]
 pub struct Context {
     pub unique_id: usize,
 
@@ -43,6 +81,8 @@ pub struct Context {
     pub stack: Vec<StackItem>,
 
     pub returned: RuntimeResult<Option<ValueRef>>,
+
+    pub storage: AHashMap<&'static str, ContextStorage>,
 }
 
 impl Eq for Context {
@@ -72,6 +112,7 @@ impl Context {
             group: Id::Specific(0),
             stack: vec![],
             returned: Ok(None),
+            storage: AHashMap::new(),
         }
     }
 
@@ -171,6 +212,23 @@ impl Vm {
         for stack_item in &mut new.stack {
             for reg in stack_item.registers.iter_mut() {
                 *reg = reg.deep_clone_checked(self, &mut Some(&mut clone_map));
+            }
+        }
+
+        if let Ok(Some(v)) = &mut new.returned {
+            *v = v.deep_clone_checked(self, &mut Some(&mut clone_map))
+        }
+
+        for (_, v) in &mut new.storage {
+            match v {
+                ContextStorage::Single(v) => {
+                    *v = v.deep_clone_checked(self, &mut Some(&mut clone_map))
+                },
+                ContextStorage::Vec(v) => {
+                    for v in v {
+                        *v = v.deep_clone_checked(self, &mut Some(&mut clone_map))
+                    }
+                },
             }
         }
 

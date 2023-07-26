@@ -6,13 +6,14 @@ use std::rc::Rc;
 
 use ahash::AHashMap;
 use derive_more::{Deref, DerefMut, Index, IndexMut};
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeSeq;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::compiling::bytecode::Bytecode;
 use crate::compiling::compiler::{CustomTypeID, TypeDef};
 use crate::new_id_wrapper;
 use crate::parsing::ast::ImportSettings;
-use crate::util::{hyperlink, ImmutStr, ImmutVec, SlabMap};
+use crate::util::{hyperlink, ImmutStr, ImmutStr32, ImmutVec, SlabMap};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpwnSource {
@@ -192,4 +193,4 @@ impl Debug for CodeArea {
 pub struct BytecodeMap(AHashMap<SpwnSource, Rc<Bytecode>>);
 
 #[derive(Default, Deref, DerefMut, Index, IndexMut)]
-pub struct TypeDefMap(AHashMap<CustomTypeID, TypeDef<ImmutVec<char>>>);
+pub struct TypeDefMap(AHashMap<CustomTypeID, TypeDef<ImmutStr32>>);

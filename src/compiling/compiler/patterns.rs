@@ -81,13 +81,13 @@ impl Compiler<'_> {
                         builder.index(path_reg, path_reg, v, span);
                     },
                     AssignPath::Member(v) => {
-                        builder.member(path_reg, path_reg, self.resolve_arr(v).spanned(span), span);
+                        builder.member(path_reg, path_reg, self.resolve_32(v).spanned(span), span);
                     },
                     AssignPath::Associated(v) => {
                         builder.associated(
                             path_reg,
                             path_reg,
-                            self.resolve_arr(v).spanned(span),
+                            self.resolve_32(v).spanned(span),
                             span,
                         );
                     },

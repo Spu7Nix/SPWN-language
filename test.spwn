@@ -1,22 +1,31 @@
 
 
 
+import "libraries/core/array.spwn"
 
-m = () {
-    throw "you are dynb"
-}
 
-mut a = [(() {
-    -> return 0
-    return 10
-})(), 2]
+impl @array {
+    map: (self, f) {
+        mut out = []
+        mut i = 0;
+        while i < self.length {
+            out.push(f(self[i]));
+            i += 1;
+        }
+        // for v in self {
+        //     // cock = f(v)
+        //     out.push(f(v))
+        // }
+        return out
+    }
+}//mMDOWOSAISAH get MOLEY on YORU PHOne
 
-dbg a;
+// a = [1, 2, 3]
+// a.push(4)
 
-try {
-    throw a
-} catch &mut e {
-    e[0] += 7;    
-}
-
-dbg a;
+dbg [1, 2, 3].map((x) {
+    -> return x
+    return x * 10
+    // -> return x * 100
+    // -> return x * 1000
+})
