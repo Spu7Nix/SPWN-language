@@ -1,5 +1,7 @@
 #![allow(clippy::result_large_err)]
 #![deny(unused_must_use)]
+#![feature(unboxed_closures)]
+#![feature(fn_traits)]
 
 use std::cell::RefCell;
 use std::error::Error;

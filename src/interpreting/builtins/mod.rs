@@ -35,28 +35,97 @@ macro_rules! raw_macro {
         }
     };
     (
-        let $fn_name:ident = ( $($args:tt)* ) { $($code:tt)*} $ctx:ident $vm:ident $program:ident $area:ident
+        let $fn_name:ident = [ $slf:ident;
+            $(
+                $capture:ident: $c_typ:ty $(= $c_var:expr)? $(=> $ref_iter:expr)?
+            ),* 
+            $(,)?
+        ]( $($args:tt)* ) { $($code:tt)*} $ctx:ident $vm:ident $program:ident $area:ident $extra:ident
     ) => {
-        #[allow(unused)]
-        let $fn_name = move |
-            mut args: Vec<$crate::interpreting::vm::ValueRef>,
-            $ctx: $crate::interpreting::context::Context,
-            $vm: &mut $crate::Vm,
-            $program: &std::rc::Rc<$crate::Program>,
-            $area: $crate::sources::CodeArea,
-        | -> $crate::interpreting::multi::Multi<
-            $crate::interpreting::vm::RuntimeResult<
-                $crate::interpreting::vm::ValueRef
-            >
-        >  {
-            // $crate::interpreting::value::Value
-            use $crate::interpreting::value::value_structs::*;
-            
-            $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
-            $crate::interpreting::builtins::impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
 
-            $($code)*
-        };
+        paste::paste! {
+            randsym::randsym! {
+                #[allow(non_camel_case_types)]
+                #[derive(Clone, Debug)]
+                pub struct /?@data/ {
+                    $(
+                        pub $capture: $c_typ,
+                    )*
+                    __fn: fn(
+                        Vec<$crate::interpreting::vm::ValueRef>,
+                        $crate::interpreting::context::Context,
+                        &mut $crate::Vm,
+                        &std::rc::Rc<$crate::Program>,
+                        $crate::sources::CodeArea,
+
+                        &mut /?@data/,
+                    ) -> $crate::interpreting::multi::Multi<
+                        $crate::interpreting::vm::RuntimeResult<
+                            $crate::interpreting::vm::ValueRef
+                        >
+                    >
+                }
+                type Args<'a, 'b> = (Vec<ValueRef>, Context, &'a mut Vm, &'b Rc<Program>, CodeArea);
+                impl FnOnce<Args<'_, '_>> for /?@data/ {
+                    type Output = Multi<RuntimeResult<ValueRef>>;
+                
+                    extern "rust-call" fn call_once(mut self, args: Args) -> Self::Output {
+                        (self.__fn)(args.0, args.1, args.2, args.3, args.4, &mut self)
+                    }
+                }
+                impl FnMut<Args<'_, '_>> for /?@data/ {
+                    extern "rust-call" fn call_mut(&mut self, args: Args) -> Self::Output {
+                        (self.__fn)(args.0, args.1, args.2, args.3, args.4, self)
+                    }
+                }
+                impl BuiltinClosure for /?@data/ {
+                    fn shallow_clone(&self) -> Rc<RefCell<dyn BuiltinClosure>> {
+                        Rc::new(RefCell::new(self.clone()))
+                    }
+                    fn get_mut_refs<'a>(&'a mut $slf) -> Box<dyn Iterator<Item = &'a mut ValueRef> + 'a> {
+                        let iter = [].into_iter()
+                        $(
+                            $(.chain($ref_iter))?
+                        )*
+                        ;
+
+                        Box::new(iter)
+                    }
+                }
+
+                #[allow(unused)]
+                let $fn_name = {
+                    #[allow(unused)]
+                    fn temp(
+                        mut args: Vec<$crate::interpreting::vm::ValueRef>,
+                        $ctx: $crate::interpreting::context::Context,
+                        $vm: &mut $crate::Vm,
+                        $program: &std::rc::Rc<$crate::Program>,
+                        $area: $crate::sources::CodeArea,
+
+                        $extra: &mut /?@data/,
+                    ) -> $crate::interpreting::multi::Multi<
+                        $crate::interpreting::vm::RuntimeResult<
+                            $crate::interpreting::vm::ValueRef
+                        >
+                    > {
+                        // $crate::interpreting::value::Value
+                        use $crate::interpreting::value::value_structs::*;
+                        
+                        $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
+                        $crate::interpreting::builtins::impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
+                        
+                        $($code)*
+                    }
+                    /?@data/ {
+                        $(
+                            $capture $(: $c_var)?,
+                        )*
+                        __fn: temp
+                    }
+                };
+            }
+        }
     }
 }
 

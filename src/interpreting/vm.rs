@@ -326,7 +326,11 @@ impl DeepClone<&StoredValue> for Vm {
                             *r = r.deep_clone_checked(self, map)
                         }
                     },
-                    MacroTarget::FullyRust { .. } => (),
+                    MacroTarget::FullyRust { fn_ptr, .. } => {
+                        let new = fn_ptr.borrow().shallow_clone();
+                        new.borrow_mut().deep_clone_inner_refs(self, map);
+                        *fn_ptr = new;
+                    },
                 }
                 if matches!(v, Value::Macro(_)) {
                     Value::Macro(new_data)
@@ -1785,7 +1789,7 @@ impl Vm {
                         let fn_ptr = fn_ptr.clone();
                         mem::drop(base);
 
-                        let out = fn_ptr.0.borrow_mut()(
+                        let x = fn_ptr.borrow_mut()(
                             {
                                 let mut out = Vec::with_capacity(fill.len());
                                 for (_, arg) in fill.clone().into_iter().enumerate() {
@@ -1805,7 +1809,7 @@ impl Vm {
                             program,
                             call_area.clone(),
                         );
-                        out
+                        x
                     },
                 }
             },
@@ -2089,7 +2093,7 @@ impl Vm {
                         args,
                         spread_arg,
                     } => {
-                        fn_ptr.hash(state);
+                        (fn_ptr.as_ref() as *const _ as *const () as usize).hash(state);
                         args.hash(state);
                         spread_arg.hash(state);
                     },
@@ -2374,29 +2378,29 @@ impl Vm {
     ) -> Multi<RuntimeResult<MacroData>> {
         let data = match &value.borrow().value {
             Value::Array(arr) => {
-                let mut n = 0usize;
-
-                // ctx.storage.insert("arr", Storag)
+                let n = 0usize;
 
                 let arr = arr.clone();
 
                 builtins::raw_macro! {
-                    let next = () {
-                        let ret = if n >= arr.len() {
+                    let next = [ self;
+                        arr: Vec<ValueRef> => self.arr.iter_mut(),
+                        n: usize,
+                    ] () {
+                        let ret = if extra.n >= extra.arr.len() {
                             Value::Maybe(None)
                         } else {
-                            let n = arr[n].clone();
+                            let n = extra.arr[extra.n].clone();
                             Value::Maybe(Some(n))
                         };
-                        n += 1;
+                        extra.n += 1;
 
                         Multi::new_single(ctx, Ok(ValueRef::new(ret.into_stored(area))))
-                    } ctx vm program area
+                    } ctx vm program area extra
                 }
-
                 MacroData {
                     target: MacroTarget::FullyRust {
-                        fn_ptr: BuiltinClosure::new(next),
+                        fn_ptr: Rc::new(RefCell::new(next)),
                         args: Box::new([]),
                         spread_arg: None,
                     },

@@ -9,7 +9,7 @@ use itertools::Itertools;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
-use super::context::Context;
+use super::context::{CloneMap, Context};
 use super::error::ErrorDiscriminants;
 use super::multi::Multi;
 use super::vm::{FuncCoord, Program, RuntimeResult, Vm};
@@ -34,55 +34,89 @@ pub struct BuiltinFn(
     ) -> Multi<RuntimeResult<ValueRef>>,
 );
 
-#[derive(Clone)]
-pub struct BuiltinClosure(
-    pub  Rc<
-        RefCell<
-            dyn FnMut(
-                Vec<ValueRef>,
-                Context,
-                &mut Vm,
-                &Rc<Program>,
-                CodeArea,
-            ) -> Multi<RuntimeResult<ValueRef>>,
-        >,
-    >,
-);
-
-impl BuiltinClosure {
-    pub fn new<F>(f: F) -> Self
-    where
-        F: FnMut(
-                Vec<ValueRef>,
-                Context,
-                &mut Vm,
-                &Rc<Program>,
-                CodeArea,
-            ) -> Multi<RuntimeResult<ValueRef>>
-            + 'static,
-    {
-        Self(Rc::new(RefCell::new(f)))
+pub trait BuiltinClosure:
+    FnMut(Vec<ValueRef>, Context, &mut Vm, &Rc<Program>, CodeArea) -> Multi<RuntimeResult<ValueRef>>
+    + Debug
+{
+    fn shallow_clone(&self) -> Rc<RefCell<dyn BuiltinClosure>>;
+    fn get_mut_refs<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut ValueRef> + 'a>;
+    fn deep_clone_inner_refs(&mut self, vm: &Vm, map: &mut Option<&mut CloneMap>) {
+        for v in self.get_mut_refs() {
+            *v = v.deep_clone_checked(vm, map);
+        }
     }
+    // fn deep_clone_checked(&self, vm: &Vm, map: &mut Option<&mut CloneMap>) -> Self {
+    //     if let Some(m) = map {
+    //         if let Some(v) = m.get(self) {
+    //             return v.clone();
+    //         }
+    //         let new = vm.deep_clone_ref_map(self, map);
+    //         // goofy thing to avoid borrow checker
+    //         if let Some(m) = map {
+    //             m.insert(self, new.clone());
+    //         }
+    //         return new;
+    //     }
+    //     vm.deep_clone_ref_map(self, map)
+    // }
+    // fn closure_eq(&self) -> Box<dyn BuiltinClosure>;
 }
 
-impl Debug for BuiltinClosure {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "BuiltinClosure at {:?}", Rc::as_ptr(&self.0))
-    }
-}
+// macro_rules! builtin- {
+//     () => {
 
-impl PartialEq for BuiltinClosure {
-    #[allow(clippy::vtable_address_comparisons)]
-    fn eq(&self, other: &Self) -> bool {
-        Rc::as_ptr(&self.0) == Rc::as_ptr(&other.0)
-    }
-}
+//     };
+// }
 
-impl Hash for BuiltinClosure {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
-    }
-}
+// #[derive(Clone)]
+// pub struct BuiltinClosure(
+//     pub  Rc<
+//         RefCell<
+//             dyn FnMut(
+//                 Vec<ValueRef>,
+//                 Context,
+//                 &mut Vm,
+//                 &Rc<Program>,
+//                 CodeArea,
+//             ) -> Multi<RuntimeResult<ValueRef>>,
+//         >,
+//     >,
+// );
+
+// impl BuiltinClosure {
+//     pub fn new<F>(f: F) -> Self
+//     where
+//         F: FnMut(
+//                 Vec<ValueRef>,
+//                 Context,
+//                 &mut Vm,
+//                 &Rc<Program>,
+//                 CodeArea,
+//             ) -> Multi<RuntimeResult<ValueRef>>
+//             + 'static,
+//     {
+//         Self(Rc::new(RefCell::new(f)))
+//     }
+// }
+
+// impl Debug for BuiltinClosure {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "BuiltinClosure at {:?}", Rc::as_ptr(&self.0))
+//     }
+// }
+
+// impl PartialEq for BuiltinClosure {
+//     #[allow(clippy::vtable_address_comparisons)]
+//     fn eq(&self, other: &Self) -> bool {
+//         Rc::as_ptr(&self.0) == Rc::as_ptr(&other.0)
+//     }
+// }
+
+// impl Hash for BuiltinClosure {
+//     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+//         Rc::as_ptr(&self.0).hash(state);
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -355,7 +389,7 @@ macro_rules! value {
 //     }
 // }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum MacroTarget {
     Spwn {
         func: FuncCoord,
@@ -363,11 +397,42 @@ pub enum MacroTarget {
         captured: ImmutVec<ValueRef>,
     },
     FullyRust {
-        fn_ptr: BuiltinFn,
-        captured: ImmutVec<ValueRef>,
+        fn_ptr: Rc<RefCell<dyn BuiltinClosure>>,
         args: ImmutVec<ImmutStr>,
         spread_arg: Option<u8>,
     },
+}
+
+impl PartialEq for MacroTarget {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Spwn {
+                    func: l_func,
+                    is_builtin: l_is_builtin,
+                    captured: l_captured,
+                },
+                Self::Spwn {
+                    func: r_func,
+                    is_builtin: r_is_builtin,
+                    captured: r_captured,
+                },
+            ) => l_func == r_func && l_is_builtin == r_is_builtin && l_captured == r_captured,
+            (
+                Self::FullyRust {
+                    fn_ptr: l_fn_ptr,
+                    args: l_args,
+                    spread_arg: l_spread_arg,
+                },
+                Self::FullyRust {
+                    fn_ptr: r_fn_ptr,
+                    args: r_args,
+                    spread_arg: r_spread_arg,
+                },
+            ) => Rc::ptr_eq(l_fn_ptr, r_fn_ptr) && l_args == r_args && l_spread_arg == r_spread_arg,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

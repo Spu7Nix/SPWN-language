@@ -7,25 +7,14 @@ import "libraries/core/array.spwn"
 impl @array {
     map: (self, f) {
         mut out = []
-        mut i = 0;
-        while i < self.length {
-            out.push(f(self[i]));
-            i += 1;
+        for v in self {
+            out.push(f(v))
         }
-        // for v in self {
-        //     // cock = f(v)
-        //     out.push(f(v))
-        // }
         return out
     }
 }//mMDOWOSAISAH get MOLEY on YORU PHOne
 
-// a = [1, 2, 3]
-// a.push(4)
-
 dbg [1, 2, 3].map((x) {
     -> return x
     return x * 10
-    // -> return x * 100
-    // -> return x * 1000
 })
