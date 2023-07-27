@@ -337,6 +337,7 @@ impl<'a> Compiler<'a> {
                         import_reg,
                         var_reg,
                         self.resolve_32(&spur).spanned(stmt.span),
+                        false,
                         stmt.span,
                     )
                 }

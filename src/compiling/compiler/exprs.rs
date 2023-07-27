@@ -266,9 +266,17 @@ impl Compiler<'_> {
                 Ok(out)
             },
             Expression::Member { base, name } => {
+                let base_mut = self.is_mut_expr(base, scope)?;
+
                 let base = self.compile_expr(base, scope, builder)?;
                 let out = builder.next_reg();
-                builder.member(base, out, name.map(|v| self.resolve_32(&v)), expr.span);
+                builder.member(
+                    base,
+                    out,
+                    name.map(|v| self.resolve_32(&v)),
+                    base_mut,
+                    expr.span,
+                );
                 Ok(out)
             },
             Expression::TypeMember { base, name } => {
@@ -292,15 +300,22 @@ impl Compiler<'_> {
 
                 let positional = params
                     .iter()
-                    .map(|p| self.compile_expr(p, scope, builder))
+                    .map(|p| {
+                        Ok((
+                            self.compile_expr(p, scope, builder)?,
+                            self.is_mut_expr(p, scope)?,
+                        ))
+                    })
                     .collect::<Result<Vec<_>, _>>()?
                     .into_boxed_slice();
 
                 let named = named_params
                     .iter()
                     .map(|(s, p)| {
-                        self.compile_expr(p, scope, builder)
-                            .map(|v| (self.resolve(&s.value), v))
+                        match self.compile_expr(p, scope, builder) {
+                            Ok(v) => Ok((self.resolve(&s.value), v, self.is_mut_expr(p, scope)?)),
+                            Err(e) => return Err(e), // e?
+                        }
                     })
                     .collect::<Result<Vec<_>, _>>()?
                     .into_boxed_slice();
@@ -332,14 +347,18 @@ impl Compiler<'_> {
                             if let Some(e) = default {
                                 s = s.extend(e.span)
                             }
-                            pattern.pat.get_name().map(|s| self.resolve(&s)).spanned(s)
+                            (
+                                pattern.pat.get_name().map(|s| self.resolve(&s)),
+                                pattern.pat.needs_mut(),
+                            )
+                                .spanned(s)
                         },
                         MacroArg::Spread { pattern } => {
                             spread_arg = Some(i as u8);
-                            pattern
-                                .pat
-                                .get_name()
-                                .map(|s| self.resolve(&s))
+                            (
+                                pattern.pat.get_name().map(|s| self.resolve(&s)),
+                                pattern.pat.needs_mut(),
+                            )
                                 .spanned(pattern.span)
                         },
                     })

@@ -15,7 +15,9 @@ use super::context::{CallInfo, CloneMap, Context, ContextStack, FullContext, Sta
 use super::multi::Multi;
 use super::value::{MacroTarget, StoredValue, Value, ValueType};
 use super::value_ops;
-use crate::compiling::bytecode::{Bytecode, CallExpr, Constant, Function, OptRegister, Register};
+use crate::compiling::bytecode::{
+    Bytecode, CallExpr, Constant, Function, Mutability, OptRegister, Register,
+};
 use crate::compiling::opcodes::{CallExprID, ConstID, Opcode};
 use crate::gd::gd_object::{make_spawn_trigger, TriggerObject, TriggerOrder};
 use crate::gd::ids::{IDClass, Id};
@@ -1047,7 +1049,10 @@ impl Vm {
 
                         return Ok(LoopFlow::ContinueLoop);
                     },
-                    Opcode::Member { from, dest, member } => {
+                    o @ (Opcode::MemberImmut { from, dest, member }
+                    | Opcode::MemberMut { from, dest, member }) => {
+                        let base_mut = matches!(o, Opcode::MemberMut { .. });
+
                         let key = match &self.get_reg_ref(member).borrow().value {
                             Value::String(s) => s.clone(),
                             _ => unreachable!(),
@@ -1156,10 +1161,6 @@ impl Vm {
                                     error!(base_type)
                                 };
                                 let Some(r) = members.get(&key) else {
-                                    // for (k, _) in members.iter() {
-                                    //     println!("({})", k);
-                                    // }
-                                    // println!("{:#?}", self.impls);
                                     error!(base_type)
                                 };
 
@@ -1169,10 +1170,25 @@ impl Vm {
                                     self_arg,
 
                                     is_method,
+                                    target,
                                     ..
                                 }) = &mut v.value
                                 {
                                     if *is_method {
+                                        if let MacroTarget::Spwn { func, .. } = target {
+                                            let needs_mut = func.get_func().args[0].value.1;
+
+                                            if needs_mut && !base_mut {
+                                                return Err(RuntimeError::ArgumentNotMutable {
+                                                    call_area: self
+                                                        .make_area(opcode_span, &program),
+                                                    macro_def_area: v.area.clone(),
+                                                    arg: Either::Left("self".into()),
+                                                    call_stack: self.get_call_stack(),
+                                                });
+                                            }
+                                        }
+
                                         *self_arg = Some(self.get_reg_ref(from).clone())
                                     } else {
                                         return Err(RuntimeError::AssociatedMemberNotAMethod {
@@ -1346,13 +1362,13 @@ impl Vm {
                             positional: call
                                 .positional
                                 .iter()
-                                .map(|r| self.get_reg_ref(*r).clone())
+                                .map(|(r, m)| (self.get_reg_ref(*r).clone(), *m))
                                 .collect_vec()
                                 .into(),
                             named: call
                                 .named
                                 .iter()
-                                .map(|(s, r)| (s.clone(), self.get_reg_ref(*r).clone()))
+                                .map(|(s, r, m)| (s.clone(), self.get_reg_ref(*r).clone(), *m))
                                 .collect_vec()
                                 .into(),
                         };
@@ -1614,8 +1630,8 @@ impl Vm {
         &mut self,
         ctx: Context,
         base: ValueRef,
-        positional_args: &[ValueRef],
-        named_args: &[(ImmutStr, ValueRef)],
+        positional_args: &[(ValueRef, Mutability)],
+        named_args: &[(ImmutStr, ValueRef, Mutability)],
         call_area: CodeArea,
         program: &Rc<Program>,
     ) -> Multi<RuntimeResult<ValueRef>> {
@@ -1624,39 +1640,41 @@ impl Vm {
 
         match &base.value {
             Value::Macro(data) | Value::Iterator(data) => {
-                let (args, spread_arg): (Box<dyn Iterator<Item = Option<&ImmutStr>>>, _) =
-                    match &data.target {
-                        MacroTarget::Spwn { func, .. } => {
-                            let f = func.get_func();
-                            (
-                                Box::new(f.args.iter().map(|v| v.value.as_ref())),
-                                f.spread_arg,
-                            )
-                        },
-                        MacroTarget::FullyRust {
-                            args, spread_arg, ..
-                        } => (Box::new(args.iter().map(Some)), *spread_arg),
-                    };
+                let (args, spread_arg): (
+                    Box<dyn Iterator<Item = (Option<&ImmutStr>, Mutability)>>,
+                    _,
+                ) = match &data.target {
+                    MacroTarget::Spwn { func, .. } => {
+                        let f = func.get_func();
+                        (
+                            Box::new(f.args.iter().map(|v| (v.value.0.as_ref(), v.value.1))),
+                            f.spread_arg,
+                        )
+                    },
+                    MacroTarget::FullyRust {
+                        args, spread_arg, ..
+                    } => (Box::new(args.iter().map(|v| (Some(v), false))), *spread_arg),
+                };
 
                 #[derive(Clone)]
                 enum ArgFill {
-                    Single(Option<ValueRef>, Option<ImmutStr>),
-                    Spread(Vec<ValueRef>),
+                    Single(Option<ValueRef>, Option<ImmutStr>, bool),
+                    Spread(Vec<ValueRef>, bool),
                 }
 
                 let mut arg_name_map = AHashMap::new();
 
                 let mut fill = args
                     .enumerate()
-                    .map(|(i, arg)| {
+                    .map(|(i, (arg, m))| {
                         if let Some(name) = &arg {
                             arg_name_map.insert(&**name, i);
                         }
 
                         if spread_arg == Some(i as u8) {
-                            ArgFill::Spread(vec![])
+                            ArgFill::Spread(vec![], m)
                         } else {
-                            ArgFill::Single(None, arg.cloned())
+                            ArgFill::Single(None, arg.cloned(), m)
                         }
                     })
                     .collect_vec();
@@ -1665,7 +1683,7 @@ impl Vm {
 
                 if data.is_method && data.self_arg.is_some() {
                     match fill.get_mut(next_arg_idx) {
-                        Some(ArgFill::Single(v, _)) => {
+                        Some(ArgFill::Single(v, ..)) => {
                             *v = data.self_arg.clone();
                             next_arg_idx += 1;
                         },
@@ -1673,13 +1691,41 @@ impl Vm {
                     }
                 }
 
-                for arg in positional_args.iter() {
+                for (idx, (arg, is_mutable)) in positional_args.iter().enumerate() {
                     match fill.get_mut(next_arg_idx) {
-                        Some(ArgFill::Single(opt, ..)) => {
+                        Some(ArgFill::Single(opt, n, needs_mutable)) => {
+                            if *needs_mutable && !is_mutable {
+                                return Multi::new_single(
+                                    ctx,
+                                    Err(RuntimeError::ArgumentNotMutable {
+                                        call_area,
+                                        macro_def_area: base_area,
+                                        arg: match n {
+                                            Some(name) => Either::Left(name.to_string()),
+                                            None => Either::Right(idx),
+                                        },
+                                        call_stack: self.get_call_stack(),
+                                    }),
+                                );
+                            }
+
                             *opt = Some(arg.clone());
                             next_arg_idx += 1;
                         },
-                        Some(ArgFill::Spread(s)) => s.push(arg.clone()),
+                        Some(ArgFill::Spread(s, needs_mutable)) => {
+                            if *needs_mutable && !is_mutable {
+                                return Multi::new_single(
+                                    ctx,
+                                    Err(RuntimeError::ArgumentNotMutable {
+                                        call_area,
+                                        macro_def_area: base_area,
+                                        arg: Either::Right(idx),
+                                        call_stack: self.get_call_stack(),
+                                    }),
+                                );
+                            }
+                            s.push(arg.clone())
+                        },
                         None => {
                             return Multi::new_single(
                                 ctx,
@@ -1695,23 +1741,34 @@ impl Vm {
                     }
                 }
 
-                for (name, arg) in named_args.iter() {
+                for (name, arg, is_mutable) in named_args.iter() {
                     let Some(idx) = arg_name_map.get(name) else {
-                    return Multi::new_single(
-                        ctx,
-                        Err(RuntimeError::UnknownKeywordArgument {
-                            name: name.to_string(),
-                            macro_def_area: base_area,
-                            call_area,
-                            call_stack: self.get_call_stack(),
-                        }),
-                    )
-                };
+                        return Multi::new_single(
+                            ctx,
+                            Err(RuntimeError::UnknownKeywordArgument {
+                                name: name.to_string(),
+                                macro_def_area: base_area,
+                                call_area,
+                                call_stack: self.get_call_stack(),
+                            }),
+                        )
+                    };
                     match &mut fill[*idx] {
-                        ArgFill::Single(opt, ..) => {
+                        ArgFill::Single(opt, _, needs_mutable) => {
+                            if *needs_mutable && !is_mutable {
+                                return Multi::new_single(
+                                    ctx,
+                                    Err(RuntimeError::ArgumentNotMutable {
+                                        call_area,
+                                        macro_def_area: base_area,
+                                        arg: Either::Left(name.to_string()),
+                                        call_stack: self.get_call_stack(),
+                                    }),
+                                );
+                            }
                             *opt = Some(arg.clone());
                         },
-                        ArgFill::Spread(_) => {
+                        ArgFill::Spread(..) => {
                             return Multi::new_single(
                                 ctx,
                                 Err(RuntimeError::UnknownKeywordArgument {
@@ -1726,7 +1783,7 @@ impl Vm {
                 }
 
                 for (i, arg) in fill.iter().enumerate() {
-                    if let ArgFill::Single(None, name) = arg {
+                    if let ArgFill::Single(None, name, ..) = arg {
                         return Multi::new_single(
                             ctx,
                             Err(RuntimeError::ArgumentNotSatisfied {
@@ -1771,7 +1828,7 @@ impl Vm {
                                         ArgFill::Single(Some(r), ..) => {
                                             vm.change_reg(Register(i as u8), r);
                                         },
-                                        ArgFill::Spread(v) => {
+                                        ArgFill::Spread(v, ..) => {
                                             vm.change_reg(
                                                 Register(i as u8),
                                                 StoredValue {
@@ -1803,11 +1860,11 @@ impl Vm {
                                 for (_, arg) in fill.clone().into_iter().enumerate() {
                                     out.push(match arg {
                                         ArgFill::Single(Some(r), ..) => r,
-                                        ArgFill::Spread(v) => ValueRef::new(StoredValue {
+                                        ArgFill::Spread(v, ..) => ValueRef::new(StoredValue {
                                             value: Value::Array(v),
                                             area: call_area.clone(),
                                         }),
-                                        ArgFill::Single(None, _) => unreachable!(),
+                                        ArgFill::Single(None, ..) => unreachable!(),
                                     })
                                 }
                                 out
@@ -2255,7 +2312,7 @@ impl Vm {
                     let ret = self.call_value(
                         ctx,
                         v.value().clone(),
-                        &[value.clone()],
+                        &[(value.clone(), false)],
                         &[],
                         area.clone(),
                         program,
@@ -2356,7 +2413,7 @@ impl Vm {
                     let ret = self.call_value(
                         ctx,
                         v.value().clone(),
-                        &[base.clone(), index.clone()],
+                        &[(base.clone(), true), (index.clone(), false)],
                         &[],
                         area.clone(),
                         program,
@@ -2454,7 +2511,7 @@ impl Vm {
                     let ret = self.call_value(
                         ctx,
                         v.value().clone(),
-                        &[value.clone()],
+                        &[(value.clone(), true)],
                         &[],
                         area.clone(),
                         program,

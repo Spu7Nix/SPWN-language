@@ -1,29 +1,32 @@
 
 
-
 import "libraries/core/array.spwn"
 
+[1, 2, 3].push(4)
 
 
-type @fib
-
-impl @fib {
-    _iter_: (&mut self) {
-        return () {
-            if self.a > 100 {
-                return ?
-            }
-            ret = self.a?
-            c = self.a + self.b
-            self.a = self.b;
-            self.b = c;
-            return ret
-        } as @iterator
-    }
-}
 
 
-for v in 0..3..11 {
-    dbg v
-}
+
+// type @fib
+
+// impl @fib {
+//     _iter_: (&mut self) {
+//         return () {
+//             if self.a > 100 {
+//                 return ?
+//             }
+//             ret = self.a?
+//             c = self.a + self.b
+//             self.a = self.b;
+//             self.b = c;
+//             return ret
+//         } as @iterator
+//     }
+// }
+
+
+// for v in 0..3..11 {
+//     dbg v
+// }
 

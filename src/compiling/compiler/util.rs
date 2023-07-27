@@ -8,7 +8,9 @@ use crate::compiling::builder::{BlockID, CodeBuilder, JumpType};
 use crate::compiling::bytecode::UnoptRegister;
 use crate::compiling::error::CompileError;
 use crate::interpreting::value::ValueType;
-use crate::parsing::ast::{DictItem, Import, ImportType, PatternNode, Vis, VisTrait};
+use crate::parsing::ast::{
+    DictItem, ExprNode, Expression, Import, ImportType, PatternNode, Vis, VisTrait,
+};
 use crate::parsing::parser::Parser;
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::{ImmutStr, ImmutVec};
@@ -344,5 +346,28 @@ impl Compiler<'_> {
             builder.insert_dict_elem(r, out, k, span, item.is_priv())
         }
         Ok(out)
+    }
+
+    pub fn is_mut_expr(&self, expr: &ExprNode, scope: ScopeID) -> CompileResult<bool> {
+        Ok(match &*expr.expr {
+            Expression::Var(v) => match self.get_var(*v, scope) {
+                Some(v) => v.mutable,
+                None => {
+                    return Err(CompileError::NonexistentVariable {
+                        area: self.make_area(expr.span),
+                        var: self.resolve(v),
+                    })
+                },
+            },
+            Expression::Index { base, .. } => self.is_mut_expr(base, scope)?,
+            Expression::Member { base, .. } => self.is_mut_expr(base, scope)?,
+            Expression::Associated { base, .. } => self.is_mut_expr(base, scope)?,
+            Expression::Ternary {
+                cond,
+                if_true,
+                if_false,
+            } => self.is_mut_expr(if_true, scope)? && self.is_mut_expr(if_false, scope)?,
+            _ => false,
+        })
     }
 }

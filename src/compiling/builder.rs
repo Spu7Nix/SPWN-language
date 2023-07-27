@@ -6,7 +6,7 @@ use itertools::Itertools;
 use semver::Version;
 use slab::Slab;
 
-use super::bytecode::{Bytecode, CallExpr, Constant, Register, UnoptRegister};
+use super::bytecode::{Bytecode, CallExpr, Constant, Mutability, Register, UnoptRegister};
 use super::compiler::{CompileResult, Compiler};
 use super::opcodes::{FuncID, Opcode, UnoptOpcode};
 use crate::compiling::bytecode::Function;
@@ -68,7 +68,7 @@ struct ProtoFunc {
     code: BlockID,
     regs_used: usize,
     span: CodeSpan,
-    args: ImmutVec<Spanned<Option<ImmutStr>>>,
+    args: ImmutVec<Spanned<(Option<ImmutStr>, Mutability)>>,
     spread_arg: Option<u8>,
     captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
 }
@@ -100,7 +100,10 @@ impl ProtoBytecode {
     pub fn new_func<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(
         &mut self,
         f: F,
-        args: (ImmutVec<Spanned<Option<ImmutStr>>>, Option<u8>),
+        args: (
+            ImmutVec<Spanned<(Option<ImmutStr>, Mutability)>>,
+            Option<u8>,
+        ),
         captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
         span: CodeSpan,
     ) -> CompileResult<FuncID> {
@@ -264,14 +267,14 @@ impl ProtoBytecode {
                         .positional
                         .iter()
                         .cloned()
-                        .map(|r| r.try_into().unwrap())
+                        .map(|(r, m)| (r.try_into().unwrap(), m))
                         .collect_vec()
                         .into(),
                     named: ce
                         .named
                         .iter()
                         .cloned()
-                        .map(|(s, r)| (s, r.try_into().unwrap()))
+                        .map(|(s, r, m)| (s, r.try_into().unwrap(), m))
                         .collect_vec()
                         .into(),
                     dest: ce.dest.map(|r| r.try_into().unwrap()),
@@ -344,7 +347,10 @@ impl<'a> CodeBuilder<'a> {
     pub fn new_func<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(
         &mut self,
         f: F,
-        args: (ImmutVec<Spanned<Option<ImmutStr>>>, Option<u8>),
+        args: (
+            ImmutVec<Spanned<(Option<ImmutStr>, Mutability)>>,
+            Option<u8>,
+        ),
         captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
         span: CodeSpan,
     ) -> CompileResult<FuncID> {
@@ -549,16 +555,25 @@ impl<'a> CodeBuilder<'a> {
         from: UnoptRegister,
         dest: UnoptRegister,
         member: Spanned<ImmutStr32>,
+        is_mut: bool,
         span: CodeSpan,
     ) {
         let next_reg = self.next_reg();
         self.load_const(member.value, next_reg, member.span);
         self.push_opcode(
-            ProtoOpcode::Raw(UnoptOpcode::Member {
-                from,
-                dest,
-                member: next_reg,
-            }),
+            if is_mut {
+                ProtoOpcode::Raw(UnoptOpcode::MemberMut {
+                    from,
+                    dest,
+                    member: next_reg,
+                })
+            } else {
+                ProtoOpcode::Raw(UnoptOpcode::MemberImmut {
+                    from,
+                    dest,
+                    member: next_reg,
+                })
+            },
             span,
         )
     }

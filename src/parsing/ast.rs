@@ -12,6 +12,7 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
+use crate::compiling::bytecode::Mutability;
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
 use crate::interpreting::value::Value;
@@ -418,6 +419,24 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
             Pattern::Path { var, path, .. } if path.is_empty() => Some(*var),
             Pattern::Both(a, ..) => a.pat.get_name(),
             _ => None,
+        }
+    }
+
+    pub fn needs_mut(&self) -> Mutability {
+        match self {
+            Pattern::Either(a, b) | Pattern::Both(a, b) => a.pat.needs_mut() || b.pat.needs_mut(),
+            Pattern::ArrayPattern(elem, ..) => elem.pat.needs_mut(),
+            Pattern::DictPattern(elem) => elem.pat.needs_mut(),
+            Pattern::ArrayDestructure(v) => v.iter().any(|p| p.pat.needs_mut()),
+            Pattern::DictDestructure(map) | Pattern::InstanceDestructure(_, map) => map
+                .iter()
+                .any(|(_, p)| p.as_ref().is_some_and(|p| p.pat.needs_mut())),
+            Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.needs_mut()),
+            Pattern::Path { .. } => false,
+            Pattern::Mut { is_ref, .. } => *is_ref,
+            Pattern::IfGuard { pat, .. } => pat.pat.needs_mut(),
+            Pattern::MacroPattern { .. } => todo!(),
+            _ => false,
         }
     }
 }

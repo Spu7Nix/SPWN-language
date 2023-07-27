@@ -49,8 +49,8 @@ pub enum Constant {
 pub struct CallExpr<Arg, R, S> {
     // pub base: R,
     pub dest: Option<R>,
-    pub positional: ImmutVec<Arg>,
-    pub named: ImmutVec<(S, Arg)>,
+    pub positional: ImmutVec<(Arg, Mutability)>,
+    pub named: ImmutVec<(S, Arg, Mutability)>,
 }
 
 impl Hash for Constant {
@@ -112,6 +112,8 @@ impl TryFrom<UnoptRegister> for OptRegister {
     }
 }
 
+pub type Mutability = bool;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Function {
     pub regs_used: u8,
@@ -119,7 +121,7 @@ pub struct Function {
 
     pub span: CodeSpan,
 
-    pub args: ImmutVec<Spanned<Option<ImmutStr>>>,
+    pub args: ImmutVec<Spanned<(Option<ImmutStr>, Mutability)>>,
     pub spread_arg: Option<u8>,
     pub captured_regs: ImmutVec<(OptRegister, OptRegister)>,
 }
@@ -284,8 +286,8 @@ mod debug_bytecode {
                                     call_expr
                                         .positional
                                         .iter()
-                                        .map(|r| r.to_string().bright_red().to_string())
-                                        .chain(call_expr.named.iter().map(|(name, r)| format!(
+                                        .map(|(r, _)| r.to_string().bright_red().to_string())
+                                        .chain(call_expr.named.iter().map(|(name, r, _)| format!(
                                             "{} = {}",
                                             name,
                                             r.to_string().bright_red()
@@ -405,6 +407,7 @@ mod debug_bytecode {
                                 .map(|(i, f)| {
                                     let s = f
                                         .value
+                                        .0
                                         .as_ref()
                                         .map(|s| s.to_string())
                                         .unwrap_or("\\".bright_red().to_string());

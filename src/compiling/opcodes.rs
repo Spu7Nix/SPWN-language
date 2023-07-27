@@ -237,8 +237,12 @@ opcodes! {
 
     #[delve(display = |b, d, i| format!("{b}[{i}] -> {d}"))]
     Index { [base], [dest], [index] },
+
     #[delve(display = |f, d, i| format!("{f}.{i} -> {d}"))]
-    Member { [from], [dest], [member] },
+    MemberImmut { [from], [dest], [member] },
+    #[delve(display = |f, d, i| format!("(mut) {f}.{i} -> {d}"))]
+    MemberMut { [from], [dest], [member] },
+
     #[delve(display = |f, d, i| format!("{f}::{i} -> {d}"))]
     Associated { [from], [dest], [member] },
     #[delve(display = |f, d, i| format!("{f}.@{i} -> {d}"))]

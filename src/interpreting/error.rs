@@ -9,6 +9,7 @@ use crate::error_maker;
 use crate::interpreting::vm::ValueRef;
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;
+use crate::util::hyperlink;
 
 error_maker! {
     Title: "Runtime Error"
@@ -202,6 +203,26 @@ error_maker! {
             ]
         ]
         ArgumentNotSatisfied {
+            call_area: CodeArea,
+            macro_def_area: CodeArea,
+            arg: Either<String, usize>,
+            [call_stack]
+        },
+
+        // ==================================================================
+        #[
+            Message: "Mutable argument required",
+            Note: Some(format!("Use `{}` to define a variable as mutable: `mut ... = ...`", hyperlink("https://spu7nix.net/spwn/#/triggerlanguage/1variables?id=variables", Some("mut"))));
+            Main Area: call_area;
+            Labels: [
+                macro_def_area => "This macro changes the value of this argument";
+                call_area => "The value passed to argument {} must be mutable": match arg {
+                    Either::Left(name) => format!("`{}`", name),
+                    Either::Right(idx) => format!("at pos {}", idx),
+                };
+            ]
+        ]
+        ArgumentNotMutable {
             call_area: CodeArea,
             macro_def_area: CodeArea,
             arg: Either<String, usize>,
