@@ -4,17 +4,26 @@
 import "libraries/core/array.spwn"
 
 
-impl @array {
-    map: (self, f) {
-        mut out = []
-        for v in self {
-            out.push(f(v))
-        }
-        return out
-    }
-}//mMDOWOSAISAH get MOLEY on YORU PHOne
 
-dbg [1, 2, 3].map((x) {
-    -> return x
-    return x * 10
-})
+type @fib
+
+impl @fib {
+    _iter_: (&mut self) {
+        return () {
+            if self.a > 100 {
+                return ?
+            }
+            ret = self.a?
+            c = self.a + self.b
+            self.a = self.b;
+            self.b = c;
+            return ret
+        } as @iterator
+    }
+}
+
+
+for v in 0..3..11 {
+    dbg v
+}
+

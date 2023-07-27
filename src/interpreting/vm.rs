@@ -711,7 +711,15 @@ impl Vm {
                                     return Ok(LoopFlow::ContinueLoop);
                                 },
                             },
-                            v => unreachable!("{:?}", v),
+                            other => {
+                                return Err(RuntimeError::TypeMismatch {
+                                    value_type: other.get_type(),
+                                    value_area: vref.area.clone(),
+                                    expected: &[ValueType::Maybe],
+                                    area: self.make_area(opcode_span, &program),
+                                    call_stack: self.get_call_stack(),
+                                })
+                            },
                         };
                     },
                     Opcode::IntoIterator { src, dest } => {
@@ -2137,7 +2145,7 @@ impl Vm {
             Value::Int(v) => v.to_string(),
             Value::Float(v) => v.to_string(),
             Value::Bool(v) => v.to_string(),
-            Value::String(v) => format!("{:?}", v),
+            Value::String(v) => v.to_string(),
             Value::Array(arr) => {
                 let mut ret = Multi::new_single(ctx, Ok(vec![]));
 
@@ -2411,7 +2419,62 @@ impl Vm {
                     is_method: false,
                 }
             },
-            _ => todo!(),
+            Value::Range { start, end, step } => {
+                builtins::raw_macro! {
+                    let next = [ self;
+                        n: i64 = *start,
+                        end: i64 = *end,
+                        step: usize = *step,
+                    ] () {
+                        let ret = if extra.n >= extra.end {
+                            Value::Maybe(None)
+                        } else {
+                            Value::Maybe(Some(ValueRef::new(Value::Int(extra.n).into_stored(area.clone()))))
+                        };
+                        extra.n += extra.step as i64;
+
+                        Multi::new_single(ctx, Ok(ValueRef::new(ret.into_stored(area))))
+                    } ctx vm program area extra
+                }
+                MacroData {
+                    target: MacroTarget::FullyRust {
+                        fn_ptr: Rc::new(RefCell::new(next)),
+                        args: Box::new([]),
+                        spread_arg: None,
+                    },
+
+                    defaults: Box::new([]),
+                    self_arg: None,
+
+                    is_method: false,
+                }
+            },
+            v => {
+                if let Some(v) = self.get_impl(v.get_type(), "_iter_") {
+                    let ret = self.call_value(
+                        ctx,
+                        v.value().clone(),
+                        &[value.clone()],
+                        &[],
+                        area.clone(),
+                        program,
+                    );
+
+                    return ret.try_map(|ctx, v| match &v.borrow().value {
+                        Value::Iterator(v) => (ctx, Ok(v.clone())),
+                        _ => todo!(),
+                    });
+                }
+
+                return Multi::new_single(
+                    ctx,
+                    Err(RuntimeError::CannotIterate {
+                        value: (v.get_type(), value.borrow().area.clone()),
+                        area: area.clone(),
+                        call_stack: self.get_call_stack(),
+                    }),
+                );
+            },
         };
 
         Multi::new_single(ctx, Ok(data))
