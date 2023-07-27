@@ -174,6 +174,8 @@ impl Parser<'_> {
                     Operator::Bin(op)
                 } else if let Some(op) = tok.to_assign_op() {
                     Operator::Assign(op)
+                } else if tok == Token::Assign {
+                    Operator::EqAssign
                 } else {
                     return Err(SyntaxError::UnexpectedToken {
                         found: tok,

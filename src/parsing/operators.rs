@@ -17,6 +17,7 @@ macro_rules! operators {
                 Bin(BinOp),
                 Unary(UnaryOp),
                 Assign(AssignOp),
+                EqAssign,
             }
 
             impl Operator {
@@ -25,6 +26,7 @@ macro_rules! operators {
                         Self::Bin(b) => b.to_str(),
                         Self::Unary(u) => u.to_str(),
                         Self::Assign(a) => a.to_str(),
+                        Self::EqAssign => "=",
                     }
                 }
             }

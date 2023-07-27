@@ -2476,6 +2476,45 @@ impl Vm {
                     is_method: false,
                 }
             },
+            Value::Dict(map) => {
+                let n = 0usize;
+
+                let arr = map
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect_vec();
+
+                builtins::raw_macro! {
+                    let next = [ self;
+                        arr: Vec<(ImmutCloneStr32, VisSource<ValueRef>)> => self.arr.iter_mut().map(|(_, v)| v.value_mut()),
+                        n: usize,
+                    ] () {
+                        let ret = if extra.n >= extra.arr.len() {
+                            Value::Maybe(None)
+                        } else {
+                            let (k, v) = extra.arr[extra.n].clone();
+                            let k = ValueRef::new(Value::String(k).into_stored(area.clone()));
+                            let v = v.take_value();
+                            Value::Maybe(Some(ValueRef::new(Value::Array(vec![k, v]).into_stored(area.clone()))))
+                        };
+                        extra.n += 1;
+
+                        Multi::new_single(ctx, Ok(ValueRef::new(ret.into_stored(area))))
+                    } ctx vm program area extra
+                }
+                MacroData {
+                    target: MacroTarget::FullyRust {
+                        fn_ptr: Rc::new(RefCell::new(next)),
+                        args: Box::new([]),
+                        spread_arg: None,
+                    },
+
+                    defaults: Box::new([]),
+                    self_arg: None,
+
+                    is_method: false,
+                }
+            },
             Value::Range { start, end, step } => {
                 builtins::raw_macro! {
                     let next = [ self;

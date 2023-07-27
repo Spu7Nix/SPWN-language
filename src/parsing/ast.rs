@@ -498,6 +498,7 @@ where
 
     fn is_priv(&self) -> bool;
     fn is_pub(&self) -> bool;
+    fn take_value(self) -> Self::Value;
     fn value(&self) -> &Self::Value;
     fn value_mut(&mut self) -> &mut Self::Value;
 
@@ -521,6 +522,13 @@ impl<T> VisTrait for VisSource<T> {
 
     fn is_pub(&self) -> bool {
         matches!(self, VisSource::Public { .. })
+    }
+
+    fn take_value(self) -> Self::Value {
+        match self {
+            VisSource::Public(v) => v,
+            VisSource::Private(v, _) => v,
+        }
     }
 
     fn value(&self) -> &Self::Value {
@@ -579,6 +587,13 @@ impl<T> VisTrait for Vis<T> {
 
     fn is_pub(&self) -> bool {
         matches!(self, Vis::Public { .. })
+    }
+
+    fn take_value(self) -> Self::Value {
+        match self {
+            Vis::Public(v) => v,
+            Vis::Private(v) => v,
+        }
     }
 
     fn value(&self) -> &Self::Value {
