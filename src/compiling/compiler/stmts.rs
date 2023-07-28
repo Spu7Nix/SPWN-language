@@ -358,7 +358,7 @@ impl<'a> Compiler<'a> {
                     stmt.span,
                 );
             },
-            Statement::Overload { op, macros } => todo!(),
+            Statement::Overload { op, branches } => {},
             Statement::Throw(v) => {
                 let v = self.compile_expr(v, scope, builder)?;
                 builder.throw(v, stmt.span);

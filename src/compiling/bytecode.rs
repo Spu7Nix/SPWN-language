@@ -18,6 +18,7 @@ use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Vis, VisTrait};
+use crate::parsing::operators::operators::Operator;
 use crate::sources::{CodeSpan, Spanned, SpwnSource};
 use crate::util::{remove_quotes, Digest, ImmutStr, ImmutStr32, ImmutVec, SlabMap};
 
@@ -135,6 +136,7 @@ pub struct Bytecode {
 
     pub functions: ImmutVec<Function>,
 
+    // pub overload_functions: AHashMap<Operator, FuncID>,
     pub custom_types: AHashMap<CustomTypeID, Vis<Spanned<ImmutStr>>>,
 
     pub export_names: ImmutVec<ImmutStr>,

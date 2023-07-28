@@ -297,6 +297,13 @@ pub enum ObjKeyType {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub struct OverloadBranch {
+    pub args: Vec<PatternNode>,
+    pub code: Statements,
+}
+
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone, EnumToStr)]
 pub enum Statement {
     Expr(ExprNode),
@@ -338,7 +345,7 @@ pub enum Statement {
     },
     Overload {
         op: Operator,
-        macros: Vec<ExprNode>,
+        branches: Vec<OverloadBranch>,
     },
 
     Throw(ExprNode),

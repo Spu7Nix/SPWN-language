@@ -12,7 +12,7 @@ macro_rules! operators {
         pub mod operators {
             use crate::lexing::tokens::Token;
 
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
             pub enum Operator {
                 Bin(BinOp),
                 Unary(UnaryOp),
@@ -31,7 +31,7 @@ macro_rules! operators {
                 }
             }
 
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
             pub enum AssignOp {
                 $(
                     $a_tok,
@@ -39,21 +39,21 @@ macro_rules! operators {
             }
 
 
-            #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+            #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
             pub enum OpType {
                 Left,
                 Right,
                 Unary,
             }
 
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
             pub enum BinOp {
                 $(
                     $($($l_tok,)+)?
                     $($($r_tok,)+)?
                 )+
             }
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
             pub enum UnaryOp {
                 $(
                     $($($u_tok,)+)?
