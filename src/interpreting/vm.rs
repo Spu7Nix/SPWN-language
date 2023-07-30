@@ -27,6 +27,7 @@ use crate::interpreting::context::TryCatch;
 use crate::interpreting::error::RuntimeError;
 use crate::interpreting::value::{BuiltinClosure, MacroData};
 use crate::parsing::ast::{Vis, VisSource, VisTrait};
+use crate::parsing::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap};
 use crate::util::{ImmutCloneStr32, ImmutStr, Str32, String32};
 
@@ -136,7 +137,6 @@ pub struct Vm {
     // readonly
     pub bytecode_map: BytecodeMap,
     pub type_def_map: TypeDefMap,
-    is_doc_gen: bool,
 
     //penis
     pub context_stack: ContextStack,
@@ -147,19 +147,23 @@ pub struct Vm {
     pub id_counters: [u16; 4],
 
     pub impls: AHashMap<ValueType, AHashMap<ImmutCloneStr32, VisSource<ValueRef>>>,
+    pub overloads: AHashMap<Operator, Vec<ValueRef>>,
+
+    pub pattern_mismatch_id_count: usize,
 }
 
 impl Vm {
-    pub fn new(is_doc_gen: bool, type_def_map: TypeDefMap, bytecode_map: BytecodeMap) -> Self {
+    pub fn new(type_def_map: TypeDefMap, bytecode_map: BytecodeMap) -> Self {
         Self {
             context_stack: ContextStack(vec![]),
-            is_doc_gen,
             triggers: vec![],
             trigger_order_count: TriggerOrder::new(),
             type_def_map,
             bytecode_map,
             id_counters: Default::default(),
             impls: AHashMap::new(),
+            overloads: AHashMap::new(),
+            pattern_mismatch_id_count: 0,
         }
     }
 
@@ -517,6 +521,37 @@ impl Vm {
                 //     format!("{}{}->", " ".repeat(func), func),
                 //     ip
                 // );
+
+                macro_rules! bin_op {
+                    ($op:ident, $a:ident, $b:ident, $to:ident) => {{
+                        let mut top = self.context_stack.last_mut().yeet_current().unwrap();
+                        top.ip += 1;
+
+                        self.bin_op(
+                            BinOp::$op,
+                            &program,
+                            $a,
+                            $b,
+                            $to,
+                            top,
+                            &mut out_contexts,
+                            opcode_span,
+                        );
+                        return Ok(LoopFlow::ContinueLoop);
+                    }};
+                }
+                macro_rules! assign_op {
+                    ($op:ident, $a:ident, $b:ident, $to:ident) => {{
+                        let mut top = self.context_stack.last_mut().yeet_current().unwrap();
+                        top.ip += 1;
+
+                        let ret = self.bin_op(BinOp::$op, &program, $a, $b, top, opcode_span);
+
+                        self.change_reg_multi($to, ret, &mut out_contexts);
+                        return Ok(LoopFlow::ContinueLoop);
+                    }};
+                }
+
                 match opcode {
                     Opcode::LoadConst { id, to } => {
                         let value = Value::from_const(self, program.get_constant(id));
@@ -540,58 +575,74 @@ impl Vm {
                     },
                     Opcode::WriteDeep { from, to } => self.write_pointee(to, self.deep_clone(from)),
                     Opcode::Plus { a, b, to } => {
-                        self.bin_op(value_ops::plus, &program, a, b, to, opcode_span)?;
+                        bin_op!(Plus, a, b, to);
                     },
                     Opcode::Minus { a, b, to } => {
-                        self.bin_op(value_ops::minus, &program, a, b, to, opcode_span)?;
+                        bin_op!(Minus, a, b, to);
                     },
                     Opcode::Mult { a, b, to } => {
-                        self.bin_op(value_ops::mult, &program, a, b, to, opcode_span)?;
+                        bin_op!(Mult, a, b, to);
                     },
                     Opcode::Div { a, b, to } => {
-                        self.bin_op(value_ops::div, &program, a, b, to, opcode_span)?;
+                        bin_op!(Div, a, b, to);
                     },
                     Opcode::Mod { a, b, to } => {
-                        self.bin_op(value_ops::modulo, &program, a, b, to, opcode_span)?;
+                        bin_op!(Mod, a, b, to);
                     },
                     Opcode::Pow { a, b, to } => {
-                        self.bin_op(value_ops::pow, &program, a, b, to, opcode_span)?;
+                        bin_op!(Pow, a, b, to);
                     },
                     Opcode::Eq { a, b, to } => {
-                        self.bin_op(value_ops::eq_op, &program, a, b, to, opcode_span)?;
+                        bin_op!(Eq, a, b, to);
                     },
                     Opcode::Neq { a, b, to } => {
-                        self.bin_op(value_ops::neq_op, &program, a, b, to, opcode_span)?;
+                        bin_op!(Neq, a, b, to);
+                    },
+                    Opcode::PureEq { a, b, to } => {
+                        let v = Value::Bool(value_ops::equality(
+                            &self.get_reg_ref(a).borrow().value,
+                            &self.get_reg_ref(b).borrow().value,
+                            self,
+                        ));
+                        self.change_reg(to, v.into_stored(self.make_area(opcode_span, &program)));
+                    },
+                    Opcode::PureNeq { a, b, to } => {
+                        let v = Value::Bool(!value_ops::equality(
+                            &self.get_reg_ref(a).borrow().value,
+                            &self.get_reg_ref(b).borrow().value,
+                            self,
+                        ));
+                        self.change_reg(to, v.into_stored(self.make_area(opcode_span, &program)));
                     },
                     Opcode::Gt { a, b, to } => {
-                        self.bin_op(value_ops::gt, &program, a, b, to, opcode_span)?;
+                        bin_op!(Gt, a, b, to);
                     },
                     Opcode::Gte { a, b, to } => {
-                        self.bin_op(value_ops::gte, &program, a, b, to, opcode_span)?;
+                        bin_op!(Gte, a, b, to);
                     },
                     Opcode::Lt { a, b, to } => {
-                        self.bin_op(value_ops::lt, &program, a, b, to, opcode_span)?;
+                        bin_op!(Lt, a, b, to);
                     },
                     Opcode::Lte { a, b, to } => {
-                        self.bin_op(value_ops::lte, &program, a, b, to, opcode_span)?;
+                        bin_op!(Lte, a, b, to);
                     },
                     Opcode::BinOr { a, b, to } => {
-                        self.bin_op(value_ops::bin_or, &program, a, b, to, opcode_span)?;
+                        bin_op!(BinOr, a, b, to);
                     },
                     Opcode::BinAnd { a, b, to } => {
-                        self.bin_op(value_ops::bin_and, &program, a, b, to, opcode_span)?;
+                        bin_op!(BinAnd, a, b, to);
                     },
                     Opcode::Range { a, b, to } => {
-                        self.bin_op(value_ops::range, &program, a, b, to, opcode_span)?;
+                        bin_op!(Range, a, b, to);
                     },
                     Opcode::In { a, b, to } => {
-                        self.bin_op(value_ops::in_op, &program, a, b, to, opcode_span)?;
+                        bin_op!(In, a, b, to);
                     },
                     Opcode::ShiftLeft { a, b, to } => {
-                        self.bin_op(value_ops::shift_left, &program, a, b, to, opcode_span)?;
+                        bin_op!(ShiftLeft, a, b, to);
                     },
                     Opcode::ShiftRight { a, b, to } => {
-                        self.bin_op(value_ops::shift_right, &program, a, b, to, opcode_span)?;
+                        bin_op!(ShiftRight, a, b, to);
                     },
                     Opcode::As { a, b, to } => {
                         let a = self.get_reg_ref(a).clone();
@@ -629,40 +680,40 @@ impl Vm {
                         }
                     },
                     Opcode::PlusEq { a, b } => {
-                        self.assign_op(value_ops::plus, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::PlusEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::MinusEq { a, b } => {
-                        self.assign_op(value_ops::minus, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::MinusEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::MultEq { a, b } => {
-                        self.assign_op(value_ops::plus, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::MultEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::DivEq { a, b } => {
-                        self.assign_op(value_ops::mult, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::DivEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::PowEq { a, b } => {
-                        self.assign_op(value_ops::pow, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::PowEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::ModEq { a, b } => {
-                        self.assign_op(value_ops::modulo, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::ModEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::BinAndEq { a, b } => {
-                        self.assign_op(value_ops::bin_and, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::BinAndEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::BinOrEq { a, b } => {
-                        self.assign_op(value_ops::bin_or, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::BinOrEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::ShiftLeftEq { a, b } => {
-                        self.assign_op(value_ops::shift_left, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::ShiftLeftEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::ShiftRightEq { a, b } => {
-                        self.assign_op(value_ops::shift_right, &program, a, b, opcode_span)?;
+                        self.assign_op(AssignOp::ShiftRightEq, &program, a, b, opcode_span)?;
                     },
                     Opcode::Not { v, to } => {
-                        self.unary_op(value_ops::unary_not, &program, v, to, opcode_span)?;
+                        self.unary_op(UnaryOp::ExclMark, &program, v, to, opcode_span)?;
                     },
                     Opcode::Negate { v, to } => {
-                        self.unary_op(value_ops::unary_negate, &program, v, to, opcode_span)?;
+                        self.unary_op(UnaryOp::Minus, &program, v, to, opcode_span)?;
                     },
                     Opcode::Jump { to } => {
                         self.context_stack.current_mut().ip = *to as usize;
@@ -1275,7 +1326,7 @@ impl Vm {
                             Value::Array(v) => v.len(),
                             Value::Dict(v) => v.len(),
                             Value::String(v) => v.len(),
-                            v => {
+                            _ => {
                                 unreachable!()
                             },
                         };
@@ -1289,7 +1340,32 @@ impl Vm {
                     Opcode::MismatchThrowIfFalse {
                         check_reg,
                         value_reg,
-                    } => {},
+                    } => {
+                        let id = self.pattern_mismatch_id_count;
+
+                        let check = self.get_reg_ref(check_reg).borrow();
+                        let matches = match &check.value {
+                            Value::Bool(b) => *b,
+                            _ => unreachable!(),
+                        };
+
+                        if !matches {
+                            let pattern_area = check.area.clone();
+
+                            mem::drop(check);
+                            self.pattern_mismatch_id_count += 1;
+
+                            let v = self.get_reg_ref(value_reg).borrow();
+                            let v = (v.value.get_type(), v.area.clone());
+
+                            return Err(RuntimeError::PatternMismatch {
+                                v,
+                                pattern_area,
+                                call_stack: self.get_call_stack(),
+                                id,
+                            });
+                        }
+                    },
                     Opcode::PushTryCatch { reg, to } => {
                         let mut ctx = self.context_stack.current_mut();
                         ctx.stack
@@ -1315,7 +1391,7 @@ impl Vm {
                         };
                         let f = &program.bytecode.functions[func];
 
-                        let mut defaults = vec![None; f.args.len()];
+                        let defaults = vec![None; f.args.len()];
 
                         let captured = f
                             .captured_regs
@@ -1498,6 +1574,13 @@ impl Vm {
                             _ => unreachable!(),
                         };
                         self.context_stack.current_mut().group = group;
+                    },
+                    Opcode::AddOperatorOverload { from, op } => {
+                        let v = self.get_reg_ref(from).clone();
+                        self.overloads.entry(op).or_insert(vec![]).push(v);
+                    },
+                    Opcode::IncMismatchIdCount => {
+                        self.pattern_mismatch_id_count += 1;
                     },
                 }
                 Ok(LoopFlow::Normal)
@@ -1894,43 +1977,84 @@ impl Vm {
     #[inline]
     pub fn bin_op(
         &mut self,
-        op: fn(&StoredValue, &StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>,
+        op: BinOp,
         program: &Rc<Program>,
         left: OptRegister,
         right: OptRegister,
-        dest: OptRegister,
+        to: OptRegister,
+        ctx: Context,
+        out_contexts: &mut Vec<Context>,
         span: CodeSpan,
-    ) -> Result<(), RuntimeError> {
-        // TODO: overloads
+    ) {
+        // TODO: overloads // no longer todo you absolute fucking fuckwit, you fucking dumbass, you are so fucking dumb holy fucking shit, i wish i was an egirl
 
-        let value = op(
-            &self.get_reg_ref(left).borrow(),
-            &self.get_reg_ref(right).borrow(),
-            span,
-            self,
-            program,
-        )?;
+        let left_ref = ctx.stack.last().unwrap().registers[*left as usize].clone();
+        let right_ref = ctx.stack.last().unwrap().registers[*right as usize].clone();
 
-        self.change_reg(
-            dest,
-            StoredValue {
-                value,
-                area: self.make_area(span, program),
-            },
-        );
-        Ok(())
+        let mut out = Multi::new_single(ctx, Ok(None));
+
+        if let Some(v) = self.overloads.get(&Operator::Bin(op)).cloned() {
+            for base in v {
+                out = out.flat_map(|ctx, v| {
+                    if v.as_ref().is_ok_and(|v| v.is_none()) {
+                        let check_id = self.pattern_mismatch_id_count;
+                        self.call_value(
+                            ctx,
+                            base.clone(),
+                            &[(left_ref.clone(), false), (right_ref.clone(), false)],
+                            &[],
+                            self.make_area(span, program),
+                            program,
+                        )
+                        .map(|ctx, v| match v {
+                            Ok(v) => (ctx, Ok(Some(v))),
+                            Err(err) => {
+                                if let RuntimeError::PatternMismatch { id, .. } = err {
+                                    if id == check_id {
+                                        return (ctx, Ok(None));
+                                    }
+                                    println!("GIG: {id} {check_id}");
+                                }
+                                (ctx, Err(err))
+                            },
+                        })
+                    } else {
+                        Multi::new_single(ctx, v)
+                    }
+                });
+            }
+        }
+
+        let out = out.map(|ctx, v| {
+            let v = match v {
+                Ok(Some(v)) => Ok(v),
+                Err(err) => Err(err),
+                Ok(None) => op.get_fn()(
+                    &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
+                    &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
+                    span,
+                    self,
+                    program,
+                )
+                .map(|v| ValueRef::new(v.into_stored(self.make_area(span, program)))),
+            };
+            (ctx, v)
+        });
+
+        self.change_reg_multi(to, out, out_contexts);
     }
 
     #[inline]
     fn assign_op(
         &mut self,
-        op: fn(&StoredValue, &StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>,
+        op: AssignOp,
+        // op: fn(&StoredValue, &StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>,
         program: &Rc<Program>,
         left: OptRegister,
         right: OptRegister,
         span: CodeSpan,
     ) -> Result<(), RuntimeError> {
-        let value = op(
+        let value = op.get_fn()(
             &self.get_reg_ref(left).borrow(),
             &self.get_reg_ref(right).borrow(),
             span,
@@ -1945,13 +2069,14 @@ impl Vm {
     #[inline]
     fn unary_op(
         &mut self,
-        op: fn(&StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>,
+        op: UnaryOp,
+        //op: fn(&StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>,
         program: &Rc<Program>,
         value: OptRegister,
         dest: OptRegister,
         span: CodeSpan,
     ) -> Result<(), RuntimeError> {
-        let value = op(&self.get_reg_ref(value).borrow(), span, self, program)?;
+        let value = op.get_fn()(&self.get_reg_ref(value).borrow(), span, self, program)?;
 
         self.change_reg(
             dest,

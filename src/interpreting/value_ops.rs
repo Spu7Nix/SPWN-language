@@ -6,7 +6,7 @@ use super::error::RuntimeError;
 use super::value::{StoredValue, Value, ValueType};
 use super::vm::{Program, RuntimeResult, Vm};
 use crate::parsing::ast::VisTrait;
-use crate::parsing::operators::operators::{BinOp, UnaryOp};
+use crate::parsing::operators::operators::{AssignOp, BinOp, UnaryOp};
 use crate::sources::CodeSpan;
 use crate::util::{Str32, String32};
 
@@ -71,7 +71,7 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
     }
 }
 
-pub fn in_op(
+fn in_op(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -96,7 +96,8 @@ pub fn in_op(
         },
     })
 }
-pub fn plus(
+
+fn plus(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -131,7 +132,7 @@ pub fn plus(
     })
 }
 
-pub fn minus(
+fn minus(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -155,7 +156,7 @@ pub fn minus(
     })
 }
 
-pub fn mult(
+fn mult(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -184,7 +185,7 @@ pub fn mult(
     })
 }
 
-pub fn div(
+fn div(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -216,7 +217,7 @@ pub fn div(
     })
 }
 
-pub fn modulo(
+fn modulo(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -240,7 +241,7 @@ pub fn modulo(
     })
 }
 
-pub fn pow(
+fn pow(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -264,7 +265,7 @@ pub fn pow(
     })
 }
 
-pub fn unary_not(
+fn unary_not(
     v: &StoredValue,
     span: CodeSpan,
     vm: &Vm,
@@ -285,7 +286,7 @@ pub fn unary_not(
     })
 }
 
-pub fn unary_negate(
+fn unary_negate(
     v: &StoredValue,
     span: CodeSpan,
     vm: &Vm,
@@ -305,7 +306,7 @@ pub fn unary_negate(
     })
 }
 
-pub fn gt(
+fn gt(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -330,7 +331,7 @@ pub fn gt(
     })
 }
 
-pub fn lt(
+fn lt(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -355,7 +356,7 @@ pub fn lt(
     })
 }
 
-pub fn gte(
+fn gte(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -380,7 +381,7 @@ pub fn gte(
     })
 }
 
-pub fn lte(
+fn lte(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -405,7 +406,7 @@ pub fn lte(
     })
 }
 
-pub fn range(
+fn range(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -492,7 +493,7 @@ pub fn bin_or(
     })
 }
 
-pub fn shift_left(
+fn shift_left(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -514,7 +515,7 @@ pub fn shift_left(
     })
 }
 
-pub fn shift_right(
+fn shift_right(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -536,7 +537,7 @@ pub fn shift_right(
     })
 }
 
-pub fn eq_op(
+fn eq(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -546,7 +547,7 @@ pub fn eq_op(
     Ok(Value::Bool(equality(&a.value, &b.value, vm)))
 }
 
-pub fn neq_op(
+fn neq(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
@@ -554,4 +555,61 @@ pub fn neq_op(
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
     Ok(Value::Bool(!equality(&a.value, &b.value, vm)))
+}
+
+pub type BinOpFn =
+    fn(&StoredValue, &StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>;
+
+pub type UnaryOpFn = fn(&StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>;
+
+impl BinOp {
+    pub fn get_fn(self) -> BinOpFn {
+        match self {
+            BinOp::Range => range,
+            BinOp::In => in_op,
+            BinOp::BinOr => bin_or,
+            BinOp::BinAnd => bin_and,
+            BinOp::Eq => eq,
+            BinOp::Neq => neq,
+            BinOp::Gt => gt,
+            BinOp::Gte => gte,
+            BinOp::Lt => lt,
+            BinOp::Lte => lte,
+            BinOp::ShiftLeft => shift_left,
+            BinOp::ShiftRight => shift_right,
+            BinOp::Plus => plus,
+            BinOp::Minus => minus,
+            BinOp::Mult => mult,
+            BinOp::Div => div,
+            BinOp::Mod => modulo,
+            BinOp::Pow => pow,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl AssignOp {
+    pub fn get_fn(self) -> BinOpFn {
+        match self {
+            AssignOp::PlusEq => plus,
+            AssignOp::MinusEq => minus,
+            AssignOp::MultEq => mult,
+            AssignOp::DivEq => div,
+            AssignOp::PowEq => pow,
+            AssignOp::ModEq => modulo,
+            AssignOp::BinAndEq => bin_and,
+            AssignOp::BinOrEq => bin_or,
+            AssignOp::ShiftLeftEq => shift_left,
+            AssignOp::ShiftRightEq => shift_right,
+        }
+    }
+}
+
+impl UnaryOp {
+    pub fn get_fn(self) -> UnaryOpFn {
+        match self {
+            UnaryOp::ExclMark => unary_not,
+            UnaryOp::Minus => unary_negate,
+        }
+    }
 }

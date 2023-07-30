@@ -6,10 +6,10 @@ use itertools::Itertools;
 use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType, TypeDef, VarData};
 use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::error::CompileError;
-use crate::compiling::opcodes::Opcode;
+use crate::compiling::opcodes::{FuncID, Opcode};
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{Expression, Pattern, Statement, StmtNode, VisTrait};
-use crate::parsing::operators::operators::AssignOp;
+use crate::parsing::operators::operators::{AssignOp, Operator};
 use crate::sources::Spannable;
 
 impl<'a> Compiler<'a> {
@@ -358,7 +358,25 @@ impl<'a> Compiler<'a> {
                     stmt.span,
                 );
             },
-            Statement::Overload { op, branches } => {},
+            Statement::Overload { op, macros } => {
+                for v in macros {
+                    if matches!(&*v.value().expr, Expression::Macro { .. }) {
+                        let macro_reg = self.compile_expr(v.value(), scope, builder)?;
+
+                        builder.push_raw_opcode(
+                            Opcode::AddOperatorOverload {
+                                from: macro_reg,
+                                op: *op,
+                            },
+                            stmt.span,
+                        );
+                    } else {
+                        return Err(CompileError::UnexpectedItemInOverload {
+                            area: self.make_area(v.value().span),
+                        });
+                    }
+                }
+            },
             Statement::Throw(v) => {
                 let v = self.compile_expr(v, scope, builder)?;
                 builder.throw(v, stmt.span);

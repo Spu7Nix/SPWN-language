@@ -1,5 +1,6 @@
 #![allow(clippy::result_large_err)]
 #![deny(unused_must_use)]
+#![allow(clippy::too_many_arguments)]
 #![feature(unboxed_closures)]
 #![feature(fn_traits)]
 
@@ -80,7 +81,7 @@ fn run_spwn(
         }
     }
 
-    let mut vm = Vm::new(false, type_def_map, bytecode_map);
+    let mut vm = Vm::new(type_def_map, bytecode_map);
 
     let program = Program {
         bytecode: vm.bytecode_map.get(&src).unwrap().clone(),

@@ -14,6 +14,7 @@ use crate::compiling::compiler::CustomTypeID;
 use crate::compiling::opcodes::OptOpcode;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
+use crate::parsing::operators::operators::Operator;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
 use crate::util::{ImmutStr, ImmutStr32, ImmutVec, SlabMap, UniqueRegister};
 
@@ -83,6 +84,8 @@ pub struct ProtoBytecode {
 
     call_exprs: UniqueRegister<CallExpr<UnoptRegister, UnoptRegister, ImmutStr>>,
     debug_funcs: Vec<FuncID>,
+
+    pub overloads: AHashMap<Operator, Vec<FuncID>>,
 }
 
 impl ProtoBytecode {
@@ -94,7 +97,12 @@ impl ProtoBytecode {
             import_paths: UniqueRegister::new(),
             debug_funcs: vec![],
             call_exprs: UniqueRegister::new(),
+            overloads: AHashMap::new(),
         }
+    }
+
+    pub fn func_amount(&self) -> usize {
+        self.functions.len()
     }
 
     pub fn new_func<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(
@@ -286,7 +294,7 @@ impl ProtoBytecode {
 }
 
 pub struct CodeBuilder<'a> {
-    proto_bytecode: &'a mut ProtoBytecode,
+    pub proto_bytecode: &'a mut ProtoBytecode,
     pub func: usize,
     pub block: BlockID,
 }
@@ -704,6 +712,26 @@ impl<'a> CodeBuilder<'a> {
     //     })?;
     //     Ok(())
     // }
+
+    pub fn pure_eq(
+        &mut self,
+        a: UnoptRegister,
+        b: UnoptRegister,
+        to: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::PureEq { a, b, to }), span)
+    }
+
+    pub fn pure_neq(
+        &mut self,
+        a: UnoptRegister,
+        b: UnoptRegister,
+        to: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::PureNeq { a, b, to }), span)
+    }
 
     pub fn eq(&mut self, a: UnoptRegister, b: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
         self.push_opcode(ProtoOpcode::Raw(Opcode::Eq { a, b, to }), span)

@@ -1,7 +1,7 @@
 use super::{ParseResult, Parser};
 use crate::lexing::tokens::Token;
 use crate::list_helper;
-use crate::parsing::ast::{OverloadBranch, Statement, Statements, StmtNode, Vis};
+use crate::parsing::ast::{Statement, Statements, StmtNode, Vis};
 use crate::parsing::error::SyntaxError;
 use crate::parsing::operators::operators::Operator;
 use crate::sources::{CodeSpan, Spannable};
@@ -184,28 +184,22 @@ impl Parser<'_> {
                     });
                 };
 
+                let vis = if self.next_is(Token::Private)? {
+                    self.next()?;
+                    Vis::Private
+                } else {
+                    Vis::Public
+                };
+
                 self.expect_tok(Token::LBracket)?;
 
-                let mut branches = vec![];
+                let mut macros = vec![];
 
                 list_helper!(self, RBracket {
-                    let mut args = vec![];
-
-                    self.expect_tok(Token::LParen)?;
-
-                    list_helper!(self, RParen {
-                        args.push(self.parse_pattern()?);
-                    });
-
-                    let code = self.parse_block()?;
-
-                    branches.push(OverloadBranch {
-                        args,
-                        code,
-                    });
+                    macros.push(vis(self.parse_expr(true)?));
                 });
 
-                Statement::Overload { op, branches }
+                Statement::Overload { op, macros }
             },
             Token::Extract => {
                 self.next()?;

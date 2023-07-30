@@ -424,6 +424,5 @@ error_maker! {
             target_area: CodeArea,
             attribute: String,
         },
-
     }
 }

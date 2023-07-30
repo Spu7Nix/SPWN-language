@@ -269,5 +269,17 @@ error_maker! {
             expected: &'static str,
             args_area: CodeArea,
         },
+
+        // ==================================================================
+        #[
+            Message: "Unexpected item in overload", Note: Some("Only explicit macro definitions are allowed".into());
+            Main Area: area;
+            Labels: [
+                area => "Found non-macro item here";
+            ]
+        ]
+        UnexpectedItemInOverload {
+            area: CodeArea,
+        },
     }
 }

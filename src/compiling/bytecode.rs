@@ -136,7 +136,6 @@ pub struct Bytecode {
 
     pub functions: ImmutVec<Function>,
 
-    // pub overload_functions: AHashMap<Operator, FuncID>,
     pub custom_types: AHashMap<CustomTypeID, Vis<Spanned<ImmutStr>>>,
 
     pub export_names: ImmutVec<ImmutStr>,

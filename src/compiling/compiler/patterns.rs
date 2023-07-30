@@ -126,7 +126,7 @@ impl Compiler<'_> {
                 self.load_type(t, a, pattern.span, builder)?;
                 let b = builder.next_reg();
                 builder.type_of(expr_reg, b, pattern.span);
-                builder.eq(a, b, out_reg, pattern.span);
+                builder.pure_eq(a, b, out_reg, pattern.span);
             },
             Pattern::IfGuard { pat, cond } => {
                 self.and_op(
@@ -218,7 +218,7 @@ impl Compiler<'_> {
                             builder.type_of(expr_reg, expr_typ, pattern.span);
 
                             let eq_reg = builder.next_reg();
-                            builder.eq(expr_typ, arr_typ, eq_reg, pattern.span);
+                            builder.pure_eq(expr_typ, arr_typ, eq_reg, pattern.span);
 
                             Ok(eq_reg)
                         },
@@ -300,7 +300,7 @@ impl Compiler<'_> {
                             builder.type_of(expr_reg, expr_typ, pattern.span);
 
                             let eq_reg = builder.next_reg();
-                            builder.eq(expr_typ, arr_typ, eq_reg, pattern.span);
+                            builder.pure_eq(expr_typ, arr_typ, eq_reg, pattern.span);
 
                             Ok(eq_reg)
                         },
@@ -312,7 +312,7 @@ impl Compiler<'_> {
                             builder.len(expr_reg, expr_len, pattern.span);
 
                             let gte_reg = builder.next_reg();
-                            builder.eq(expr_len, pat_len, gte_reg, pattern.span);
+                            builder.pure_eq(expr_len, pat_len, gte_reg, pattern.span);
 
                             Ok(gte_reg)
                         },

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::bytecode::{OptRegister, Register, UnoptRegister};
 use crate::gd::ids::IDClass;
 use crate::new_id_wrapper;
+use crate::parsing::operators::operators::Operator;
 
 pub type UnoptOpcode = Opcode<UnoptRegister>;
 pub type OptOpcode = Opcode<OptRegister>;
@@ -160,6 +161,12 @@ opcodes! {
     #[delve(display = |v, to| format!("-{v} -> {to}"))]
     Negate { [v], [to] },
 
+
+    #[delve(display = |a, b, to| format!("pure {a} == {b} -> {to}"))]
+    PureEq { [a], [b], [to] },
+    #[delve(display = |a, b, to| format!("pure {a} != {b} -> {to}"))]
+    PureNeq { [a], [b], [to] },
+
     #[delve(display = |to| format!("to {to}"))]
     Jump { to: OpcodePos },
     // #[delve(display = |to: &FuncID| format!("jump to {to:?}"))]
@@ -195,7 +202,7 @@ opcodes! {
 
     #[delve(display = |skip| format!("skip to {skip}"))]
     EnterArrowStatement { skip: OpcodePos },
-    #[delve(display = || "yeet")]
+    #[delve(display = "yeet")]
     YeetContext,
 
 
@@ -261,7 +268,7 @@ opcodes! {
     #[delve(display = |reg, to| format!("push try, catch -> {reg}, to {to}"))]
     PushTryCatch { [reg], to: OpcodePos },
 
-    #[delve(display = || format!("pop try catch"))]
+    #[delve(display = "pop try catch")]
     PopTryCatch,
 
     #[delve(display = |i, r| format!("{i}: (...) {{...}} -> {r}"))]
@@ -285,6 +292,11 @@ opcodes! {
     #[delve(display = |f| format!("{f}!"))]
     CallTriggerFunc { [func] },
 
-    #[delve(display = |r| format!(""))]
+    #[delve(display = |r| format!("set context group from {r}"))]
     SetContextGroup { [reg] },
+
+    #[delve(display = |from, op| format!("add {op:?} overload from {from}"))]
+    AddOperatorOverload { [from], op: Operator },
+    #[delve(display = "<internal>")]
+    IncMismatchIdCount,
 }

@@ -242,6 +242,7 @@ error_maker! {
         PatternMismatch {
             v: (ValueType, CodeArea),
             pattern_area: CodeArea,
+            id: usize,
             [call_stack]
         },
 
