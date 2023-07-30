@@ -1834,7 +1834,7 @@ impl Vm {
                                 call_area,
                                 call_stack: self.get_call_stack(),
                             }),
-                        )
+                        );
                     };
                     match &mut fill[*idx] {
                         ArgFill::Single(opt, _, needs_mutable) => {

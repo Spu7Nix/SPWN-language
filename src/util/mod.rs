@@ -332,17 +332,3 @@ pub fn clear_ansi(s: &str) -> Cow<'_, str> {
 pub fn remove_quotes(s: &str) -> &str {
     &s[1..(s.len() - 1)]
 }
-
-// struct Dink {
-//     gog: usize,
-//     fuck: Vec<f64>,
-// }
-
-// fn bink(v: &Rc<RefCell<Dink>>) -> std::cell::Ref<'_, Vec<f64>> {
-//     std::cell::Ref::map(v.borrow(), |r| &r.fuck)
-// }
-
-// enum Bunk {
-//     Dig(u8),
-//     Fuck(u8, u16),
-// }

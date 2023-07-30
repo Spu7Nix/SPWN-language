@@ -21,8 +21,12 @@ use crate::compiling::builder::ProtoBytecode;
 use crate::compiling::bytecode::Register;
 use crate::compiling::compiler::Compiler;
 use crate::compiling::opcodes::{ConstID, OptOpcode};
+use crate::gd::gd_object::SPWN_SIGNATURE_GROUP;
 use crate::interpreting::context::{CallInfo, Context};
 use crate::interpreting::vm::{FuncCoord, Program};
+#[cfg(target_os = "windows")]
+use crate::liveeditor::win::LiveEditorClient;
+use crate::liveeditor::Message;
 use crate::parsing::parser::Parser;
 use crate::sources::{SpwnSource, TypeDefMap};
 use crate::util::{BasicError, RandomState};
@@ -34,6 +38,8 @@ mod error;
 mod gd;
 mod interpreting;
 mod lexing;
+#[cfg(target_os = "windows")]
+mod liveeditor;
 mod parsing;
 mod sources;
 mod util;
@@ -126,6 +132,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match args.command {
         Command::Build { file, settings } => {
+            #[cfg(target_os = "windows")]
+            if settings.live_editor {
+                println!("Connecting to websocket....");
+
+                let mut client = LiveEditorClient::try_create_client()?;
+
+                // client.try_send_message(Message::RemoveObjectsByGroup(SPWN_SIGNATURE_GROUP.into()))?;
+                // client.try_send_message(Message::AddObjects(include_str!("../test.spwn")))?;
+
+                // std::process::exit(0);
+            }
+
             match run_spwn(settings, DocSettings::default(), false) {
                 Ok(o) => o,
                 Err(e) => {

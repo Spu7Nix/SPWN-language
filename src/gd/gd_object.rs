@@ -211,10 +211,11 @@ pub fn get_used_ids(ls: &str) -> [AHashSet<u16>; 4] {
     out
 }
 
-pub const SPWN_SIGNATURE_GROUP: Id = Id::Specific(1001);
+pub const SPWN_SIGNATURE_GROUP: u16 = 1001;
+pub const SPWN_SIGNATURE_GROUP_ID: Id = Id::Specific(SPWN_SIGNATURE_GROUP);
 
 pub fn remove_spwn_objects(file_content: &mut String) {
-    let spwn_group = match SPWN_SIGNATURE_GROUP {
+    let spwn_group = match SPWN_SIGNATURE_GROUP_ID {
         Id::Specific(n) => n.to_string(),
         _ => unreachable!(),
     };
@@ -372,17 +373,18 @@ pub fn append_objects(
         match trigger.mode {
             ObjectType::Object => {
                 match trigger.params.get_mut(&57) {
-                    Some(ObjParam::GroupList(l)) => (*l).push(SPWN_SIGNATURE_GROUP),
+                    Some(ObjParam::GroupList(l)) => (*l).push(SPWN_SIGNATURE_GROUP_ID),
                     Some(ObjParam::Group(g)) => {
                         let group = *g;
-                        trigger
-                            .params
-                            .insert(57, ObjParam::GroupList(vec![group, SPWN_SIGNATURE_GROUP]));
+                        trigger.params.insert(
+                            57,
+                            ObjParam::GroupList(vec![group, SPWN_SIGNATURE_GROUP_ID]),
+                        );
                     },
                     _ => {
                         trigger
                             .params
-                            .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP));
+                            .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP_ID));
                     },
                 };
 
@@ -399,19 +401,20 @@ pub fn append_objects(
             ObjectType::Trigger => {
                 match trigger.params.get_mut(&57) {
                     Some(ObjParam::GroupList(l)) => {
-                        (*l).push(SPWN_SIGNATURE_GROUP);
+                        (*l).push(SPWN_SIGNATURE_GROUP_ID);
                         //list
                     },
                     Some(ObjParam::Group(g)) => {
                         let group = *g;
-                        trigger
-                            .params
-                            .insert(57, ObjParam::GroupList(vec![group, SPWN_SIGNATURE_GROUP]));
+                        trigger.params.insert(
+                            57,
+                            ObjParam::GroupList(vec![group, SPWN_SIGNATURE_GROUP_ID]),
+                        );
                     },
                     _ => {
                         trigger
                             .params
-                            .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP));
+                            .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP_ID));
                         //Vec::new()
                     },
                 };
