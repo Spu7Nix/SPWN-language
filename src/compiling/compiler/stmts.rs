@@ -45,7 +45,7 @@ impl<'a> Compiler<'a> {
             Statement::AssignOp(left, op, right) => {
                 macro_rules! assign_op {
                     ($opcode_name:ident) => {{
-                        let var = match &*left.pat {
+                        let (var, _) = match &*left.pat {
                             Pattern::Path {
                                 var,
                                 path,

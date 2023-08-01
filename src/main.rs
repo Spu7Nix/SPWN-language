@@ -1,6 +1,7 @@
-#![allow(clippy::result_large_err)]
 #![deny(unused_must_use)]
+#![allow(clippy::result_large_err)]
 #![allow(clippy::too_many_arguments)]
+#![allow(clippy::type_complexity)]
 #![feature(unboxed_closures)]
 #![feature(fn_traits)]
 

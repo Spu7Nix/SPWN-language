@@ -516,6 +516,14 @@ impl<'a> CodeBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(Opcode::WriteDeep { from, to }), span)
     }
 
+    pub fn assign_ref(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::AssignRef { from, to }), span)
+    }
+
+    pub fn assign_deep(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::AssignDeep { from, to }), span)
+    }
+
     pub fn iter_next(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
         self.push_opcode(ProtoOpcode::Raw(Opcode::IterNext { src, dest }), span)
     }

@@ -19,11 +19,11 @@ impl Compiler<'_> {
         scope: ScopeID,
         builder: &mut CodeBuilder,
         span: CodeSpan,
-    ) -> CompileResult<UnoptRegister> {
+    ) -> CompileResult<(UnoptRegister, bool)> {
         macro_rules! normal_access {
             () => {
                 match self.get_var(var, scope) {
-                    Some(v) if v.mutable => v.reg,
+                    Some(v) if v.mutable => (v.reg, false),
                     Some(v) => {
                         return Err(CompileError::ImmutableAssign {
                             area: self.make_area(span),
@@ -42,7 +42,7 @@ impl Compiler<'_> {
                                     reg: r,
                                 },
                             );
-                            r
+                            (r, true)
                         } else {
                             return Err(CompileError::NonexistentVariable {
                                 area: self.make_area(span),
@@ -54,7 +54,7 @@ impl Compiler<'_> {
             };
         }
 
-        let var_reg = if !try_new {
+        let (var_reg, is_new) = if !try_new {
             normal_access!()
         } else if path.is_empty() {
             let r = builder.next_reg();
@@ -66,7 +66,7 @@ impl Compiler<'_> {
                     reg: r,
                 },
             );
-            r
+            (r, true)
         } else {
             normal_access!()
         };
@@ -100,9 +100,9 @@ impl Compiler<'_> {
                 }
             }
 
-            Ok(path_reg)
+            Ok((path_reg, false))
         } else {
-            Ok(var_reg)
+            Ok((var_reg, is_new))
         }
         // println!("{}", path_reg);
     }
@@ -319,7 +319,6 @@ impl Compiler<'_> {
                         &|compiler, builder| {
                             let mut funcs = vec![];
 
-                            #[allow(clippy::type_complexity)]
                             for (i, elem) in v.iter().enumerate() {
                                 let f: Box<
                                     dyn Fn(
@@ -372,15 +371,25 @@ impl Compiler<'_> {
                         area: self.make_area(pattern.span),
                     });
                 }
-                println!("{}", try_new_var);
+                // println!("{}", try_new_var);
 
-                let path_reg =
+                let (path_reg, is_new) =
                     self.get_path_reg(*var, try_new_var, path, scope, builder, pattern.span)?;
 
                 if *is_ref {
-                    builder.copy_ref(expr_reg, path_reg, pattern.span);
+                    let f = if is_new {
+                        CodeBuilder::copy_ref
+                    } else {
+                        CodeBuilder::assign_ref
+                    };
+                    f(builder, expr_reg, path_reg, pattern.span);
                 } else {
-                    builder.write_deep(expr_reg, path_reg, pattern.span);
+                    let f = if is_new {
+                        CodeBuilder::write_deep
+                    } else {
+                        CodeBuilder::assign_deep
+                    };
+                    f(builder, expr_reg, path_reg, pattern.span);
                 }
                 builder.load_const(true, out_reg, pattern.span);
             },

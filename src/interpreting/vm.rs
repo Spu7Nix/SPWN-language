@@ -7,6 +7,7 @@ use std::mem::{self};
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use base64::Engine;
 use colored::Colorize;
 use derive_more::{Deref, DerefMut};
 use itertools::{Either, Itertools};
@@ -18,7 +19,7 @@ use super::value_ops;
 use crate::compiling::bytecode::{
     Bytecode, CallExpr, Constant, Function, Mutability, OptRegister, Register,
 };
-use crate::compiling::opcodes::{CallExprID, ConstID, Opcode};
+use crate::compiling::opcodes::{CallExprID, ConstID, Opcode, RuntimeStringFlag};
 use crate::gd::gd_object::{make_spawn_trigger, TriggerObject, TriggerOrder};
 use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::{ObjectKey, OBJECT_KEYS};
@@ -174,6 +175,26 @@ impl Vm {
         }
     }
 
+    pub fn insert_ctx_val<T, F>(
+        &mut self,
+        mut ctx: Context,
+        v: RuntimeResult<T>,
+        mut f: F,
+        out: &mut Vec<Context>,
+    ) where
+        F: FnMut(&mut Context, T),
+    {
+        match v {
+            Ok(v) => {
+                f(&mut ctx, v);
+                self.context_stack.last_mut().contexts.push(ctx)
+            },
+            Err(err) => {
+                self.handle_errored_ctx(ctx, err, out);
+            },
+        }
+    }
+
     pub fn insert_multi<T, F>(
         &mut self,
         v: Multi<RuntimeResult<T>>,
@@ -182,21 +203,8 @@ impl Vm {
     ) where
         F: FnMut(&mut Context, T),
     {
-        for (mut ctx, v) in v {
-            match v {
-                Ok(v) => {
-                    f(&mut ctx, v);
-                    self.context_stack.last_mut().contexts.push(ctx)
-                },
-                Err(err) => {
-                    self.handle_errored_ctx(ctx, err, out);
-
-                    // ctx.stack.pop();
-                    // ctx.ret_error(err);
-
-                    // out.push(ctx);
-                },
-            }
+        for (ctx, v) in v {
+            self.insert_ctx_val(ctx, v, &mut f, out);
         }
     }
 
@@ -541,13 +549,36 @@ impl Vm {
                     }};
                 }
                 macro_rules! assign_op {
-                    ($op:ident, $a:ident, $b:ident, $to:ident) => {{
+                    ($op:ident, $a:ident, $b:ident) => {{
                         let mut top = self.context_stack.last_mut().yeet_current().unwrap();
                         top.ip += 1;
 
-                        let ret = self.bin_op(BinOp::$op, &program, $a, $b, top, opcode_span);
+                        self.assign_op(
+                            AssignOp::$op,
+                            &program,
+                            $a,
+                            $b,
+                            top,
+                            &mut out_contexts,
+                            opcode_span,
+                        );
+                        return Ok(LoopFlow::ContinueLoop);
+                    }};
+                }
+                macro_rules! unary_op {
+                    ($op:ident, $v:ident, $to:ident) => {{
+                        let mut top = self.context_stack.last_mut().yeet_current().unwrap();
+                        top.ip += 1;
 
-                        self.change_reg_multi($to, ret, &mut out_contexts);
+                        self.unary_op(
+                            UnaryOp::$op,
+                            &program,
+                            $v,
+                            $to,
+                            top,
+                            &mut out_contexts,
+                            opcode_span,
+                        );
                         return Ok(LoopFlow::ContinueLoop);
                     }};
                 }
@@ -574,6 +605,13 @@ impl Vm {
                         self.write_pointee(to, v)
                     },
                     Opcode::WriteDeep { from, to } => self.write_pointee(to, self.deep_clone(from)),
+                    Opcode::AssignRef { from, to } => {
+                        let v = self.get_reg_ref(from).borrow().clone();
+                        self.write_pointee(to, v)
+                    },
+                    Opcode::AssignDeep { from, to } => {
+                        self.write_pointee(to, self.deep_clone(from))
+                    },
                     Opcode::Plus { a, b, to } => {
                         bin_op!(Plus, a, b, to);
                     },
@@ -680,40 +718,40 @@ impl Vm {
                         }
                     },
                     Opcode::PlusEq { a, b } => {
-                        self.assign_op(AssignOp::PlusEq, &program, a, b, opcode_span)?;
+                        assign_op!(PlusEq, a, b);
                     },
                     Opcode::MinusEq { a, b } => {
-                        self.assign_op(AssignOp::MinusEq, &program, a, b, opcode_span)?;
+                        assign_op!(MinusEq, a, b);
                     },
                     Opcode::MultEq { a, b } => {
-                        self.assign_op(AssignOp::MultEq, &program, a, b, opcode_span)?;
+                        assign_op!(MultEq, a, b);
                     },
                     Opcode::DivEq { a, b } => {
-                        self.assign_op(AssignOp::DivEq, &program, a, b, opcode_span)?;
+                        assign_op!(DivEq, a, b);
                     },
                     Opcode::PowEq { a, b } => {
-                        self.assign_op(AssignOp::PowEq, &program, a, b, opcode_span)?;
+                        assign_op!(PowEq, a, b);
                     },
                     Opcode::ModEq { a, b } => {
-                        self.assign_op(AssignOp::ModEq, &program, a, b, opcode_span)?;
+                        assign_op!(ModEq, a, b);
                     },
                     Opcode::BinAndEq { a, b } => {
-                        self.assign_op(AssignOp::BinAndEq, &program, a, b, opcode_span)?;
+                        assign_op!(BinAndEq, a, b);
                     },
                     Opcode::BinOrEq { a, b } => {
-                        self.assign_op(AssignOp::BinOrEq, &program, a, b, opcode_span)?;
+                        assign_op!(BinOrEq, a, b);
                     },
                     Opcode::ShiftLeftEq { a, b } => {
-                        self.assign_op(AssignOp::ShiftLeftEq, &program, a, b, opcode_span)?;
+                        assign_op!(ShiftLeftEq, a, b);
                     },
                     Opcode::ShiftRightEq { a, b } => {
-                        self.assign_op(AssignOp::ShiftRightEq, &program, a, b, opcode_span)?;
+                        assign_op!(ShiftRightEq, a, b);
                     },
                     Opcode::Not { v, to } => {
-                        self.unary_op(UnaryOp::ExclMark, &program, v, to, opcode_span)?;
+                        unary_op!(ExclMark, v, to);
                     },
                     Opcode::Negate { v, to } => {
-                        self.unary_op(UnaryOp::Minus, &program, v, to, opcode_span)?;
+                        unary_op!(Minus, v, to);
                     },
                     Opcode::Jump { to } => {
                         self.context_stack.current_mut().ip = *to as usize;
@@ -943,7 +981,45 @@ impl Vm {
                             },
                         )
                     },
-                    Opcode::ApplyStringFlag { flag, reg } => todo!(),
+                    Opcode::ApplyStringFlag { flag, reg } => {
+                        let area = self.make_area(opcode_span, &program);
+
+                        let val = match &self.get_reg_ref(reg).borrow().value {
+                            Value::String(s) => {
+                                let mut v = vec![];
+
+                                match flag {
+                                    RuntimeStringFlag::ByteString => {
+                                        for c in s.chars() {
+                                            let mut buf = [0u8; 4];
+
+                                            for b in c.encode_utf8(&mut buf).bytes() {
+                                                v.push(ValueRef::new(
+                                                    Value::Int(b as i64).into_stored(area.clone()),
+                                                ))
+                                            }
+                                        }
+
+                                        Value::Array(v)
+                                    },
+                                    RuntimeStringFlag::Unindent => {
+                                        let s = unindent::unindent(&s.to_string());
+
+                                        Value::String(String32::from(s).into())
+                                    },
+                                    RuntimeStringFlag::Base64 => {
+                                        let s = base64::engine::general_purpose::URL_SAFE
+                                            .encode(s.to_string());
+
+                                        Value::String(String32::from(s).into())
+                                    },
+                                }
+                            },
+                            _ => unreachable!(),
+                        };
+
+                        self.change_reg(reg, val.into_stored(area))
+                    },
                     Opcode::WrapMaybe { from, to } => {
                         let v = self.deep_clone_ref(from);
                         self.change_reg(
@@ -1174,7 +1250,7 @@ impl Vm {
                                     },
                                     Value::Instance { items, .. } => {
                                         if let Some(v) = items.get(&key) {
-                                            if let VisSource::Private(v, src) = v {
+                                            if let VisSource::Private(_, src) = v {
                                                 if src != &program.src {
                                                     return Err(
                                                         RuntimeError::PrivateMemberAccess {
@@ -1313,7 +1389,56 @@ impl Vm {
                             },
                         }
                     },
-                    Opcode::TypeMember { from, dest, member } => todo!(),
+                    Opcode::TypeMember { from, dest, member } => {
+                        let from = self.get_reg_ref(from).borrow();
+
+                        let key = match &self.get_reg_ref(member).borrow().value {
+                            Value::String(s) => s.clone(),
+                            _ => unreachable!(),
+                        };
+
+                        match &from.value {
+                            Value::Module { types, .. } => {
+                                let typ = types
+                                    .iter()
+                                    .find(|k| *self.type_def_map[k.value()].name == *key)
+                                    .ok_or(RuntimeError::NonexistentTypeMember {
+                                        area: self.make_area(opcode_span, &program),
+                                        type_name: key.to_string(),
+                                        call_stack: self.get_call_stack(),
+                                    })?;
+
+                                if typ.is_priv() {
+                                    return Err(RuntimeError::PrivateType {
+                                        area: self.make_area(opcode_span, &program),
+                                        type_name: key.to_string(),
+                                        call_stack: self.get_call_stack(),
+                                    });
+                                }
+
+                                let typ = *typ.value();
+
+                                mem::drop(from);
+
+                                self.change_reg(
+                                    dest,
+                                    StoredValue {
+                                        value: Value::Type(ValueType::Custom(typ)),
+                                        area: self.make_area(opcode_span, &program),
+                                    },
+                                );
+                            },
+                            v => {
+                                return Err(RuntimeError::TypeMismatch {
+                                    value_type: v.get_type(),
+                                    value_area: from.area.clone(),
+                                    area: self.make_area(opcode_span, &program),
+                                    expected: &[ValueType::Module],
+                                    call_stack: self.get_call_stack(),
+                                })
+                            },
+                        }
+                    },
                     Opcode::TypeOf { src, dest } => {
                         let t = self.get_reg_ref(src).borrow().value.get_type();
                         self.change_reg(
@@ -1991,12 +2116,12 @@ impl Vm {
         let left_ref = ctx.stack.last().unwrap().registers[*left as usize].clone();
         let right_ref = ctx.stack.last().unwrap().registers[*right as usize].clone();
 
-        let mut out = Multi::new_single(ctx, Ok(None));
+        let mut out = Multi::new_single(ctx, None);
 
         if let Some(v) = self.overloads.get(&Operator::Bin(op)).cloned() {
             for base in v {
                 out = out.flat_map(|ctx, v| {
-                    if v.as_ref().is_ok_and(|v| v.is_none()) {
+                    if v.as_ref().is_none() {
                         let check_id = self.pattern_mismatch_id_count;
                         self.call_value(
                             ctx,
@@ -2007,15 +2132,15 @@ impl Vm {
                             program,
                         )
                         .map(|ctx, v| match v {
-                            Ok(v) => (ctx, Ok(Some(v))),
+                            Ok(v) => (ctx, Some(Ok(v))),
                             Err(err) => {
                                 if let RuntimeError::PatternMismatch { id, .. } = err {
                                     if id == check_id {
-                                        return (ctx, Ok(None));
+                                        return (ctx, None);
                                     }
                                     println!("GIG: {id} {check_id}");
                                 }
-                                (ctx, Err(err))
+                                (ctx, Some(Err(err)))
                             },
                         })
                     } else {
@@ -2027,9 +2152,9 @@ impl Vm {
 
         let out = out.map(|ctx, v| {
             let v = match v {
-                Ok(Some(v)) => Ok(v),
-                Err(err) => Err(err),
-                Ok(None) => op.get_fn()(
+                Some(Ok(v)) => Ok(v),
+                Some(Err(err)) => Err(err),
+                None => op.get_fn()(
                     &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
                     &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
                     span,
@@ -2048,44 +2173,143 @@ impl Vm {
     fn assign_op(
         &mut self,
         op: AssignOp,
-        // op: fn(&StoredValue, &StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>,
         program: &Rc<Program>,
         left: OptRegister,
         right: OptRegister,
+        ctx: Context,
+        out_contexts: &mut Vec<Context>,
         span: CodeSpan,
-    ) -> Result<(), RuntimeError> {
-        let value = op.get_fn()(
-            &self.get_reg_ref(left).borrow(),
-            &self.get_reg_ref(right).borrow(),
-            span,
-            self,
-            program,
-        )?;
+    ) {
+        let left_ref = ctx.stack.last().unwrap().registers[*left as usize].clone();
+        let right_ref = ctx.stack.last().unwrap().registers[*right as usize].clone();
 
-        self.get_reg_ref(left).borrow_mut().value = value;
-        Ok(())
+        let mut out: Multi<Option<Result<(), RuntimeError>>> = Multi::new_single(ctx, None);
+
+        if let Some(v) = self.overloads.get(&Operator::Assign(op)).cloned() {
+            for base in v {
+                out = out.flat_map(|ctx, v| {
+                    if v.as_ref().is_none() {
+                        let check_id = self.pattern_mismatch_id_count;
+                        self.call_value(
+                            ctx,
+                            base.clone(),
+                            &[(left_ref.clone(), true), (right_ref.clone(), false)],
+                            &[],
+                            self.make_area(span, program),
+                            program,
+                        )
+                        .map(|ctx, v| match v {
+                            Ok(_) => (ctx, Some(Ok(()))),
+                            Err(err) => {
+                                if let RuntimeError::PatternMismatch { id, .. } = err {
+                                    if id == check_id {
+                                        return (ctx, None);
+                                    }
+                                    println!("GIG: {id} {check_id}");
+                                }
+                                (ctx, Some(Err(err)))
+                            },
+                        })
+                    } else {
+                        Multi::new_single(ctx, v)
+                    }
+                });
+            }
+        }
+
+        let out = out.map(|ctx, v| {
+            let v = match v {
+                Some(Ok(_)) => Ok(None),
+                Some(Err(err)) => Err(err),
+                None => op.get_fn()(
+                    &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
+                    &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
+                    span,
+                    self,
+                    program,
+                )
+                .map(|v| v.into_stored(self.make_area(span, program)))
+                .map(Some),
+            };
+            (ctx, v)
+        });
+
+        self.insert_multi(
+            out,
+            |ctx, v| {
+                if let Some(v) = v {
+                    let mut g =
+                        ctx.stack.last_mut().unwrap().registers[*left as usize].borrow_mut();
+                    *g = v;
+                }
+            },
+            out_contexts,
+        );
     }
 
     #[inline]
     fn unary_op(
         &mut self,
         op: UnaryOp,
-        //op: fn(&StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>,
         program: &Rc<Program>,
         value: OptRegister,
         dest: OptRegister,
+        ctx: Context,
+        out_contexts: &mut Vec<Context>,
         span: CodeSpan,
-    ) -> Result<(), RuntimeError> {
-        let value = op.get_fn()(&self.get_reg_ref(value).borrow(), span, self, program)?;
+    ) {
+        let value_ref = ctx.stack.last().unwrap().registers[*value as usize].clone();
 
-        self.change_reg(
-            dest,
-            StoredValue {
-                value,
-                area: self.make_area(span, program),
-            },
-        );
-        Ok(())
+        let mut out = Multi::new_single(ctx, None);
+
+        if let Some(v) = self.overloads.get(&Operator::Unary(op)).cloned() {
+            for base in v {
+                out = out.flat_map(|ctx, v| {
+                    if v.as_ref().is_none() {
+                        let check_id = self.pattern_mismatch_id_count;
+                        self.call_value(
+                            ctx,
+                            base.clone(),
+                            &[(value_ref.clone(), false)],
+                            &[],
+                            self.make_area(span, program),
+                            program,
+                        )
+                        .map(|ctx, v| match v {
+                            Ok(v) => (ctx, Some(Ok(v))),
+                            Err(err) => {
+                                if let RuntimeError::PatternMismatch { id, .. } = err {
+                                    if id == check_id {
+                                        return (ctx, None);
+                                    }
+                                    println!("GIG: {id} {check_id}");
+                                }
+                                (ctx, Some(Err(err)))
+                            },
+                        })
+                    } else {
+                        Multi::new_single(ctx, v)
+                    }
+                });
+            }
+        }
+
+        let out = out.map(|ctx, v| {
+            let v = match v {
+                Some(Ok(v)) => Ok(v),
+                Some(Err(err)) => Err(err),
+                None => op.get_fn()(
+                    &ctx.stack.last().unwrap().registers[*value as usize].borrow(),
+                    span,
+                    self,
+                    program,
+                )
+                .map(|v| ValueRef::new(v.into_stored(self.make_area(span, program)))),
+            };
+            (ctx, v)
+        });
+
+        self.change_reg_multi(dest, out, out_contexts);
     }
 }
 

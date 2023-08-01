@@ -1,19 +1,18 @@
 
-import "libraries/core/array.spwn"
+// import "libraries/core/array.spwn"
 
-overload + {
-    (mut a: @array, b: @array) {
-        for i in b {
-            a.push(i)
-        }
-        return a
-    },
-}
-mut a = [1, 2];
-b = a + [4, 8];
-dbg a;
-dbg b;
-a[0] = 6
-dbg a;
-dbg b;
+// overload = {
+//     (a: @number, b: @string) {
+        
+//     },
+// }
 
+
+mut a = [5, 7];
+dbg a;
+a[0] += 3;
+dbg a;
+
+
+
+&a[0] = 5
