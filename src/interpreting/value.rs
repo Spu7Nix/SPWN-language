@@ -15,13 +15,14 @@ use super::multi::Multi;
 use super::vm::{FuncCoord, Program, RuntimeResult, Vm};
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::{CustomTypeID, LocalTypeID};
+use crate::gd::gd_object::ObjParam;
 use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::ObjectKey;
 use crate::interpreting::vm::ValueRef;
 use crate::new_id_wrapper;
-use crate::parsing::ast::{MacroArg, Vis, VisSource, VisTrait};
+use crate::parsing::ast::{MacroArg, ObjectType, Vis, VisSource, VisTrait};
 use crate::sources::{CodeArea, Spanned};
-use crate::util::{ImmutCloneStr, ImmutCloneStr32, ImmutCloneVec, ImmutStr, ImmutVec};
+use crate::util::{ImmutCloneStr, ImmutCloneStr32, ImmutCloneVec, ImmutStr, ImmutVec, String32};
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
 pub struct BuiltinFn(
@@ -489,11 +490,13 @@ value! {
 
     Error(usize),
 
-    //Object(AHashMap<u8, ObjParam>, ObjectType),
+    Object {
+        params: AHashMap<u8, ObjParam>,
+        typ: ObjectType,
+    },
     ObjectKey(ObjectKey),
 
     Epsilon,
-
 
     Chroma {
         r: u8, g: u8, b: u8, a: u8,
@@ -518,7 +521,7 @@ impl ValueType {
 }
 
 impl Value {
-    pub fn from_const(_vm: &mut Vm, c: &Constant) -> Value {
+    pub fn from_const(vm: &mut Vm, c: &Constant, area: CodeArea) -> Value {
         match c {
             Constant::Int(v) => Value::Int(*v),
             Constant::Float(v) => Value::Float(*v),
@@ -531,6 +534,45 @@ impl Value {
                 IDClass::Block => Value::Block(Id::Specific(*id)),
                 IDClass::Item => Value::Item(Id::Specific(*id)),
             },
+            Constant::Array(arr) => Value::Array(
+                arr.iter()
+                    .map(|c| {
+                        let value = Value::from_const(vm, c, area.clone());
+                        ValueRef::new(value.into_stored(area.clone()))
+                    })
+                    .collect(),
+            ),
+            Constant::Dict(m) => Value::Dict(
+                m.iter()
+                    .map(|(s, c)| {
+                        let value = Value::from_const(vm, c, area.clone());
+                        // let g = s.into_utfstring();
+                        (
+                            s.clone().into_utfstring().into(),
+                            VisSource::Public(ValueRef::new(value.into_stored(area.clone()))),
+                        )
+                    })
+                    .collect(),
+            ),
+            Constant::Maybe(o) => Value::Maybe(o.clone().map(|c| {
+                let value = Value::from_const(vm, &c, area.clone());
+                ValueRef::new(value.into_stored(area.clone()))
+            })),
+            Constant::Builtins => Value::Builtins,
+            Constant::Empty => Value::Empty,
+            Constant::Instance { typ, items } => Value::Instance {
+                typ: *typ,
+                items: items
+                    .iter()
+                    .map(|(s, c)| {
+                        let value = Value::from_const(vm, c, area.clone());
+                        (
+                            s.clone().into_utfstring().into(),
+                            VisSource::Public(ValueRef::new(value.into_stored(area.clone()))),
+                        )
+                    })
+                    .collect(),
+            },
         }
     }
 
@@ -538,15 +580,3 @@ impl Value {
         StoredValue { value: self, area }
     }
 }
-
-// const fn glump<const N: usize>(arr: [usize; N]) -> usize {
-//     const I: usize = 0;
-//     const I: usize = 1;
-
-//     todo!()
-//     // let mut glub = 0;
-//     // for i in 0..N {
-//     //     glub += i
-//     // }
-//     // glub
-// }

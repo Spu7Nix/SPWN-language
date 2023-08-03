@@ -1,14 +1,66 @@
 use std::rc::Rc;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
+use super::context::Context;
 use super::error::RuntimeError;
+use super::multi::Multi;
 use super::value::{StoredValue, Value, ValueType};
 use super::vm::{Program, RuntimeResult, Vm};
+use crate::compiling::bytecode::OptRegister;
+use crate::gd::gd_object::ObjParam;
 use crate::parsing::ast::VisTrait;
 use crate::parsing::operators::operators::{AssignOp, BinOp, UnaryOp};
 use crate::sources::CodeSpan;
-use crate::util::{Str32, String32};
+use crate::util::String32;
+
+pub fn to_obj_param(
+    v: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    program: &Rc<Program>,
+) -> RuntimeResult<ObjParam> {
+    let param = 'm: {
+        match &v.value {
+            Value::Int(n) => Some(ObjParam::Number(*n as f64)),
+            Value::Float(n) => Some(ObjParam::Number(*n)),
+
+            Value::Group(id) => Some(ObjParam::Group(*id)),
+            Value::Channel(id) => Some(ObjParam::Channel(*id)),
+            Value::Block(id) => Some(ObjParam::Block(*id)),
+            Value::Item(id) => Some(ObjParam::Item(*id)),
+
+            Value::Bool(b) => Some(ObjParam::Bool(*b)),
+            Value::String(s) => Some(ObjParam::Text(s.to_string())),
+
+            Value::Epsilon => Some(ObjParam::Epsilon),
+
+            Value::TriggerFunction { group, .. } => Some(ObjParam::Group(*group)),
+
+            Value::Array(v) => {
+                let mut arr = vec![];
+                for k in v {
+                    match &k.borrow().value {
+                        Value::Group(g) => arr.push(*g),
+                        _ => break 'm None,
+                    }
+                }
+                Some(ObjParam::GroupList(arr))
+            },
+            // if v.iter().all(|k| {
+            //     matches!(&vm.memory[*k].value, Value::Group(_))
+            // }) => ObjParam::GroupList(v.iter().map(f))
+            // Value::Bool(b) => *b,
+            _ => None,
+        }
+    };
+
+    param.ok_or(RuntimeError::InvalidObjectValue {
+        value_area: v.area.clone(),
+        area: vm.make_area(span, program),
+        call_stack: vm.get_call_stack(),
+    })
+}
 
 pub fn to_bool(
     v: &StoredValue,
@@ -30,7 +82,7 @@ pub fn to_bool(
     })
 }
 
-pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
+pub fn equality(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Array(v1), Value::Array(v2)) => {
             if v1.len() != v2.len() {
@@ -38,7 +90,7 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
             } else {
                 v1.iter()
                     .zip(v2)
-                    .all(|(k1, k2)| equality(&k1.borrow().value, &k2.borrow().value, vm))
+                    .all(|(k1, k2)| equality(&k1.borrow().value, &k2.borrow().value))
             }
         },
         (Value::Dict(v1), Value::Dict(v2)) => {
@@ -48,8 +100,7 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
                 for (k, k1) in v1 {
                     match v2.get(k) {
                         Some(k2) => {
-                            if !equality(&k1.value().borrow().value, &k1.value().borrow().value, vm)
-                            {
+                            if !equality(&k1.value().borrow().value, &k2.value().borrow().value) {
                                 return false;
                             }
                         },
@@ -60,41 +111,116 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
             }
         },
         (Value::Maybe(Some(k1)), Value::Maybe(Some(k2))) => {
-            equality(&k1.borrow().value, &k2.borrow().value, vm)
+            equality(&k1.borrow().value, &k2.borrow().value)
         },
-        (Value::Dict { .. }, _) => todo!(),
-        (Value::Maybe { .. }, _) => todo!(),
-        (Value::Instance { .. }, _) => todo!(),
-        (Value::Module { .. }, _) => todo!(),
-        // todo: iterator, object
+        (
+            Value::Instance {
+                typ: typ1,
+                items: items1,
+            },
+            Value::Instance {
+                typ: typ2,
+                items: items2,
+            },
+        ) => {
+            if typ1 != typ2 || items1.len() != items2.len() {
+                false
+            } else {
+                for (k, k1) in items1 {
+                    match items2.get(k) {
+                        Some(k2) => {
+                            if !equality(&k1.value().borrow().value, &k2.value().borrow().value) {
+                                return false;
+                            }
+                        },
+                        None => return false,
+                    }
+                }
+                true
+            }
+        },
+        (
+            Value::Module {
+                exports: exports1,
+                types: types1,
+            },
+            Value::Module {
+                exports: exports2,
+                types: types2,
+            },
+        ) => {
+            if exports1.len() != exports2.len() || types1 != types2 {
+                false
+            } else {
+                for (k, k1) in exports1 {
+                    match exports2.get(k) {
+                        Some(k2) => {
+                            if !equality(&k1.borrow().value, &k2.borrow().value) {
+                                return false;
+                            }
+                        },
+                        None => return false,
+                    }
+                }
+                true
+            }
+        },
+        (
+            Value::Object {
+                typ: typ1,
+                params: params1,
+            },
+            Value::Object {
+                typ: typ2,
+                params: params2,
+            },
+        ) => {
+            if typ1 != typ2 || params1.len() != params2.len() {
+                false
+            } else {
+                for (k, k1) in params1 {
+                    match params2.get(k) {
+                        Some(k2) => {
+                            if k1 != k2 {
+                                return false;
+                            }
+                        },
+                        None => return false,
+                    }
+                }
+                true
+            }
+        },
         _ => a == b,
     }
 }
 
 fn in_op(
-    a: &StoredValue,
-    b: &StoredValue,
+    a: OptRegister,
+    b: OptRegister,
+    mut ctx: Context,
     span: CodeSpan,
     vm: &Vm,
     program: &Rc<Program>,
-) -> RuntimeResult<Value> {
-    Ok(match (&a.value, &b.value) {
-        (a, Value::Array(b)) => {
-            todo!("context shit overloading boboggl") // context shit overloading boboggl
-        },
+) -> Multi<RuntimeResult<Value>> {
+    todo!()
+    // Ok(match (&a.value, &b.value) {
+    //     (a, Value::Array(b)) => {
+    //         todo!("context shit overloading boboggl") // context shit overloading boboggl
+    //     },
 
-        (Value::String(s), Value::Dict(d)) => Value::Bool(d.contains_key(s)),
+    //     (Value::String(s), Value::Dict(d)) => Value::Bool(d.contains_key(s)),
 
-        _ => {
-            return Err(RuntimeError::InvalidOperands {
-                op: BinOp::In,
-                a: (a.value.get_type(), a.area.clone()),
-                b: (b.value.get_type(), b.area.clone()),
-                area: vm.make_area(span, program),
-                call_stack: vm.get_call_stack(),
-            })
-        },
-    })
+    //     _ => {
+    //         return Err(RuntimeError::InvalidOperands {
+    //             op: BinOp::In,
+    //             a: (a.value.get_type(), a.area.clone()),
+    //             b: (b.value.get_type(), b.area.clone()),
+    //             area: vm.make_area(span, program),
+    //             call_stack: vm.get_call_stack(),
+    //         })
+    //     },
+    // })
 }
 
 fn plus(
@@ -427,7 +553,11 @@ fn range(
                     step: *end as usize,
                 }
             } else {
-                todo!()
+                Value::Range {
+                    start: *start,
+                    end: *b,
+                    step: *step,
+                }
             }
         },
         // (Value::Int(a), Value::Float(b)) => Value::Range(*a, *b as i64, 1),
@@ -544,7 +674,7 @@ fn eq(
     vm: &Vm,
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
-    Ok(Value::Bool(equality(&a.value, &b.value, vm)))
+    Ok(Value::Bool(equality(&a.value, &b.value)))
 }
 
 fn neq(
@@ -554,35 +684,44 @@ fn neq(
     vm: &Vm,
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
-    Ok(Value::Bool(!equality(&a.value, &b.value, vm)))
+    Ok(Value::Bool(!equality(&a.value, &b.value)))
 }
 
 pub type BinOpFn =
     fn(&StoredValue, &StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>;
+pub type BinOpFnSplittable = fn(
+    OptRegister,
+    OptRegister,
+    bulgaria: Context,
+    CodeSpan,
+    &Vm,
+    &Rc<Program>,
+) -> Multi<RuntimeResult<Value>>;
 
 pub type UnaryOpFn = fn(&StoredValue, CodeSpan, &Vm, &Rc<Program>) -> RuntimeResult<Value>;
 
 impl BinOp {
-    pub fn get_fn(self) -> BinOpFn {
+    pub fn get_fn(self) -> Either<BinOpFn, BinOpFnSplittable> {
         match self {
-            BinOp::Range => range,
-            BinOp::In => in_op,
-            BinOp::BinOr => bin_or,
-            BinOp::BinAnd => bin_and,
-            BinOp::Eq => eq,
-            BinOp::Neq => neq,
-            BinOp::Gt => gt,
-            BinOp::Gte => gte,
-            BinOp::Lt => lt,
-            BinOp::Lte => lte,
-            BinOp::ShiftLeft => shift_left,
-            BinOp::ShiftRight => shift_right,
-            BinOp::Plus => plus,
-            BinOp::Minus => minus,
-            BinOp::Mult => mult,
-            BinOp::Div => div,
-            BinOp::Mod => modulo,
-            BinOp::Pow => pow,
+            BinOp::Range => Either::Left(range),
+            BinOp::BinOr => Either::Left(bin_or),
+            BinOp::BinAnd => Either::Left(bin_and),
+            BinOp::Eq => Either::Left(eq),
+            BinOp::Neq => Either::Left(neq),
+            BinOp::Gt => Either::Left(gt),
+            BinOp::Gte => Either::Left(gte),
+            BinOp::Lt => Either::Left(lt),
+            BinOp::Lte => Either::Left(lte),
+            BinOp::ShiftLeft => Either::Left(shift_left),
+            BinOp::ShiftRight => Either::Left(shift_right),
+            BinOp::Plus => Either::Left(plus),
+            BinOp::Minus => Either::Left(minus),
+            BinOp::Mult => Either::Left(mult),
+            BinOp::Div => Either::Left(div),
+            BinOp::Mod => Either::Left(modulo),
+            BinOp::Pow => Either::Left(pow),
+            // BinOp::As => Either::Right(pow),
+            BinOp::In => Either::Right(in_op),
             _ => unreachable!(),
         }
     }

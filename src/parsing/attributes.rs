@@ -135,7 +135,7 @@ pub(crate) mod attr_names {
     pub const DOC: &str = "doc";
     pub const DEBUG_BYTECODE: &str = "debug_bytecode";
     pub const BUILTIN: &str = "builtin";
-    pub const OVERLOAD: &str = "overload";
+    pub const ALIAS: &str = "alias";
 }
 
 pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
@@ -208,7 +208,7 @@ pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
         },
         Attribute {
             namespace: None,
-            name: attr_names::OVERLOAD,
+            name: attr_names::ALIAS,
             template: AttributeTemplate {
                 word: false,
                 list: None,

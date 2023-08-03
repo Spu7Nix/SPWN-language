@@ -47,7 +47,7 @@ impl ContextStorage {
         panic!("go fuck yourself")
     }
 
-    pub fn vec(&self) -> &Vec<ValueRef> {
+    pub fn vec(&self) -> &[ValueRef] {
         if let Self::Vec(v) = self {
             return v;
         }

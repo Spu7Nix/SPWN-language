@@ -1,3 +1,6 @@
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
+
 use super::optimize::{clean_network, is_start_group, replace_groups};
 use super::{
     obj_ids, obj_props, ReservedIds, Swaps, Trigger, TriggerGang, TriggerNetwork, Triggerlist,
@@ -44,8 +47,7 @@ pub(crate) fn param_identifier(param: &ObjParam) -> String {
     // str.hash(&mut hasher);
     // hasher.finish()
 }
-use std::cmp::Ordering;
-use std::collections::BTreeSet;
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct TriggerParam(u8, String);
 

@@ -1,18 +1,9 @@
 
-// import "libraries/core/array.spwn"
-
-// overload = {
-//     (a: @number, b: @string) {
-        
-//     },
-// }
-
-
-mut a = [5, 7];
-dbg a;
-a[0] += 3;
-dbg a;
 
 
 
-&a[0] = 5
+
+
+
+
+

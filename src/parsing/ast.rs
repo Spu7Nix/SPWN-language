@@ -390,7 +390,11 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
         cond: E,
     },
 
-    MacroPattern(Option<P>),
+    MacroPattern {
+        // (<pattern>...) -> <pattern>
+        args: Vec<P>,
+        ret: P,
+    },
 }
 
 impl<T, E> Pattern<T, PatternNode, E, Spur> {
@@ -408,7 +412,6 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
             Pattern::Path { var, .. } => interner.borrow().resolve(var) == "self",
             Pattern::Mut { name, .. } => interner.borrow().resolve(name) == "self",
             Pattern::IfGuard { pat, .. } => pat.pat.is_self(interner),
-            Pattern::MacroPattern { .. } => todo!(),
             _ => false,
         }
     }
@@ -432,10 +435,8 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
                 .iter()
                 .any(|(_, p)| p.as_ref().is_some_and(|p| p.pat.needs_mut())),
             Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.needs_mut()),
-            Pattern::Path { .. } => false,
             Pattern::Mut { is_ref, .. } => *is_ref,
             Pattern::IfGuard { pat, .. } => pat.pat.needs_mut(),
-            Pattern::MacroPattern { .. } => todo!(),
             _ => false,
         }
     }

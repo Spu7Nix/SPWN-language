@@ -2,9 +2,9 @@ use super::{CompileResult, Compiler};
 use crate::compiling::error::CompileError;
 use crate::parsing::ast::{AttrArgs, Attribute, Expression};
 use crate::parsing::attributes::attr_names;
-use crate::sources::Spanned;
+use crate::sources::{Spannable, Spanned};
 
-pub struct Overload {
+pub struct Alias {
     pub name: String,
 }
 
@@ -28,18 +28,21 @@ impl Compiler<'_> {
         self.find_attr_by_str_name(attrs, attr_names::BUILTIN)
     }
 
-    pub fn find_overload_attr(&self, attrs: &[Attribute]) -> CompileResult<Option<Overload>> {
+    pub fn find_alias_attr(&self, attrs: &[Attribute]) -> CompileResult<Option<Spanned<Alias>>> {
         for attr in attrs {
-            if self.interner.borrow().resolve(&*attr.item.name) != attr_names::OVERLOAD {
+            if self.interner.borrow().resolve(&*attr.item.name) != attr_names::ALIAS {
                 continue;
             }
 
             match &attr.item.args {
                 AttrArgs::Eq(expr) => match &*expr.expr {
                     Expression::Var(s) => {
-                        return Ok(Some(Overload {
-                            name: self.interner.borrow().resolve(s).into(),
-                        }))
+                        return Ok(Some(
+                            Alias {
+                                name: self.interner.borrow().resolve(s).into(),
+                            }
+                            .spanned(attr.span),
+                        ))
                     },
                     _ => {
                         return Err(CompileError::InvalidAttributeArgType {

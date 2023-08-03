@@ -9,6 +9,7 @@ use std::rc::Rc;
 use ahash::AHashMap;
 use base64::Engine;
 use colored::Colorize;
+use delve::VariantNames;
 use derive_more::{Deref, DerefMut};
 use itertools::{Either, Itertools};
 
@@ -22,12 +23,12 @@ use crate::compiling::bytecode::{
 use crate::compiling::opcodes::{CallExprID, ConstID, Opcode, RuntimeStringFlag};
 use crate::gd::gd_object::{make_spawn_trigger, TriggerObject, TriggerOrder};
 use crate::gd::ids::{IDClass, Id};
-use crate::gd::object_keys::{ObjectKey, OBJECT_KEYS};
+use crate::gd::object_keys::{ObjectKey, ObjectKeyValueType, OBJECT_KEYS};
 use crate::interpreting::builtins;
 use crate::interpreting::context::TryCatch;
 use crate::interpreting::error::RuntimeError;
 use crate::interpreting::value::{BuiltinClosure, MacroData};
-use crate::parsing::ast::{Vis, VisSource, VisTrait};
+use crate::parsing::ast::{ObjectType, Vis, VisSource, VisTrait};
 use crate::parsing::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap};
 use crate::util::{ImmutCloneStr32, ImmutStr, Str32, String32};
@@ -326,7 +327,6 @@ impl DeepClone<&StoredValue> for Vm {
             v @ (Value::Macro(data) | Value::Iterator(data)) => {
                 let mut new_data = data.clone();
                 for r in new_data.defaults.iter_mut().flatten() {
-                    // if let Some(r) = i {
                     *r = r.deep_clone_checked(self, map)
                     // }
                 }
@@ -352,7 +352,7 @@ impl DeepClone<&StoredValue> for Vm {
                     Value::Iterator(new_data)
                 }
             },
-            // todo: iterator, object
+            Value::Object { .. } => todo!(),
             v => v.clone(),
         };
 
@@ -554,7 +554,22 @@ impl Vm {
                         top.ip += 1;
 
                         self.assign_op(
-                            AssignOp::$op,
+                            Either::Left(AssignOp::$op),
+                            &program,
+                            $a,
+                            $b,
+                            top,
+                            &mut out_contexts,
+                            opcode_span,
+                        );
+                        return Ok(LoopFlow::ContinueLoop);
+                    }};
+                    (= $deep:expr, $a:ident, $b:ident) => {{
+                        let mut top = self.context_stack.last_mut().yeet_current().unwrap();
+                        top.ip += 1;
+
+                        self.assign_op(
+                            Either::Right($deep),
                             &program,
                             $a,
                             $b,
@@ -585,7 +600,11 @@ impl Vm {
 
                 match opcode {
                     Opcode::LoadConst { id, to } => {
-                        let value = Value::from_const(self, program.get_constant(id));
+                        let value = Value::from_const(
+                            self,
+                            program.get_constant(id),
+                            self.make_area(opcode_span, &program),
+                        );
                         self.change_reg(
                             to,
                             value.into_stored(self.make_area(opcode_span, &program)),
@@ -606,11 +625,10 @@ impl Vm {
                     },
                     Opcode::WriteDeep { from, to } => self.write_pointee(to, self.deep_clone(from)),
                     Opcode::AssignRef { from, to } => {
-                        let v = self.get_reg_ref(from).borrow().clone();
-                        self.write_pointee(to, v)
+                        assign_op!(= false, to, from);
                     },
                     Opcode::AssignDeep { from, to } => {
-                        self.write_pointee(to, self.deep_clone(from))
+                        assign_op!(= true, to, from);
                     },
                     Opcode::Plus { a, b, to } => {
                         bin_op!(Plus, a, b, to);
@@ -640,7 +658,6 @@ impl Vm {
                         let v = Value::Bool(value_ops::equality(
                             &self.get_reg_ref(a).borrow().value,
                             &self.get_reg_ref(b).borrow().value,
-                            self,
                         ));
                         self.change_reg(to, v.into_stored(self.make_area(opcode_span, &program)));
                     },
@@ -648,7 +665,6 @@ impl Vm {
                         let v = Value::Bool(!value_ops::equality(
                             &self.get_reg_ref(a).borrow().value,
                             &self.get_reg_ref(b).borrow().value,
-                            self,
                         ));
                         self.change_reg(to, v.into_stored(self.make_area(opcode_span, &program)));
                     },
@@ -937,6 +953,97 @@ impl Vm {
                                 .into_stored(self.make_area(opcode_span, &program)),
                         )
                     },
+
+                    Opcode::AllocObject { dest, capacity } => self.change_reg(
+                        dest,
+                        StoredValue {
+                            value: Value::Object {
+                                params: AHashMap::with_capacity(capacity as usize),
+                                typ: ObjectType::Object,
+                            },
+                            area: self.make_area(opcode_span, &program),
+                        },
+                    ),
+                    Opcode::AllocTrigger { dest, capacity } => self.change_reg(
+                        dest,
+                        StoredValue {
+                            value: Value::Object {
+                                params: AHashMap::with_capacity(capacity as usize),
+                                typ: ObjectType::Trigger,
+                            },
+                            area: self.make_area(opcode_span, &program),
+                        },
+                    ),
+                    Opcode::PushObjectElemKey {
+                        elem,
+                        obj_key,
+                        dest,
+                    } => {
+                        // Objec
+                        let push = self.deep_clone(elem);
+
+                        let param = {
+                            let types = obj_key.types();
+
+                            let mut valid = false;
+
+                            for t in types {
+                                match (t, &push.value) {
+                                    (ObjectKeyValueType::Int, Value::Int(_))
+                                    | (
+                                        ObjectKeyValueType::Float,
+                                        Value::Float(_) | Value::Int(_),
+                                    )
+                                    | (ObjectKeyValueType::Bool, Value::Bool(_))
+                                    | (
+                                        ObjectKeyValueType::Group,
+                                        Value::Group(_) | Value::TriggerFunction { .. },
+                                    )
+                                    | (ObjectKeyValueType::Channel, Value::Channel(_))
+                                    | (ObjectKeyValueType::Block, Value::Block(_))
+                                    | (ObjectKeyValueType::Item, Value::Item(_))
+                                    | (ObjectKeyValueType::String, Value::String(_))
+                                    | (ObjectKeyValueType::Epsilon, Value::Epsilon) => {
+                                        valid = true;
+                                        break;
+                                    },
+
+                                    (ObjectKeyValueType::GroupArray, Value::Array(v))
+                                        if v.iter().all(|k| {
+                                            matches!(&k.borrow().value, Value::Group(_))
+                                        }) =>
+                                    {
+                                        valid = true;
+                                        break;
+                                    },
+
+                                    _ => (),
+                                }
+                            }
+
+                            if !valid {
+                                println!("{:?} {:?}", types, &push.value);
+                                // todo!()
+                                todo!(
+                                    "\n\nOk   heres the deal!!! I not this yet XDXDC😭😭🤣🤣 \nLOl"
+                                )
+                            }
+
+                            value_ops::to_obj_param(&push, opcode_span, self, &program)?
+                        };
+
+                        match &mut self.get_reg_ref(dest).borrow_mut().value {
+                            Value::Object { params, .. } => {
+                                params.insert(obj_key.id(), param);
+                            },
+                            _ => unreachable!(),
+                        }
+                    },
+                    Opcode::PushObjectElemUnchecked {
+                        elem,
+                        obj_key,
+                        dest,
+                    } => todo!(),
                     Opcode::EnterArrowStatement { skip } => {
                         // println!("futa");
                         // println!("smeagol: {}", self.context_stack.current().unique_id);
@@ -1462,6 +1569,20 @@ impl Vm {
                                 .into_stored(self.make_area(opcode_span, &program)),
                         )
                     },
+                    Opcode::ArgAmount { src, dest } => {
+                        let amount = match &self.get_reg_ref(src).borrow().value {
+                            Value::Macro(data) => data.defaults.len(),
+                            _ => {
+                                unreachable!()
+                            },
+                        };
+
+                        self.change_reg(
+                            dest,
+                            Value::Int(amount as i64)
+                                .into_stored(self.make_area(opcode_span, &program)),
+                        )
+                    },
                     Opcode::MismatchThrowIfFalse {
                         check_reg,
                         value_reg,
@@ -1605,10 +1726,10 @@ impl Vm {
                                     &*program.src,
                                     SpwnSource::Core(_) | SpwnSource::Std(_)
                                 ) {
-                                    // return Err(RuntimeError::ImplOnBuiltin {
-                                    //     area: self.make_area(opcode_span, &program),
-                                    //     call_stack: self.get_call_stack(),
-                                    // });
+                                    return Err(RuntimeError::ImplOnBuiltin {
+                                        area: self.make_area(opcode_span, &program),
+                                        call_stack: self.get_call_stack(),
+                                    });
                                 }
                             },
                         }
@@ -1843,10 +1964,10 @@ impl Vm {
         call_area: CodeArea,
         program: &Rc<Program>,
     ) -> Multi<RuntimeResult<ValueRef>> {
-        let base = base.borrow();
-        let base_area = base.area.clone();
+        let base_ref = base.borrow();
+        let base_area = base_ref.area.clone();
 
-        match &base.value {
+        match &base_ref.value {
             Value::Macro(data) | Value::Iterator(data) => {
                 let (args, spread_arg): (
                     Box<dyn Iterator<Item = (Option<&ImmutStr>, Mutability)>>,
@@ -2018,7 +2139,7 @@ impl Vm {
                         let is_builtin = *is_builtin;
                         let captured = captured.clone();
 
-                        mem::drop(base);
+                        mem::drop(base_ref);
 
                         self.run_function(
                             ctx,
@@ -2060,7 +2181,7 @@ impl Vm {
                     },
                     MacroTarget::FullyRust { fn_ptr, .. } => {
                         let fn_ptr = fn_ptr.clone();
-                        mem::drop(base);
+                        mem::drop(base_ref);
 
                         let x = fn_ptr.borrow_mut()(
                             {
@@ -2086,16 +2207,34 @@ impl Vm {
                     },
                 }
             },
-            v => Multi::new_single(
-                ctx,
-                Err(RuntimeError::TypeMismatch {
-                    value_type: v.get_type(),
-                    value_area: base_area,
-                    expected: &[ValueType::Macro, ValueType::Iterator],
-                    area: call_area.clone(),
-                    call_stack: self.get_call_stack(),
-                }),
-            ),
+            Value::Type(vt) => {
+                todo!()
+            },
+            v => {
+                if let Some(v) = self.get_impl(v.get_type(), "_call_") {
+                    let mut positional = vec![(base.clone(), true)];
+                    for i in positional_args {
+                        positional.push(i.clone())
+                    }
+                    return self.call_value(
+                        ctx,
+                        v.value().clone(),
+                        &positional,
+                        named_args,
+                        call_area.clone(),
+                        program,
+                    );
+                }
+
+                Multi::new_single(
+                    ctx,
+                    Err(RuntimeError::CannotCall {
+                        value: (v.get_type(), base_area),
+                        area: call_area.clone(),
+                        call_stack: self.get_call_stack(),
+                    }),
+                )
+            },
         }
     }
 
@@ -2111,10 +2250,7 @@ impl Vm {
         out_contexts: &mut Vec<Context>,
         span: CodeSpan,
     ) {
-        // TODO: overloads // no longer todo you absolute fucking fuckwit, you fucking dumbass, you are so fucking dumb holy fucking shit, i wish i was an egirl
-
-        let left_ref = ctx.stack.last().unwrap().registers[*left as usize].clone();
-        let right_ref = ctx.stack.last().unwrap().registers[*right as usize].clone();
+        // TOODO: overloads // no longer toodo you absolute fucking fuckwit, you fucking dumbass, you are so fucking dumb holy fucking shit, i wish i was an egirl
 
         let mut out = Multi::new_single(ctx, None);
 
@@ -2123,10 +2259,15 @@ impl Vm {
                 out = out.flat_map(|ctx, v| {
                     if v.as_ref().is_none() {
                         let check_id = self.pattern_mismatch_id_count;
+
+                        let left_ref = ctx.stack.last().unwrap().registers[*left as usize].clone();
+                        let right_ref =
+                            ctx.stack.last().unwrap().registers[*right as usize].clone();
+
                         self.call_value(
                             ctx,
                             base.clone(),
-                            &[(left_ref.clone(), false), (right_ref.clone(), false)],
+                            &[(left_ref, false), (right_ref, false)],
                             &[],
                             self.make_area(span, program),
                             program,
@@ -2150,21 +2291,56 @@ impl Vm {
             }
         }
 
-        let out = out.map(|ctx, v| {
-            let v = match v {
-                Some(Ok(v)) => Ok(v),
-                Some(Err(err)) => Err(err),
-                None => op.get_fn()(
-                    &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
-                    &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
-                    span,
-                    self,
-                    program,
-                )
-                .map(|v| ValueRef::new(v.into_stored(self.make_area(span, program)))),
-            };
-            (ctx, v)
-        });
+        let func = op.get_fn();
+
+        let out = match func {
+            Either::Left(func) => out.map(|ctx, v| {
+                let v = match v {
+                    Some(Ok(v)) => Ok(v),
+                    Some(Err(err)) => Err(err),
+                    None => func(
+                        &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
+                        &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
+                        span,
+                        self,
+                        program,
+                    )
+                    .map(|v| ValueRef::new(v.into_stored(self.make_area(span, program)))),
+                };
+                (ctx, v)
+            }),
+            Either::Right(func) => out.flat_map(|ctx, v| {
+                let v = match v {
+                    Some(Ok(v)) => Ok(v),
+                    Some(Err(err)) => Err(err),
+                    None => {
+                        return func(left, right, ctx, span, self, program).try_map(|ctx, v| {
+                            (
+                                ctx,
+                                Ok(ValueRef::new(v.into_stored(self.make_area(span, program)))),
+                            )
+                        })
+                    },
+                };
+                Multi::new_single(ctx, v)
+            }),
+        };
+
+        // let out = out.map(|ctx, v| {
+        //     let v = match v {
+        //         Some(Ok(v)) => Ok(v),
+        //         Some(Err(err)) => Err(err),
+        //         None => op.get_fn()(
+        //             &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
+        //             &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
+        //             span,
+        //             self,
+        //             program,
+        //         )
+        //         .map(|v| ValueRef::new(v.into_stored(self.make_area(span, program)))),
+        //     };
+        //     (ctx, v)
+        // });
 
         self.change_reg_multi(to, out, out_contexts);
     }
@@ -2172,28 +2348,44 @@ impl Vm {
     #[inline]
     fn assign_op(
         &mut self,
-        op: AssignOp,
+        // left: any assign eq
+        // right: normal assign, bool: is by ref
+        op: Either<AssignOp, bool>,
         program: &Rc<Program>,
         left: OptRegister,
         right: OptRegister,
-        ctx: Context,
+        mut ctx: Context,
         out_contexts: &mut Vec<Context>,
         span: CodeSpan,
     ) {
-        let left_ref = ctx.stack.last().unwrap().registers[*left as usize].clone();
-        let right_ref = ctx.stack.last().unwrap().registers[*right as usize].clone();
+        if let Either::Right(true) = op {
+            let v = ctx.stack.last().unwrap().registers[*right as usize].clone();
+            ctx.stack.last_mut().unwrap().registers[*right as usize] = self.deep_clone_ref(&v)
+        }
 
         let mut out: Multi<Option<Result<(), RuntimeError>>> = Multi::new_single(ctx, None);
 
-        if let Some(v) = self.overloads.get(&Operator::Assign(op)).cloned() {
+        if let Some(v) = self
+            .overloads
+            .get(&match op {
+                Either::Left(op) => Operator::Assign(op),
+                Either::Right(_) => Operator::EqAssign,
+            })
+            .cloned()
+        {
             for base in v {
                 out = out.flat_map(|ctx, v| {
                     if v.as_ref().is_none() {
                         let check_id = self.pattern_mismatch_id_count;
+
+                        let left_ref = ctx.stack.last().unwrap().registers[*left as usize].clone();
+                        let right_ref =
+                            ctx.stack.last().unwrap().registers[*right as usize].clone();
+
                         self.call_value(
                             ctx,
                             base.clone(),
-                            &[(left_ref.clone(), true), (right_ref.clone(), false)],
+                            &[(left_ref, true), (right_ref, false)],
                             &[],
                             self.make_area(span, program),
                             program,
@@ -2217,19 +2409,26 @@ impl Vm {
             }
         }
 
-        let out = out.map(|ctx, v| {
+        // Right(deep) -> do normal `=` assign shit
+        // Left(None) -> aint do nun
+        // Left(Some(v)) -> will store `v` in `left`
+
+        let out: Multi<RuntimeResult<Either<Option<StoredValue>, bool>>> = out.map(|ctx, v| {
             let v = match v {
-                Some(Ok(_)) => Ok(None),
+                Some(Ok(_)) => Ok(Either::Left(None)),
                 Some(Err(err)) => Err(err),
-                None => op.get_fn()(
-                    &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
-                    &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
-                    span,
-                    self,
-                    program,
-                )
-                .map(|v| v.into_stored(self.make_area(span, program)))
-                .map(Some),
+                None => match op {
+                    Either::Left(op) => op.get_fn()(
+                        &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
+                        &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
+                        span,
+                        self,
+                        program,
+                    )
+                    .map(|v| v.into_stored(self.make_area(span, program)))
+                    .map(|v| Either::Left(Some(v))),
+                    Either::Right(deep) => Ok(Either::Right(deep)),
+                },
             };
             (ctx, v)
         });
@@ -2237,10 +2436,29 @@ impl Vm {
         self.insert_multi(
             out,
             |ctx, v| {
-                if let Some(v) = v {
-                    let mut g =
-                        ctx.stack.last_mut().unwrap().registers[*left as usize].borrow_mut();
-                    *g = v;
+                match v {
+                    Either::Left(Some(v)) => {
+                        let mut g =
+                            ctx.stack.last_mut().unwrap().registers[*left as usize].borrow_mut();
+                        *g = v;
+                    },
+                    Either::Right(deep) => {
+                        // println!("halquimura {}", deep);
+                        if deep {
+                            let right_val = ctx.stack.last().unwrap().registers[*right as usize]
+                                .borrow()
+                                .clone();
+                            // println!("olgacock {:?}", right_val.value);
+                            let mut g = ctx.stack.last_mut().unwrap().registers[*left as usize]
+                                .borrow_mut();
+                            *g = right_val;
+                        } else {
+                            let right_ref =
+                                ctx.stack.last().unwrap().registers[*right as usize].clone();
+                            ctx.stack.last_mut().unwrap().registers[*left as usize] = right_ref;
+                        }
+                    },
+                    _ => (),
                 }
             },
             out_contexts,
@@ -2258,8 +2476,6 @@ impl Vm {
         out_contexts: &mut Vec<Context>,
         span: CodeSpan,
     ) {
-        let value_ref = ctx.stack.last().unwrap().registers[*value as usize].clone();
-
         let mut out = Multi::new_single(ctx, None);
 
         if let Some(v) = self.overloads.get(&Operator::Unary(op)).cloned() {
@@ -2267,6 +2483,8 @@ impl Vm {
                 out = out.flat_map(|ctx, v| {
                     if v.as_ref().is_none() {
                         let check_id = self.pattern_mismatch_id_count;
+                        let value_ref =
+                            ctx.stack.last().unwrap().registers[*value as usize].clone();
                         self.call_value(
                             ctx,
                             base.clone(),
@@ -2352,13 +2570,9 @@ impl Vm {
                 }
             },
             (Value::Int(i), ValueType::Error) => Value::Error(*i as usize),
+
             (Value::Float(i), ValueType::Int) => Value::Int(*i as i64),
 
-            (_, ValueType::String) => {
-                return self
-                    .runtime_display(ctx, v, &self.make_area(span, program), program)
-                    .try_map(|ctx, v| (ctx, Ok(Value::String(String32::from_str(&v).into()))))
-            },
             (Value::Bool(b), ValueType::Int) => Value::Int(*b as i64),
             (Value::Bool(b), ValueType::Float) => Value::Float(*b as i64 as f64),
 
@@ -2405,7 +2619,6 @@ impl Vm {
                     )
                 },
             },
-
             (Value::String(s), ValueType::Array) => Value::Array(
                 s.chars()
                     .map(|c| {
@@ -2417,6 +2630,11 @@ impl Vm {
                     .collect(),
             ),
 
+            (_, ValueType::String) => {
+                return self
+                    .runtime_display(ctx, v, &self.make_area(span, program), program)
+                    .try_map(|ctx, v| (ctx, Ok(Value::String(String32::from_str(&v).into()))))
+            },
             (v, ValueType::Type) => Value::Type(v.get_type()),
 
             _ => {
@@ -2435,7 +2653,6 @@ impl Vm {
     }
 
     pub fn hash_value(&self, val: &ValueRef, state: &mut DefaultHasher) {
-        // todo: rest
         std::mem::discriminant(&val.borrow().value).hash(state);
 
         match &val.borrow().value {
@@ -2522,8 +2739,6 @@ impl Vm {
                 if let Some(v) = self_arg {
                     self.hash_value(v, state)
                 }
-                // data.func.h
-                // data.hash(state)
             },
             Value::Epsilon => (),
             Value::Instance { typ, items } => {
@@ -2537,6 +2752,13 @@ impl Vm {
             },
             Value::Chroma { r, g, b, a } => (r, g, b, a).hash(state),
             Value::ObjectKey(a) => a.hash(state),
+            Value::Object { params, typ } => {
+                for (id, p) in params {
+                    id.hash(state);
+                    p.hash(state);
+                }
+                typ.hash(state);
+            },
         }
     }
 
@@ -2647,7 +2869,6 @@ impl Vm {
             },
             Value::TriggerFunction { .. } => "!{...}".to_string(),
             Value::Error(id) => {
-                use delve::VariantNames;
                 format!(
                     "{} {{...}}",
                     crate::interpreting::error::ErrorDiscriminants::VARIANT_NAMES[*id]
@@ -2667,9 +2888,19 @@ impl Vm {
                         program,
                     );
 
+                    // todo: while calling overload error
+
                     return ret.try_map(|ctx, v| match &v.borrow().value {
                         Value::String(v) => (ctx, Ok(v.as_ref().into())),
-                        _ => todo!(),
+                        v => (
+                            ctx,
+                            Err(RuntimeError::InvalidReturnTypeForBuiltin {
+                                area: area.clone(),
+                                found: v.get_type(),
+                                expected: ValueType::String,
+                                builtin: "_display_",
+                            }),
+                        ),
                     });
                 }
 
@@ -2691,6 +2922,14 @@ impl Vm {
 
                 return ret.try_map(|c, v| (c, Ok(format!("{}::{{{}}}", t, v.iter().join(", ")))));
             },
+            Value::Object { params, typ } => format!(
+                "{} {{ {} }}",
+                match typ {
+                    ObjectType::Object => "obj",
+                    ObjectType::Trigger => "trigger",
+                },
+                params.iter().map(|(s, k)| format!("{s}: {k:?}")).join(", ")
+            ),
         };
         Multi::new_single(ctx, Ok(s))
     }
@@ -2905,9 +3144,19 @@ impl Vm {
                         program,
                     );
 
+                    // todo: while calling overload error
+
                     return ret.try_map(|ctx, v| match &v.borrow().value {
                         Value::Iterator(v) => (ctx, Ok(v.clone())),
-                        _ => todo!(),
+                        v => (
+                            ctx,
+                            Err(RuntimeError::InvalidReturnTypeForBuiltin {
+                                area: area.clone(),
+                                found: v.get_type(),
+                                expected: ValueType::Iterator,
+                                builtin: "_iter_",
+                            }),
+                        ),
                     });
                 }
 
@@ -2923,13 +3172,5 @@ impl Vm {
         };
 
         Multi::new_single(ctx, Ok(data))
-
-        // fn biddy() {
-        //     crate::interpreting::builtins::raw_macro! {
-        //         let dig = (&mut Array(slf) as "self", gaga) {
-        //             todo!()
-        //         } ctx vm program area
-        //     }
-        // }
     }
 }

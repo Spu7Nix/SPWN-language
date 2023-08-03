@@ -347,9 +347,21 @@ impl<'a> Compiler<'a> {
                 }
             },
             Statement::Impl { name, items } => {
-                let dict_reg = self.compile_dictlike(items, scope, stmt.span, builder)?;
+                let mut new_items = items.clone();
+
+                for item in items {
+                    if let Some(alias) = self.find_alias_attr(&item.value().attributes)? {
+                        let mut aliased = item.clone();
+                        aliased.value_mut().name = self.intern(&alias.name).spanned(alias.span);
+                        new_items.push(aliased);
+                    }
+                }
+
+                let dict_reg = self.compile_dictlike(&new_items, scope, stmt.span, builder)?;
                 let typ_reg = builder.next_reg();
+
                 self.load_type(&name.value, typ_reg, name.span, builder)?;
+
                 builder.push_raw_opcode(
                     Opcode::Impl {
                         base: typ_reg,

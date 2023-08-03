@@ -475,6 +475,13 @@ impl<'a> CodeBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(Opcode::AllocDict { dest, capacity }), span)
     }
 
+    pub fn alloc_obj(&mut self, dest: UnoptRegister, capacity: u16, span: CodeSpan) {
+        self.push_opcode(
+            ProtoOpcode::Raw(Opcode::AllocObject { dest, capacity }),
+            span,
+        )
+    }
+
     pub fn insert_dict_elem(
         &mut self,
         elem: UnoptRegister,
@@ -771,6 +778,10 @@ impl<'a> CodeBuilder<'a> {
 
     pub fn len(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
         self.push_opcode(ProtoOpcode::Raw(Opcode::Len { src, dest }), span)
+    }
+
+    pub fn arg_amount(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::ArgAmount { src, dest }), span)
     }
 
     pub fn call(

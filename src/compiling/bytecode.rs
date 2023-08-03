@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::Index;
@@ -24,14 +25,15 @@ use crate::util::{remove_quotes, Digest, ImmutStr, ImmutStr32, ImmutVec, SlabMap
 
 #[derive(Clone, Debug, From, EnumDisplay, Serialize, Deserialize)]
 pub enum Constant {
-    #[delve(display = |i: &i64| format!("{i}"))]
+    #[delve(display = |i| format!("{i}"))]
     Int(i64),
-    #[delve(display = |i: &f64| format!("{i}"))]
+    #[delve(display = |i| format!("{i}"))]
     Float(f64),
-    #[delve(display = |i: &bool| format!("{i}"))]
+    #[delve(display = |i| format!("{i}"))]
     Bool(bool),
-    #[delve(display = |i: &ImmutStr32| format!("{:?}", i))]
+    #[delve(display = |i| format!("{:?}", i))]
     String(ImmutStr32),
+
     #[delve(display = |t: &ValueType| {
         format!(
             "@{}",
@@ -42,8 +44,29 @@ pub enum Constant {
         )
     })]
     Type(ValueType),
-    #[delve(display = |class: &IDClass, id: &u16| format!("{id}{class}"))]
+
+    #[delve(display = |class, id| format!("{id}{class}"))]
     Id(IDClass, u16),
+
+    #[delve(display = |a: &Vec<Constant>| format!("[{}]", a.iter().map(|a| format!("{a}")).join(", ")))]
+    Array(Vec<Constant>),
+
+    #[delve(display = |d: &AHashMap<ImmutStr32, Constant>| format!("{{{}}}", d.iter().map(|(k, v)| format!("{k}: {v}")).join(", ")))]
+    Dict(AHashMap<ImmutStr32, Constant>),
+
+    #[delve(display = |m: &Option<Box<Constant>>| format!("{}?", m.as_ref().map(|v| format!("{v}")).unwrap_or("".into())))]
+    Maybe(Option<Box<Constant>>),
+
+    #[delve(display = "$")]
+    Builtins,
+    #[delve(display = "()")]
+    Empty,
+
+    #[delve(display = |_, i: &AHashMap<ImmutStr32, Box<Constant>>| format!("@<type>::{{{}}}", i.iter().map(|(k, v)| format!("{k}: {v}")).join(", ")))]
+    Instance {
+        typ: CustomTypeID,
+        items: AHashMap<ImmutStr32, Box<Constant>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -65,6 +88,29 @@ impl Hash for Constant {
             Constant::Id(class, id) => {
                 class.hash(state);
                 id.hash(state);
+            },
+            Constant::Array(v) => {
+                for i in v {
+                    v.hash(state)
+                }
+            },
+            Constant::Dict(map) => {
+                let a: BTreeMap<_, _> = map.iter().collect();
+                for (k, v) in a {
+                    v.hash(state);
+                    k.hash(state);
+                }
+            },
+            Constant::Maybe(m) => m.hash(state),
+            Constant::Builtins => "$".hash(state),
+            Constant::Empty => "()".hash(state),
+            Constant::Instance { typ, items } => {
+                let a: BTreeMap<_, _> = items.iter().collect();
+                for (k, v) in a {
+                    v.hash(state);
+                    k.hash(state);
+                }
+                typ.hash(state);
             },
         }
     }

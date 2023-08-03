@@ -318,7 +318,7 @@ impl Compiler<'_> {
 
     pub fn compile_dictlike(
         &mut self,
-        items: &Vec<Vis<DictItem>>,
+        items: &[Vis<DictItem>],
         scope: ScopeID,
         span: CodeSpan,
         builder: &mut CodeBuilder<'_>,
@@ -363,9 +363,7 @@ impl Compiler<'_> {
             Expression::Member { base, .. } => self.is_mut_expr(base, scope)?,
             Expression::Associated { base, .. } => self.is_mut_expr(base, scope)?,
             Expression::Ternary {
-                cond,
-                if_true,
-                if_false,
+                if_true, if_false, ..
             } => self.is_mut_expr(if_true, scope)? && self.is_mut_expr(if_false, scope)?,
             _ => false,
         })

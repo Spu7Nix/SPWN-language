@@ -14,7 +14,8 @@ use crate::compiling::opcodes::{Opcode, RuntimeStringFlag};
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{
-    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, StringType, VisTrait,
+    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, ObjKeyType,
+    ObjectType, StringType, VisTrait,
 };
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::{CodeSpan, Spannable, SpwnSource, ZEROSPAN};
@@ -314,7 +315,7 @@ impl Compiler<'_> {
                     .map(|(s, p)| {
                         match self.compile_expr(p, scope, builder) {
                             Ok(v) => Ok((self.resolve(&s.value), v, self.is_mut_expr(p, scope)?)),
-                            Err(e) => return Err(e), // e?
+                            Err(e) => Err(e), // e?
                         }
                     })
                     .collect::<Result<Vec<_>, _>>()?
@@ -371,6 +372,12 @@ impl Compiler<'_> {
                     .collect_vec();
 
                 let is_builtin = self.find_builtin_attr(&expr.attributes);
+                if is_builtin && !matches!(&*self.src, SpwnSource::Core(..)) {
+                    return Err(CompileError::BuiltinAttrOutsideOfCore {
+                        area: self.make_area(expr.span),
+                    });
+                }
+
                 let is_debug = self.find_debug_bytecode_attr(&expr.attributes);
 
                 let func_id = builder.new_func(
@@ -666,23 +673,44 @@ impl Compiler<'_> {
                 Ok(out)
             },
             Expression::Obj(typ, items) => {
-                todo!();
-                // builder.new_object(
-                //     items.len() as u16,
-                //     out_reg,
-                //     |builder, elems| {
-                //         for (key, expr) in items {
-                //             let value_reg =
-                //                 self.compile_expr(expr, scope, builder, ExprType::normal())?;
+                let dest = builder.next_reg();
+                match typ {
+                    ObjectType::Object => builder.push_raw_opcode(
+                        Opcode::AllocObject {
+                            dest,
+                            capacity: items.len() as u16,
+                        },
+                        expr.span,
+                    ),
+                    ObjectType::Trigger => builder.push_raw_opcode(
+                        Opcode::AllocTrigger {
+                            dest,
+                            capacity: items.len() as u16,
+                        },
+                        expr.span,
+                    ),
+                }
+                for (key, expr) in items {
+                    let value_reg = self.compile_expr(expr, scope, builder)?;
 
-                //             elems.push((*key, value_reg));
-                //         }
+                    builder.push_raw_opcode(
+                        match key.value {
+                            ObjKeyType::Name(k) => Opcode::PushObjectElemKey {
+                                elem: value_reg,
+                                obj_key: k,
+                                dest,
+                            },
+                            ObjKeyType::Num(n) => Opcode::PushObjectElemUnchecked {
+                                elem: value_reg,
+                                obj_key: n,
+                                dest,
+                            },
+                        },
+                        key.span,
+                    )
+                }
 
-                //         Ok(())
-                //     },
-                //     expr.span,
-                //     *typ,
-                // )?;
+                Ok(dest)
             },
         }
     }

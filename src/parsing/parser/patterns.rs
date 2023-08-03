@@ -9,7 +9,7 @@ use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable};
 
 impl<'a> Parser<'a> {
-    pub fn parse_pattern_value(&mut self) -> ParseResult<PatternNode> {
+    fn parse_pattern_value(&mut self) -> ParseResult<PatternNode> {
         let start = self.peek_span()?;
 
         macro_rules! dictlike_destructure {
@@ -163,18 +163,27 @@ impl<'a> Parser<'a> {
                 },
                 Token::LParen => {
                     if self.skip_tok(Token::RParen)? {
-                        self.expect_tok(Token::FatArrow)?;
-                        self.expect_tok(Token::Spread)?;
-                        Pattern::MacroPattern(None)
+                        self.expect_tok(Token::Arrow)?;
+                        let ret = self.parse_pattern()?;
+                        Pattern::MacroPattern { args: vec![], ret }
                     } else {
                         let p = self.parse_pattern()?;
-                        self.expect_tok(Token::RParen)?;
-
-                        if self.skip_tok(Token::FatArrow)? {
-                            self.expect_tok(Token::Spread)?;
-                            Pattern::MacroPattern(Some(p))
+                        if self.skip_tok(Token::Comma)? {
+                            let mut args = vec![p];
+                            list_helper!(self, RParen {
+                                args.push(self.parse_pattern()?);
+                            });
+                            self.expect_tok(Token::Arrow)?;
+                            let ret = self.parse_pattern()?;
+                            Pattern::MacroPattern { args, ret }
                         } else {
-                            *p.pat
+                            self.expect_tok(Token::RParen)?;
+                            if self.skip_tok(Token::Arrow)? {
+                                let ret = self.parse_pattern()?;
+                                Pattern::MacroPattern { args: vec![p], ret }
+                            } else {
+                                *p.pat
+                            }
                         }
                     }
                 },
@@ -240,30 +249,46 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    pub fn parse_pattern(&mut self) -> ParseResult<PatternNode> {
-        let mut left = self.parse_pattern_value()?;
+    fn parse_pattern_op(&mut self, prec: usize) -> ParseResult<PatternNode> {
+        let next_prec = if prec == 2 { None } else { Some(prec + 1) };
 
-        loop {
-            left = match self.peek()? {
-                Token::BinAnd | Token::Colon => {
-                    self.next()?;
-                    let right = self.parse_pattern_value()?;
-                    PatternNode {
-                        span: left.span.extend(self.span()),
-                        pat: Box::new(Pattern::Both(left, right)),
-                    }
-                },
-                Token::BinOr => {
-                    self.next()?;
-                    let right = self.parse_pattern_value()?;
-                    PatternNode {
-                        span: left.span.extend(self.span()),
-                        pat: Box::new(Pattern::Either(left, right)),
-                    }
-                },
-                _ => break,
-            }
+        let mut left = match next_prec {
+            Some(next_prec) => self.parse_pattern_op(next_prec)?,
+            None => self.parse_pattern_value()?,
+        };
+
+        while matches!(
+            (self.peek()?, prec),
+            (Token::Colon, 0) | (Token::BinOr, 1) | (Token::BinAnd, 2)
+        ) {
+            let peek = self.next()?;
+            let right = match next_prec {
+                Some(next_prec) => self.parse_pattern_op(next_prec)?,
+                None => self.parse_pattern_value()?,
+            };
+            let new_span = left.span.extend(right.span);
+
+            left = PatternNode {
+                span: new_span,
+                pat: Box::new({
+                    let p = match peek {
+                        Token::Colon => Pattern::Both,
+                        Token::BinOr => Pattern::Either,
+                        Token::BinAnd => Pattern::Both,
+                        _ => unreachable!(),
+                    };
+                    p(left, right)
+                }),
+            };
         }
+
+        Ok(left)
+    }
+
+    pub fn parse_pattern(&mut self) -> ParseResult<PatternNode> {
+        let mut left = self.parse_pattern_op(0)?;
+
+        // println!("alcuckgya {:#?}", left);
 
         loop {
             let start_span = left.span;

@@ -1,5 +1,6 @@
 use ahash::AHashMap;
 use lazy_static::lazy_static;
+use paste::paste;
 
 #[derive(Debug)]
 pub enum ObjectKeyValueType {
@@ -15,8 +16,6 @@ pub enum ObjectKeyValueType {
     String,
     Epsilon,
 }
-
-use paste::paste;
 
 macro_rules! object_keys {
     (

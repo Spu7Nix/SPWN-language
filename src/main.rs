@@ -1,7 +1,10 @@
-#![deny(unused_must_use)]
-#![allow(clippy::result_large_err)]
-#![allow(clippy::too_many_arguments)]
-#![allow(clippy::type_complexity)]
+#![deny(unused_must_use, clippy::nonstandard_macro_braces)]
+#![allow(
+    clippy::result_large_err,
+    clippy::too_many_arguments,
+    clippy::type_complexity
+)]
+#![warn(clippy::branches_sharing_code)]
 #![feature(unboxed_closures)]
 #![feature(fn_traits)]
 

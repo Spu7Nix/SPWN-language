@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::bytecode::{OptRegister, Register, UnoptRegister};
 use crate::gd::ids::IDClass;
+use crate::gd::object_keys::ObjectKey;
 use crate::new_id_wrapper;
 use crate::parsing::operators::operators::Operator;
 
@@ -204,6 +205,15 @@ opcodes! {
     #[delve(display = |base, items, dest| format!("@{base}::{{{items}}} -> {dest}"))]
     MakeInstance { [base], [items], [dest] },
 
+    #[delve(display = |dest, cap| format!("obj {{...; {cap}}} -> {dest}"))]
+    AllocObject { [dest], capacity: u16 },
+    #[delve(display = |dest, cap| format!("trigger {{...; {cap}}} -> {dest}"))]
+    AllocTrigger { [dest], capacity: u16 },
+    #[delve(display = |e: &R, k: &ObjectKey, d: &R| format!("insert {}:{e} into R{d}", <&ObjectKey as Into<& str>>::into(k)))]
+    PushObjectElemKey { [elem], obj_key: ObjectKey, [dest] },
+    #[delve(display = |e: &R, k: &u8, d: &R| format!("insert {k}:{e} into {d}"))]
+    PushObjectElemUnchecked { [elem], obj_key: u8, [dest] },
+
 
     #[delve(display = |skip| format!("skip to {skip}"))]
     EnterArrowStatement { skip: OpcodePos },
@@ -265,6 +275,9 @@ opcodes! {
 
     #[delve(display = |s, d| format!("{s}.len() -> {d}"))]
     Len { [src], [dest] },
+
+    #[delve(display = |s, d| format!("{s} arg amount -> {d}"))]
+    ArgAmount { [src], [dest] },
 
 
     #[delve(display = |r, v| format!("if not {r}, throw mismatch"))]

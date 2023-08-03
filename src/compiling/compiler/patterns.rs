@@ -15,7 +15,7 @@ impl Compiler<'_> {
         &mut self,
         var: Spur,
         try_new: bool,
-        path: &Vec<AssignPath<ExprNode, Spur>>,
+        path: &[AssignPath<ExprNode, Spur>],
         scope: ScopeID,
         builder: &mut CodeBuilder,
         span: CodeSpan,
@@ -410,7 +410,39 @@ impl Compiler<'_> {
                 }
                 builder.load_const(true, out_reg, pattern.span);
             },
-            Pattern::MacroPattern(_) => todo!(),
+            Pattern::MacroPattern { args, .. } => {
+                self.and_op(
+                    &[
+                        &|_, builder| {
+                            let macro_typ = builder.next_reg();
+                            builder.load_const(ValueType::Macro, macro_typ, pattern.span);
+
+                            let expr_typ = builder.next_reg();
+                            builder.type_of(expr_reg, expr_typ, pattern.span);
+
+                            let eq_reg = builder.next_reg();
+                            builder.pure_eq(expr_typ, macro_typ, eq_reg, pattern.span);
+
+                            Ok(eq_reg)
+                        },
+                        &|_, builder| {
+                            let pat_arg_amount = builder.next_reg();
+                            builder.load_const(args.len() as i64, pat_arg_amount, pattern.span);
+
+                            let expr_arg_amount = builder.next_reg();
+                            builder.arg_amount(expr_reg, expr_arg_amount, pattern.span);
+
+                            let eq_reg = builder.next_reg();
+                            builder.pure_eq(expr_arg_amount, pat_arg_amount, eq_reg, pattern.span);
+
+                            Ok(eq_reg)
+                        },
+                    ],
+                    out_reg,
+                    pattern.span,
+                    builder,
+                )?;
+            },
         }
 
         Ok(out_reg)

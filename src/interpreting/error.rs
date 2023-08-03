@@ -1,9 +1,9 @@
 use std::string::ToString;
 
-use itertools::Either;
+use itertools::{Either, Itertools};
 
 use super::context::CallInfo;
-use super::value::{StoredValue, Value, ValueType};
+use super::value::ValueType;
 use super::vm::Vm;
 use crate::error_maker;
 use crate::interpreting::vm::ValueRef;
@@ -60,7 +60,6 @@ error_maker! {
             Main Area: area;
             Labels: [
                 area => "Expected {}, found {}": {
-                    use itertools::Itertools;
                     let len = expected.len();
                     expected.iter().enumerate().map(|(i, t)| {
                         if len > 1 && i == len - 1 {
@@ -99,7 +98,7 @@ error_maker! {
         // ==================================================================
         #[
             Message: "Cannot iterator", Note: match value.0 {
-                ValueType::Custom(..) => Some("Try overloading the `_iter_` method (`#[overload = _iter_]`)".into()),
+                ValueType::Custom(..) => Some("Try overloading the `_iter_` method".into()),
                 _ => None,
             };
             Main Area: area;
@@ -109,6 +108,24 @@ error_maker! {
             ]
         ]
         CannotIterate {
+            value: (ValueType, CodeArea),
+            area: CodeArea,
+            [call_stack]
+        },
+
+        // ==================================================================
+        #[
+            Message: "Cannot caller", Note: match value.0 {
+                ValueType::Custom(..) => Some("Try overloading the `_call_` method".into()),
+                _ => None,
+            };
+            Main Area: area;
+            Labels: [
+                area => "Cannot call {}": value.0.runtime_display(vm);
+                value.1 => "Value defined as {} here": value.0.runtime_display(vm);
+            ]
+        ]
+        CannotCall {
             value: (ValueType, CodeArea),
             area: CodeArea,
             [call_stack]
@@ -128,19 +145,20 @@ error_maker! {
             [call_stack]
         },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Invalid object value", Note: None;
-        //     Labels: [
-        //         v.1 => "{} is not a valid object value": v.0;
-        //         area => "Object key used here";
-        //     ]
-        // ]
-        // InvalidObjectValue {
-        //     v: (String, CodeArea),
-        //     area: CodeArea,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Invalid object value", Note: None;
+            Main Area: area;
+            Labels: [
+                value_area => "This is not a valid object value";
+                area => "Object key used here";
+            ]
+        ]
+        InvalidObjectValue {
+            value_area: CodeArea,
+            area: CodeArea,
+            [call_stack]
+        },
 
         // ==================================================================
         #[
@@ -538,6 +556,21 @@ error_maker! {
             to: ValueType,
         },
 
+        // ==================================================================
+        #[
+            Message: "Invalid return type for builtin", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "`{}` expected {}, found {}": builtin, expected.runtime_display(vm), found.runtime_display(vm);
+            ]
+        ]
+        InvalidReturnTypeForBuiltin {
+            area: CodeArea,
+            found: ValueType,
+            expected: ValueType,
+            builtin: &'static str,
+        },
+
 
         // // ============================ BUILTIN FUNC ERRORS ============================
 
@@ -557,19 +590,3 @@ error_maker! {
         // },
     }
 }
-
-// impl RuntimeError {
-//     pub fn to_value(&self, vm: &mut Vm) -> Value {
-//         match self {
-//             RuntimeError::InvalidOperands { a, b, op, area, call_stack } => todo!(),
-//             RuntimeError::InvalidUnaryOperand { v, op, area, call_stack } => todo!(),
-//             RuntimeError::TypeMismatch { v, area, expected, call_stack } => todo!(),
-//             RuntimeError::ThrownError { area, message, call_stack } => todo!(),
-//             RuntimeError::ContextSplitDisallowed { area, call_stack } => todo!(),
-//         }
-//     }
-
-//     pub fn get
-// }
-
-// impl R
