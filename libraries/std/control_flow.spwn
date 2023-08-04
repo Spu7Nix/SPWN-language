@@ -1,0 +1,18 @@
+extract import "obj_ids.spwn"
+
+wait = (duration: @int | @float | @epsilon) {
+    if duration is @epsilon || duration > 0.0 {
+        // 😀
+        $.add(trigger {
+            OBJ_ID: @obj_id::triggers.SPAWN,
+            SPAWN_DURATION: duration,
+            TARGET: !{
+                -> return
+            },
+        }, true)
+    }
+}
+
+return {
+    wait,
+}

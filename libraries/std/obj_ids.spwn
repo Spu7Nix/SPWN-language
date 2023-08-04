@@ -1,0 +1,67 @@
+type @obj_id
+impl @obj_id {
+    triggers: {
+        MOVE: 901,
+        ROTATE: 1346,
+        ANIMATE: 1585,
+        PULSE: 1006,
+        COUNT: 1611,
+        ALPHA: 1007,
+        TOGGLE: 1049,
+        FOLLOW: 1347,
+        SPAWN: 1268,
+        STOP: 1616,
+        TOUCH: 1595,
+        INSTANT_COUNT: 1811,
+        ON_DEATH: 1812,
+        FOLLOW_PLAYER_Y: 1814,
+        COLLISION: 1815,
+        PICKUP: 1817,
+        BG_EFFECT_ON: 1818,
+        BG_EFFECT_OFF: 1819,
+        SHAKE: 1520,
+        COLOR: 899,
+        ENABLE_TRAIL: 32,
+        DISABLE_TRAIL: 33,
+        HIDE: 1612,
+        SHOW: 1613
+    },
+
+    portals: {
+        GRAVITY_DOWN: 10,
+        GRAVITY_UP: 11,
+        CUBE: 12,
+        SHIP: 13,
+        BALL: 47,
+        UFO: 111,
+        WAVE: 660,
+        ROBOT: 745,
+        SPIDER: 1331,
+        MIRROR_ON: 45,
+        MIRROR_OFF: 46,
+        SIZE_NORMAL: 99,
+        SIZE_MINI: 101,
+        DUAL_ON: 286,
+        DUAL_OFF: 287,
+        TELEPORT: 747,
+        SPEED_YELLOW: 200,
+        SPEED_BLUE: 201,
+        SPEED_GREEN: 202,
+        SPEED_PINK: 203,
+        SPEED_RED: 1334,
+    },
+
+    misc: {
+        COLLISION_BLOCK: 1816,
+
+        J_BLOCK: 1813,
+        H_BLOCK: 1859,
+        D_BLOCK: 1755,
+        S_BLOCK: 1829,
+
+        ITEM_DISPLAY: 1615,
+        TEXT: 914,
+
+        USER_COIN: 1329,
+    }
+}

@@ -177,9 +177,25 @@ impl Compiler<'_> {
                     parent: None,
                     typ: Some(ScopeType::Global),
                 });
+
+                // if entry.is_some() {
+                //     let import_type =
+                //         ImportType::Module(BUILTIN_DIR.join("core/lib.spwn"), ModuleImport::Core);
+
+                //     // self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
+                // }
+                // if let Some(attrs) = entry {
+                //     if !attrs.iter().any(|a| *a == FileAttribute::NoStd) {
+                //         let import_type =
+                //             ImportType::Module(BUILTIN_DIR.join("std/lib.spwn"), ModuleImport::Std);
+                //         // self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
+                //     }
+                // }
+
                 for stmt in &ast.statements {
                     self.compile_stmt(stmt, base_scope, b)?;
                 }
+
                 Ok(())
             },
             (Box::new([]), None),

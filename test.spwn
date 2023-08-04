@@ -1,9 +1,27 @@
+extract import "libraries/std/lib.spwn"
+
+
+// dbg true && true;
+// dbg false && true;
+// dbg true && false;
+// dbg false && false;
+
+// dbg 0 > 0.0;
+// dbg 1 > 0.0;
+// // g = () {
+// //     dbg 0;
+// //     !{
+// //         dbg 1;
+// //         -> return 5
+// //     }
+// // }
+
+// // h = () {
+// //     g();
+// // }
 
 
 
-
-
-
-
-
-
+// // dbg 2;
+// // h();
+// // dbg 3;

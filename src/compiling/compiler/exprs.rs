@@ -176,7 +176,7 @@ impl Compiler<'_> {
                     BinOp::ShiftLeft => bin_op!(ShiftLeft),
                     BinOp::ShiftRight => bin_op!(ShiftRight),
                     BinOp::As => bin_op!(As),
-                    BinOp::Or => self.and_op(
+                    BinOp::Or => self.or_op(
                         &[
                             &|compiler, builder| compiler.compile_expr(left, scope, builder),
                             &|compiler, builder| compiler.compile_expr(right, scope, builder),
@@ -185,7 +185,7 @@ impl Compiler<'_> {
                         expr.span,
                         builder,
                     )?,
-                    BinOp::And => self.or_op(
+                    BinOp::And => self.and_op(
                         &[
                             &|compiler, builder| compiler.compile_expr(left, scope, builder),
                             &|compiler, builder| compiler.compile_expr(right, scope, builder),
@@ -373,9 +373,9 @@ impl Compiler<'_> {
 
                 let is_builtin = self.find_builtin_attr(&expr.attributes);
                 if is_builtin && !matches!(&*self.src, SpwnSource::Core(..)) {
-                    return Err(CompileError::BuiltinAttrOutsideOfCore {
-                        area: self.make_area(expr.span),
-                    });
+                    // return Err(CompileError::BuiltinAttrOutsideOfCore {
+                    //     area: self.make_area(expr.span),
+                    // });
                 }
 
                 let is_debug = self.find_debug_bytecode_attr(&expr.attributes);

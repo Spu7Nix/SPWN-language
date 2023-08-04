@@ -1,0 +1,27 @@
+extract import "group.spwn"
+extract import "easing.spwn"
+
+import "../core/builtins.spwn"
+
+
+
+// for x in 0..1000 {
+//     for y in 0..100 {
+//         $.add(obj {
+//             OBJ_ID: 5,
+//             X: 15 + x * 30,
+//             Y: 15 + y * 30,
+//             ROTATION: 30,
+//         }, true);
+//     }
+// }
+
+
+
+dbg 1;
+10g.move(10, 0, 0.5, @easing::NONE, 2.0)
+dbg 2;
+10g.move(10, 10, 0.5, @easing::NONE, 2.0)
+dbg 3;
+10g.move(0, -5, 0.5, @easing::NONE, 2.0)
+dbg 4;

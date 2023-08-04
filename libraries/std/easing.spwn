@@ -1,0 +1,57 @@
+type @easing
+
+et = (id: @int) {
+    return @easing::{
+        id,
+    }
+}
+
+impl @easing {
+    NONE: et(0),
+    EASE_IN_OUT: et(1),
+    EASE_IN: et(2),
+    EASE_OUT: et(3),
+    ELASTIC_IN_OUT: et(4),
+    ELASTIC_IN: et(5),
+    ELASTIC_OUT: et(6),
+    BOUNCE_IN_OUT: et(7),
+    BOUNCE_IN: et(8),
+    BOUNCE_OUT: et(9),
+    EXPONENTIAL_IN_OUT: et(10),
+    EXPONENTIAL_IN: et(11),
+    EXPONENTIAL_OUT: et(12),
+    SINE_IN_OUT: et(13),
+    SINE_IN: et(14),
+    SINE_OUT: et(15),
+    BACK_IN_OUT: et(16),
+    BACK_IN: et(17),
+    BACK_OUT: et(18),
+
+    id: (&self) -> @int {
+        return self.id
+    },
+
+    _display_: (&self) -> @string {
+        return match self.id {
+            ==0 => "NONE",
+            ==1 => "EASE_IN_OUT",
+            ==2 => "EASE_IN",
+            ==3 => "EASE_OUT",
+            ==4 => "ELASTIC_IN_OUT",
+            ==5 => "ELASTIC_IN",
+            ==6 => "ELASTIC_OUT",
+            ==7 => "BOUNCE_IN_OUT",
+            ==8 => "BOUNCE_IN",
+            ==9 => "BOUNCE_OUT",
+            ==10 => "EXPONENTIAL_IN_OUT",
+            ==11 => "EXPONENTIAL_IN",
+            ==12 => "EXPONENTIAL_OUT",
+            ==13 => "SINE_IN_OUT",
+            ==14 => "SINE_IN",
+            ==15 => "SINE_OUT",
+            ==16 => "BACK_IN_OUT",
+            ==17 => "BACK_IN",
+            ==18 => "BACK_OUT",
+        }
+    }
+}

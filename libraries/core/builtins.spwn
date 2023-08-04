@@ -3,12 +3,13 @@
  * Do not modify or your changes will be overwritten!
 */
 
-impl @array {
+impl @builtins {
     
     	
 	#[doc("\nfghfddggfd")]
-	push: #[builtin] (
-		&mut self: @array,
-		elem: _,
+	add: #[builtin] (
+		&self: @builtins,
+		object: @object,
+		ignore_context: @bool = false,
 	) {},
 }

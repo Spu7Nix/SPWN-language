@@ -21,7 +21,7 @@ use crate::compiling::bytecode::{
     Bytecode, CallExpr, Constant, Function, Mutability, OptRegister, Register,
 };
 use crate::compiling::opcodes::{CallExprID, ConstID, Opcode, RuntimeStringFlag};
-use crate::gd::gd_object::{make_spawn_trigger, TriggerObject, TriggerOrder};
+use crate::gd::gd_object::{make_spawn_trigger, GdObject, TriggerObject, TriggerOrder};
 use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::{ObjectKey, ObjectKeyValueType, OBJECT_KEYS};
 use crate::interpreting::builtins;
@@ -143,6 +143,7 @@ pub struct Vm {
     //penis
     pub context_stack: ContextStack,
 
+    pub objects: Vec<GdObject>,
     pub triggers: Vec<TriggerObject>,
     pub trigger_order_count: TriggerOrder,
 
@@ -158,6 +159,7 @@ impl Vm {
     pub fn new(type_def_map: TypeDefMap, bytecode_map: BytecodeMap) -> Self {
         Self {
             context_stack: ContextStack(vec![]),
+            objects: vec![],
             triggers: vec![],
             trigger_order_count: TriggerOrder::new(),
             type_def_map,
@@ -352,7 +354,6 @@ impl DeepClone<&StoredValue> for Vm {
                     Value::Iterator(new_data)
                 }
             },
-            Value::Object { .. } => todo!(),
             v => v.clone(),
         };
 
@@ -1722,15 +1723,15 @@ impl Vm {
                         match t {
                             ValueType::Custom(..) => (),
                             _ => {
-                                if !matches!(
-                                    &*program.src,
-                                    SpwnSource::Core(_) | SpwnSource::Std(_)
-                                ) {
-                                    return Err(RuntimeError::ImplOnBuiltin {
-                                        area: self.make_area(opcode_span, &program),
-                                        call_stack: self.get_call_stack(),
-                                    });
-                                }
+                                // if !matches!(
+                                //     &*program.src,
+                                //     SpwnSource::Core(_) | SpwnSource::Std(_)
+                                // ) {
+                                //     return Err(RuntimeError::ImplOnBuiltin {
+                                //         area: self.make_area(opcode_span, &program),
+                                //         call_stack: self.get_call_stack(),
+                                //     });
+                                // }
                             },
                         }
 

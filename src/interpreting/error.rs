@@ -435,17 +435,18 @@ error_maker! {
         //     [call_stack]
         // },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Added object in runtime context", Note: Some("TODO (link to docs)".into());
-        //     Labels: [
-        //         area => "Cannot add this object at runtime";
-        //     ]
-        // ]
-        // AddObjectInTriggerContext {
-        //     area: CodeArea,
-        //     [call_stack]
-        // },
+        // ==================================================================
+        #[
+            Message: "Added object in runtime context", Note: Some("TODO (link to docs)".into());
+            Main Area: area;
+            Labels: [
+                area => "Cannot add this object at runtime";
+            ]
+        ]
+        AddObjectInTriggerContext {
+            area: CodeArea,
+            [call_stack]
+        },
 
         // ==================================================================
         #[
