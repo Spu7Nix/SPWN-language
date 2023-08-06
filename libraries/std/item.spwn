@@ -1,6 +1,23 @@
-EQUAL_TO = 0
-LARGER_THAN = 1
-SMALLER_THAN = 2
+
+type @comparison
+
+impl @comparison {
+    EQUAL_TO: @comparison::{id: 0},
+    LARGER_THAN: @comparison::{id: 1},
+    SMALLER_THAN: @comparison::{id: 2},
+
+    id: (&self) -> @int {
+        return self.id
+    },
+
+    _display_: (&self) -> @string {
+        return match self.id {
+            ==0 => "EQUAL_TO",
+            ==1 => "LARGER_THAN",
+            ==2 => "SMALLER_THAN",
+        }
+    } 
+}
 
 impl @item {
     add: (&self, amount: @int) {
@@ -16,7 +33,7 @@ impl @item {
     // Watch me drive this Toyota 100mph + fucking zoinked out of my gourd.
     if_is: (
         self,
-        comparison: @int,
+        comparison: @comparison,
         other: @int,
         function: @trigger_function
     ) -> @NULL {
@@ -25,7 +42,7 @@ impl @item {
             TARGET: function,
             COUNT: other,
             ACTIVATE_GROUP: true,
-            COMPARISON: comparison,
+            COMPARISON: comparison.id,
             ITEM: self,
         }, true)
     },

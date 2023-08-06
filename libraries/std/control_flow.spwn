@@ -13,6 +13,34 @@ wait = (duration: @int | @float | @epsilon) {
     }
 }
 
+call_with_delay = (
+	time: @float | @int | @epsilon,
+	function: @trigger_function | @group
+) {
+	$.add(trigger {
+		OBJ_ID: 1268,
+		SPAWN_DURATION: time,
+		TARGET: function,
+	}, true)
+}
+
+// while_loop = (
+//     expr: () -> @bool,
+//     code: () -> (),
+// ) {
+//     func = !{
+//         if expr() {
+//             code()
+//             call_with_delay(ε, func)
+//         } else {
+//             -> return
+//         }
+//     }
+
+//     func!
+// }
+
 return {
     wait,
+    call_with_delay,
 }

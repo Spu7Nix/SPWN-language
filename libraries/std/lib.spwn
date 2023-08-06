@@ -19,17 +19,25 @@ extract import "control_flow.spwn"
 //     }
 // }
 
-
-mut c = @counter::new()
-c += 100
-mut c2 = @counter::new()
-wait(1)
-c2 -= 5
-
 wait(1)
 
-c.copy_to(c2)
+// while_loop(() => true, () {
+//     10g.move(10, 0, 0.5, @easing::EASE_IN_OUT, 2.0)
+//     wait(0.5)
+// })
 
-//mut c2 = @counter::new()
+mut c = @counter::new([(n) {
+    -> 10g.move(10 * n, 0, 0.5, @easing::EASE_IN_OUT, 2.0)
+}])
+mut c2 = @counter::new([])
+
+
+c2 += 10
+c -= 5
+
+wait(1)
+
+c += c2
+
 
 
