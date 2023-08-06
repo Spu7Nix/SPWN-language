@@ -1,6 +1,11 @@
 extract import "libraries/std/lib.spwn"
 
 
+
+
+// @int -> () = 5
+
+
 // dbg true && true;
 // dbg false && true;
 // dbg true && false;

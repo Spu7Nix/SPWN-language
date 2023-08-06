@@ -1,0 +1,33 @@
+EQUAL_TO = 0
+LARGER_THAN = 1
+SMALLER_THAN = 2
+
+impl @item {
+    add: (&self, amount: @int) {
+        $.add(trigger {
+            OBJ_ID: 1817,
+            COUNT: amount,
+            ITEM: self,
+        }, true)
+    },
+
+
+    // Huffing paint thinner makes you invincible.
+    // Watch me drive this Toyota 100mph + fucking zoinked out of my gourd.
+    if_is: (
+        self,
+        comparison: @int,
+        other: @int,
+        function: @trigger_function
+    ) -> @NULL {
+        $.add(trigger {
+            OBJ_ID: 1811,
+            TARGET: function,
+            COUNT: other,
+            ACTIVATE_GROUP: true,
+            COMPARISON: comparison,
+            ITEM: self,
+        }, true)
+    },
+}
+    

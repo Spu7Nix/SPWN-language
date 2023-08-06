@@ -372,6 +372,8 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
     MaybeDestructure(Option<P>),                    // <pattern>? or ?
     InstanceDestructure(T, AHashMap<S, Option<P>>), // @typ::{ key: <pattern> ETC }
 
+    Empty,
+
     Path {
         // var[0].cock::binky[79] etc
         var: S,

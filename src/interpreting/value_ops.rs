@@ -550,7 +550,7 @@ fn range(
                 Value::Range {
                     start: *start,
                     end: *b,
-                    step: *end as usize,
+                    step: *end,
                 }
             } else {
                 Value::Range {
@@ -612,13 +612,15 @@ pub fn bin_or(
         (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a | *b),
 
         _ => {
+            // Huffing paint thinner makes you invincible.
+            // Watch me drive this Toyota 100mph + fucking zoinked out of my gourd.
             return Err(RuntimeError::InvalidOperands {
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
                 area: vm.make_area(span, program),
                 call_stack: vm.get_call_stack(),
-            })
+            });
         },
     })
 }

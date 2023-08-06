@@ -1,8 +1,11 @@
+extract import "item.spwn"
 extract import "group.spwn"
 extract import "easing.spwn"
 
 import "../core/builtins.spwn"
 
+extract import "counter.spwn"
+extract import "control_flow.spwn"
 
 
 // for x in 0..1000 {
@@ -17,11 +20,16 @@ import "../core/builtins.spwn"
 // }
 
 
+mut c = @counter::new()
+c += 100
+mut c2 = @counter::new()
+wait(1)
+c2 -= 5
 
-dbg 1;
-10g.move(10, 0, 0.5, @easing::NONE, 2.0)
-dbg 2;
-10g.move(10, 10, 0.5, @easing::NONE, 2.0)
-dbg 3;
-10g.move(0, -5, 0.5, @easing::NONE, 2.0)
-dbg 4;
+wait(1)
+
+c.copy_to(c2)
+
+//mut c2 = @counter::new()
+
+

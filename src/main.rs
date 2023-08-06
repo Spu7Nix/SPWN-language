@@ -408,6 +408,7 @@ fn run_spwn(
 
     for (_, v) in out {
         if let Err(e) = v {
+            println!("{:#?}", e);
             Err(e.to_report(&vm))?
         }
     }

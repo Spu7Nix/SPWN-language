@@ -443,6 +443,15 @@ impl Compiler<'_> {
                     builder,
                 )?;
             },
+            Pattern::Empty => {
+                let macro_typ = builder.next_reg();
+                builder.load_const(ValueType::Empty, macro_typ, pattern.span);
+
+                let expr_typ = builder.next_reg();
+                builder.type_of(expr_reg, expr_typ, pattern.span);
+
+                builder.pure_eq(expr_typ, macro_typ, out_reg, pattern.span);
+            },
         }
 
         Ok(out_reg)

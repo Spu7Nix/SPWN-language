@@ -126,9 +126,19 @@ impl<'a> Parser<'a> {
                 },
                 Token::TypeIndicator => {
                     let typ = self.intern_string(&self.slice()[1..]);
+                    let span = self.span();
                     if self.skip_tok(Token::DoubleColon)? {
                         let map = dictlike_destructure!();
                         Pattern::InstanceDestructure(typ, map)
+                    } else if self.skip_tok(Token::Arrow)? {
+                        let ret = self.parse_pattern()?;
+                        Pattern::MacroPattern {
+                            args: vec![PatternNode {
+                                pat: Box::new(Pattern::Type(typ)),
+                                span,
+                            }],
+                            ret,
+                        }
                     } else {
                         Pattern::Type(typ)
                     }
@@ -163,9 +173,12 @@ impl<'a> Parser<'a> {
                 },
                 Token::LParen => {
                     if self.skip_tok(Token::RParen)? {
-                        self.expect_tok(Token::Arrow)?;
-                        let ret = self.parse_pattern()?;
-                        Pattern::MacroPattern { args: vec![], ret }
+                        if self.skip_tok(Token::Arrow)? {
+                            let ret = self.parse_pattern()?;
+                            Pattern::MacroPattern { args: vec![], ret }
+                        } else {
+                            Pattern::Empty
+                        }
                     } else {
                         let p = self.parse_pattern()?;
                         if self.skip_tok(Token::Comma)? {

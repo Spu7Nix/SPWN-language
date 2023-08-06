@@ -3109,14 +3109,14 @@ impl Vm {
                     let next = [ self;
                         n: i64 = *start,
                         end: i64 = *end,
-                        step: usize = *step,
+                        step: i64 = *step,
                     ] () {
-                        let ret = if extra.n >= extra.end {
+                        let ret = if extra.n == extra.end {
                             Value::Maybe(None)
                         } else {
                             Value::Maybe(Some(ValueRef::new(Value::Int(extra.n).into_stored(area.clone()))))
                         };
-                        extra.n += extra.step as i64;
+                        extra.n += extra.step;
 
                         Multi::new_single(ctx, Ok(ValueRef::new(ret.into_stored(area))))
                     } ctx vm program area extra

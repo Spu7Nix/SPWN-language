@@ -465,7 +465,7 @@ value! {
     Range {
         start: i64,
         end: i64,
-        step: usize,
+        step: i64,
     }, //start, end, step
 
     Maybe(Option<ValueRef>),
