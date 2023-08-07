@@ -125,7 +125,7 @@ impl Compiler<'_> {
                 builder.load_const(v, reg, span);
             },
             Err(_) => match self.available_custom_types.get(v) {
-                Some(k) => builder.load_const(ValueType::Custom(*k), reg, span),
+                Some(k) => builder.load_const(ValueType::Custom(*k.value()), reg, span),
                 None => {
                     return Err(CompileError::NonexistentType {
                         area: self.make_area(span),

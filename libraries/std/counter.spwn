@@ -53,6 +53,10 @@ impl @counter {
         }
     },
 
+    add_bind: (mut self, action: @int -> ()) {
+        self.binds.push(action)
+    },
+
 
     add_const: (
         mut self,

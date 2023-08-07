@@ -1312,7 +1312,7 @@ impl Vm {
 
                             (Value::Range { start, .. }, "start") => Some(Value::Int(*start)),
                             (Value::Range { end, .. }, "end") => Some(Value::Int(*end)),
-                            (Value::Range { step, .. }, "step") => Some(Value::Int(*step as i64)),
+                            (Value::Range { step, .. }, "step") => Some(Value::Int(*step)),
 
                             (Value::Array(v), "length") => Some(Value::Int(v.len() as i64)),
                             (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),

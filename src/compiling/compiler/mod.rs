@@ -85,10 +85,10 @@ pub struct Compiler<'a> {
     is_doc_gen: bool,
 
     bytecode_map: &'a mut BytecodeMap,
-    type_def_map: &'a mut TypeDefMap,
+    pub type_def_map: &'a mut TypeDefMap,
 
     pub local_type_defs: SlabMap<LocalTypeID, Vis<TypeDef<Spur>>>,
-    available_custom_types: AHashMap<Spur, CustomTypeID>,
+    pub available_custom_types: AHashMap<Spur, Vis<CustomTypeID>>,
 
     deferred_trigger_func_stack: Vec<Vec<DeferredTriggerFunc>>,
 }
@@ -136,7 +136,7 @@ impl Compiler<'_> {
         self.interner.borrow().resolve(s).into()
     }
 
-    fn resolve_32(&self, s: &Spur) -> ImmutStr32 {
+    pub fn resolve_32(&self, s: &Spur) -> ImmutStr32 {
         String32::from_chars(self.interner.borrow().resolve(s).chars().collect_vec()).into()
     }
 

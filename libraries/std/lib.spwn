@@ -3,6 +3,7 @@ extract import "group.spwn"
 extract import "easing.spwn"
 
 import "../core/builtins.spwn"
+import "../core/array.spwn"
 
 extract import "counter.spwn"
 extract import "control_flow.spwn"

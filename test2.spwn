@@ -1,0 +1,7 @@
+gag = import "test3.spwn"
+
+
+dbg 2;
+dbg gag.@teest;
+
+return {}

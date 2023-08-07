@@ -15,6 +15,7 @@ use crate::compiling::opcodes::OptOpcode;
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
+use crate::parsing::ast::VisTrait;
 use crate::parsing::operators::operators::Operator;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
 use crate::util::{ImmutStr, ImmutStr32, ImmutVec, SlabMap, UniqueRegister};
@@ -249,17 +250,31 @@ impl ProtoBytecode {
             version: Version::parse(env!("CARGO_PKG_VERSION")).unwrap(),
             constants: constants.into(),
             functions: funcs.into(),
+            // custom_types: compiler
+            //     .local_type_defs
+            //     .iter()
+            //     .map(|(id, v)| {
+            //         (
+            //             CustomTypeID {
+            //                 local: id,
+            //                 source_hash: src_hash,
+            //             },
+            //             v.as_ref()
+            //                 .map(|def| compiler.resolve(&def.name).spanned(def.def_span)),
+            //         )
+            //     })
+            //     .collect(),
             custom_types: compiler
-                .local_type_defs
+                .available_custom_types
                 .iter()
-                .map(|(id, v)| {
+                .map(|(name, id_vis)| {
                     (
-                        CustomTypeID {
-                            local: id,
-                            source_hash: src_hash,
-                        },
-                        v.as_ref()
-                            .map(|def| compiler.resolve(&def.name).spanned(def.def_span)),
+                        *id_vis.value(),
+                        id_vis.as_ref().map(|id| {
+                            compiler
+                                .resolve(name)
+                                .spanned(compiler.type_def_map[id].def_span)
+                        }),
                     )
                 })
                 .collect(),

@@ -2,56 +2,8 @@
 
 
 
-
-// @int -> () = 5
-
-
-// dbg true && true;
-// dbg false && true;
-// dbg true && false;
-// dbg false && false;
-
-// dbg 0 > 0.0;
-// dbg 1 > 0.0;
-// // g = () {
-// //     dbg 0;
-// //     !{
-// //         dbg 1;
-// //         -> return 5
-// //     }
-// // }
-
-// // h = () {
-// //     g();
-// // }
-
-
-
-// // dbg 2;
-// // h();
-// // dbg 3;
-
-
-// a = {
-//     dick: [6, 3],
-//     fart: 69,
-// }
-
-// {dick: [j, g], fart: @string} = a
-// dbg j;
-// dbg g;
-// dbg fart;
-
-type @gug
-
-overload == {
-    (a: @gug, b: @int) {
-        -> return true
-        -> return false
-    }
+g = (a, &mut b) {
+    
 }
-match @gug::{} {
-    ==6 => dbg 6,
-    ==7 => dbg 7,
-    _ => dbg 9,
-}
+mut b = 6
+g(1, b)

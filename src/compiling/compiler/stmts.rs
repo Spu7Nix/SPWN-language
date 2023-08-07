@@ -8,7 +8,7 @@ use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::{FuncID, Opcode};
 use crate::interpreting::value::ValueType;
-use crate::parsing::ast::{Expression, Pattern, Statement, Statements, StmtNode, VisTrait};
+use crate::parsing::ast::{Expression, Pattern, Statement, Statements, StmtNode, Vis, VisTrait};
 use crate::parsing::operators::operators::{AssignOp, Operator};
 use crate::sources::Spannable;
 
@@ -308,7 +308,8 @@ impl<'a> Compiler<'a> {
                         name: name_str,
                     },
                 );
-                self.available_custom_types.insert(*name.value(), custom_id);
+                self.available_custom_types
+                    .insert(*name.value(), name.map(|_| custom_id));
             },
             Statement::ExtractImport(import) => {
                 let import_reg = builder.next_reg();
@@ -339,7 +340,7 @@ impl<'a> Compiler<'a> {
                 }
 
                 for (id, name) in types.iter() {
-                    self.available_custom_types.insert(*name, *id);
+                    self.available_custom_types.insert(*name, Vis::Public(*id));
                 }
             },
             Statement::Impl { name, items } => {
