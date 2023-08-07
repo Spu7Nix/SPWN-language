@@ -136,6 +136,7 @@ pub(crate) mod attr_names {
     pub const DEBUG_BYTECODE: &str = "debug_bytecode";
     pub const BUILTIN: &str = "builtin";
     pub const ALIAS: &str = "alias";
+    pub const NO_STD: &str = "no_std";
 }
 
 pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
@@ -147,12 +148,14 @@ pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
         //     template: AttributeTemplate::WORD,
         //     duplicates: AttributeDuplicates::ErrorFollowing,
         // },
-        // Attribute {
-        //     namespace: None,
-        //     name: "no_std",
-        //     template: AttributeTemplate::WORD,
-        //     duplicates: AttributeDuplicates::ErrorFollowing,
-        // },
+        Attribute {
+            namespace: None,
+            name: attr_names::NO_STD,
+            template: AttributeTemplate::WORD,
+            duplicates: AttributeDuplicates::ErrorFollowing,
+            style: &[AttrStyle::Inner],
+            targets: &[],
+        },
         // Attribute {
         //     namespace: None,
         //     name: "doc",

@@ -150,7 +150,7 @@ impl Compiler<'_> {
         let base_dir = importer_src.path().parent().unwrap();
         let mut path = base_dir.to_path_buf();
 
-        match import.settings.typ {
+        match import.typ {
             ImportType::File => path.push(&import.path),
             ImportType::Library => {
                 path.push("libraries");
@@ -159,7 +159,7 @@ impl Compiler<'_> {
             },
         };
 
-        let is_file = matches!(import.settings.typ, ImportType::File);
+        let is_file = matches!(import.typ, ImportType::File);
 
         let new_src = Rc::new(SpwnSource::File(path.clone()));
 

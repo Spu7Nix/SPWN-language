@@ -42,7 +42,7 @@ use crate::liveeditor::win::LiveEditorClient;
 use crate::liveeditor::Message;
 use crate::parsing::parser::Parser;
 use crate::sources::{SpwnSource, TypeDefMap};
-use crate::util::{BasicError, HexColorize, RandomState};
+use crate::util::{hyperlink, BasicError, HexColorize, RandomState};
 
 mod cli;
 mod compiling;
@@ -138,7 +138,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::Build { file, settings } => {
             let mut spinner = Spinner::new(args.no_spinner);
 
-            let gd_path = if !settings.no_level {
+            let gd_path = if !(settings.no_level || settings.live_editor) {
                 Some(if let Some(ref sf) = settings.save_file {
                     sf.clone()
                 } else if cfg!(target_os = "windows") {
@@ -153,7 +153,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 } else if cfg!(target_os = "android") {
                     PathBuf::from("/data/data/com.robtopx.geometryjump/CCLocalLevels.dat")
                 } else {
-                    panic!("Unsupported operating system");
+                    return Err(BasicError("Unsupported operating system").into());
                 })
             } else {
                 None
@@ -200,8 +200,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                     spinner.complete(None);
 
-                    if level_string.is_empty() {}
-
                     gd_object::remove_spwn_objects(&mut level_string);
 
                     (level_string, level_name)
@@ -236,7 +234,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             if !triggers.is_empty() && !settings.no_optimize {
                 spinner.start(format!(
                     "{:20}",
-                    "Optimizing Triggers...".color_hex(OPTIMISING_COLOR).bold()
+                    "Optimizing triggers...".color_hex(OPTIMISING_COLOR).bold()
                 ));
 
                 triggers =
@@ -268,6 +266,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
 
             println!();
+
+            if settings.console_output {
+                println!("{}", hyperlink("todo <playground link>", Some(&new_ls)));
+            }
 
             if settings.live_editor {
                 spinner.start(format!(
@@ -333,9 +335,7 @@ fn run_spwn(
     is_doc_gen: bool,
 ) -> Result<SpwnOutput, Box<dyn Error>> {
     let src = Rc::new(SpwnSource::File(file));
-    let code = src
-        .read()
-        .ok_or_else(|| BasicError("Failed to read SPWN file".into()))?;
+    let code = src.read().ok_or(BasicError("Failed to read SPWN file"))?;
 
     let interner = Rc::new(RefCell::new(Rodeo::with_hasher(RandomState::new())));
 

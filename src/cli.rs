@@ -55,9 +55,6 @@ pub struct BuildSettings {
     #[arg(short = 'o', long)]
     pub no_optimize: bool,
 
-    #[arg(short = 'y', long)]
-    pub no_optimize_bytecode: bool,
-
     #[arg(short = 'f', long)]
     pub save_file: Option<PathBuf>,
 

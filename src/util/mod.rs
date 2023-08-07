@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::hash_map::Drain;
+use std::fmt;
 use std::iter::Map;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
@@ -141,11 +142,11 @@ impl<T: Colorize> HexColorize for T {
 }
 
 #[derive(Debug)]
-pub struct BasicError(pub(crate) String);
-impl std::error::Error for BasicError {}
+pub struct BasicError<T: fmt::Display>(pub(crate) T);
+impl<T: fmt::Display + fmt::Debug> std::error::Error for BasicError<T> {}
 
-impl std::fmt::Display for BasicError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<T: fmt::Display> fmt::Display for BasicError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }

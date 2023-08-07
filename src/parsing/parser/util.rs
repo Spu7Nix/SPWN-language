@@ -12,8 +12,8 @@ use crate::gd::ids::IDClass;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{
-    Attribute, DictItem, ExprNode, Expression, Import, ImportSettings, ImportType, StringContent,
-    StringFlags, StringType, Vis,
+    Attribute, DictItem, ExprNode, Expression, Import, ImportType, StringContent, StringFlags,
+    StringType, Vis,
 };
 use crate::parsing::attributes::AttributeTarget;
 use crate::parsing::error::SyntaxError;
@@ -365,22 +365,14 @@ impl Parser<'_> {
 
                 Import {
                     path: self.parse_plain_string(self.slice())?.into(),
-                    settings: ImportSettings {
-                        typ: ImportType::File,
-                        is_absolute: false,
-                        allow_builtin_impl: false,
-                    },
+                    typ: ImportType::File,
                 }
             },
             Token::Ident => {
                 self.next()?;
                 Import {
                     path: self.slice().into(),
-                    settings: ImportSettings {
-                        typ: ImportType::Library,
-                        is_absolute: false,
-                        allow_builtin_impl: false,
-                    },
+                    typ: ImportType::Library,
                 }
             },
             other => {

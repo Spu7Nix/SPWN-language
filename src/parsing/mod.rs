@@ -3,3 +3,5 @@ pub mod attributes;
 pub mod error;
 pub mod operators;
 pub mod parser;
+#[cfg(test)]
+mod tests;

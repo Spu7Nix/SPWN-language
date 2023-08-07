@@ -68,14 +68,6 @@ impl StringContent {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub struct ImportSettings {
-    pub typ: ImportType,
-    pub is_absolute: bool,
-    pub allow_builtin_impl: bool,
-}
-
-#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ImportType {
     File,
@@ -86,7 +78,7 @@ pub enum ImportType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Import {
     pub path: PathBuf,
-    pub settings: ImportSettings,
+    pub typ: ImportType,
 }
 
 #[cfg_attr(test, derive(PartialEq))]

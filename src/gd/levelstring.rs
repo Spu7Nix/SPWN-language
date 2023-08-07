@@ -87,8 +87,7 @@ pub fn get_level_string(
                     k2_detected = true;
                     if level_detected {
                         return Err(BasicError(
-                            "Level is not initialized! Please open the level, place some objects, then save and quit to initialize the level."
-                            .to_string()).into()
+                            "Level is not initialized! Please open the level, place some objects, then save and quit to initialize the level.").into()
                         );
                     }
                 } else if k2_detected {
@@ -127,16 +126,14 @@ pub fn get_level_string(
     if level_detected && !k4_detected {
         return Err(BasicError(
             "Level is not initialized! Please open the level, place some objects, then save and quit to initialize the level"
-            .to_string()
         ).into());
     } else if !k4_detected {
         if let Some(level_name) = level_name {
             return Err(BasicError(format!("Level named \"{level_name}\" was not found")).into());
         } else {
-            return Err(BasicError(
-                "No level found! Please create a level for SPWN to operate on".to_string(),
-            )
-            .into());
+            return Err(
+                BasicError("No level found! Please create a level for SPWN to operate on").into(),
+            );
         }
     }
 

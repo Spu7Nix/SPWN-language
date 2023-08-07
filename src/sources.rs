@@ -12,7 +12,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::compiling::bytecode::Bytecode;
 use crate::compiling::compiler::{CustomTypeID, TypeDef};
 use crate::new_id_wrapper;
-use crate::parsing::ast::ImportSettings;
 use crate::util::{hyperlink, ImmutStr, ImmutStr32, ImmutVec, SlabMap};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -94,28 +93,21 @@ impl CodeArea {
     // }
 }
 
+pub const ZEROSPAN: CodeSpan = CodeSpan { start: 0, end: 0 };
+
 #[allow(renamed_and_removed_lints, unknown_lints)]
-#[derive(
-    Clone, PartialEq, Eq, Copy, Default, Serialize, Deserialize, Hash, derive_more::Display,
-)]
+#[derive(Clone, Eq, Copy, Default, Serialize, Deserialize, Hash, derive_more::Display)]
+#[cfg_attr(not(test), derive(PartialEq))]
 #[display(fmt = "{}..{}", start, end)]
 pub struct CodeSpan {
     pub start: usize,
     pub end: usize,
 }
 
-pub const ZEROSPAN: CodeSpan = CodeSpan { start: 0, end: 0 };
-
-impl CodeSpan {
-    pub fn extend(&self, other: CodeSpan) -> CodeSpan {
-        CodeSpan {
-            start: self.start,
-            end: other.end,
-        }
-    }
-
-    pub fn internal() -> CodeSpan {
-        CodeSpan { start: 0, end: 0 }
+#[cfg(test)]
+impl PartialEq for CodeSpan {
+    fn eq(&self, _: &Self) -> bool {
+        true
     }
 }
 
@@ -130,6 +122,19 @@ impl From<Range<usize>> for CodeSpan {
 impl From<CodeSpan> for Range<usize> {
     fn from(s: CodeSpan) -> Self {
         s.start..s.end
+    }
+}
+
+impl CodeSpan {
+    pub fn extend(&self, other: CodeSpan) -> CodeSpan {
+        CodeSpan {
+            start: self.start,
+            end: other.end,
+        }
+    }
+
+    pub fn internal() -> CodeSpan {
+        CodeSpan { start: 0, end: 0 }
     }
 }
 
