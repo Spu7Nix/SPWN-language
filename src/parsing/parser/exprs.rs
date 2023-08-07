@@ -187,6 +187,8 @@ impl Parser<'_> {
                         }
                     };
 
+                    // println!("spingkla {:?}", after_close);
+
                     match after_close {
                         Token::FatArrow | Token::LBracket | Token::Arrow if allow_macros => (),
                         _ => {
@@ -196,6 +198,7 @@ impl Parser<'_> {
                                     .spanned(start.extend(self.span()));
                             }
                             let mut inner = self.parse_expr(true)?;
+                            // println!("hullub");
                             self.expect_tok(Token::RParen)?;
                             inner.span = start.extend(self.span());
                             return Ok(inner);
@@ -245,13 +248,14 @@ impl Parser<'_> {
                             if is_spread {
                                 args.push(MacroArg::Spread { pattern: pat })
                             } else {
-                                let default = if !is_first && self.skip_tok(Token::Assign)? {
+                                let default = if self.skip_tok(Token::Assign)? {
                                     Some(self.parse_expr(true)?)
                                 } else {
                                     None
                                 };
                                 args.push(MacroArg::Single { pattern: pat, default })
                             }
+                            // println!("fulcrum e");
 
                             index += 1;
 

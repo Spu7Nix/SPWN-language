@@ -12,6 +12,7 @@ use super::opcodes::{FuncID, Opcode, UnoptOpcode};
 use crate::compiling::bytecode::Function;
 use crate::compiling::compiler::CustomTypeID;
 use crate::compiling::opcodes::OptOpcode;
+use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::new_id_wrapper;
 use crate::parsing::operators::operators::Operator;
@@ -748,6 +749,16 @@ impl<'a> CodeBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(Opcode::PureNeq { a, b, to }), span)
     }
 
+    pub fn pure_gte(
+        &mut self,
+        a: UnoptRegister,
+        b: UnoptRegister,
+        to: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode(ProtoOpcode::Raw(Opcode::PureGte { a, b, to }), span)
+    }
+
     pub fn eq(&mut self, a: UnoptRegister, b: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
         self.push_opcode(ProtoOpcode::Raw(Opcode::Eq { a, b, to }), span)
     }
@@ -792,5 +803,27 @@ impl<'a> CodeBuilder<'a> {
     ) {
         let id = self.proto_bytecode.call_exprs.insert(v).into();
         self.push_opcode(ProtoOpcode::Raw(Opcode::Call { base, call: id }), span)
+    }
+
+    pub fn new_trigger_fn_regs(&mut self, span: CodeSpan) -> (UnoptRegister, UnoptRegister) {
+        let group_reg = self.next_reg();
+        let out_reg = self.next_reg();
+
+        self.push_raw_opcode(
+            Opcode::LoadArbitraryID {
+                class: IDClass::Group,
+                dest: group_reg,
+            },
+            span,
+        );
+        self.push_raw_opcode(
+            Opcode::MakeTriggerFunc {
+                src: group_reg,
+                dest: out_reg,
+            },
+            span,
+        );
+
+        (group_reg, out_reg)
     }
 }

@@ -367,10 +367,10 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
     ArrayPattern(P, P), // <pattern>[<pattern>]
     DictPattern(P),     // <pattern>{:}
 
-    ArrayDestructure(Vec<P>),                       // [ <pattern> ]
-    DictDestructure(AHashMap<S, Option<P>>),        // { key: <pattern> ETC }
-    MaybeDestructure(Option<P>),                    // <pattern>? or ?
-    InstanceDestructure(T, AHashMap<S, Option<P>>), // @typ::{ key: <pattern> ETC }
+    ArrayDestructure(Vec<P>),                        // [ <pattern> ]
+    DictDestructure(AHashMap<Spanned<S>, P>),        // { key: <pattern> ETC }
+    MaybeDestructure(Option<P>),                     // <pattern>? or ?
+    InstanceDestructure(T, AHashMap<Spanned<S>, P>), // @typ::{ key: <pattern> ETC }
 
     Empty,
 
@@ -407,9 +407,9 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
             Pattern::ArrayPattern(a, b) => a.pat.is_self(interner) || b.pat.is_self(interner),
             Pattern::DictPattern(a) => a.pat.is_self(interner),
             Pattern::ArrayDestructure(v) => v.iter().any(|p| p.pat.is_self(interner)),
-            Pattern::DictDestructure(map) | Pattern::InstanceDestructure(_, map) => map
-                .iter()
-                .any(|(_, p)| p.as_ref().is_some_and(|p| p.pat.is_self(interner))),
+            Pattern::DictDestructure(map) | Pattern::InstanceDestructure(_, map) => {
+                map.iter().any(|(_, p)| p.pat.is_self(interner))
+            },
             Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.is_self(interner)),
             Pattern::Path { var, .. } => interner.borrow().resolve(var) == "self",
             Pattern::Mut { name, .. } => interner.borrow().resolve(name) == "self",
@@ -433,9 +433,9 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
             Pattern::ArrayPattern(elem, ..) => elem.pat.needs_mut(),
             Pattern::DictPattern(elem) => elem.pat.needs_mut(),
             Pattern::ArrayDestructure(v) => v.iter().any(|p| p.pat.needs_mut()),
-            Pattern::DictDestructure(map) | Pattern::InstanceDestructure(_, map) => map
-                .iter()
-                .any(|(_, p)| p.as_ref().is_some_and(|p| p.pat.needs_mut())),
+            Pattern::DictDestructure(map) | Pattern::InstanceDestructure(_, map) => {
+                map.iter().any(|(_, p)| p.pat.needs_mut())
+            },
             Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.needs_mut()),
             Pattern::Mut { is_ref, .. } => *is_ref,
             Pattern::IfGuard { pat, .. } => pat.pat.needs_mut(),

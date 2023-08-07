@@ -44,7 +44,7 @@ overload = {
 
 
 impl @counter {
-    new: (binds) -> @counter {
+    new: (binds = []) -> @counter {
         return @counter::{
             item: ?i,
             pos_bits: 10,

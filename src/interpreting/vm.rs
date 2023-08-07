@@ -669,6 +669,17 @@ impl Vm {
                         ));
                         self.change_reg(to, v.into_stored(self.make_area(opcode_span, &program)));
                     },
+                    Opcode::PureGte { a, b, to } => {
+                        // let v = value_ops::e
+                        let v = value_ops::gte(
+                            &self.get_reg_ref(a).borrow(),
+                            &self.get_reg_ref(b).borrow(),
+                            opcode_span,
+                            self,
+                            &program,
+                        )?;
+                        self.change_reg(to, v.into_stored(self.make_area(opcode_span, &program)));
+                    },
                     Opcode::Gt { a, b, to } => {
                         bin_op!(Gt, a, b, to);
                     },
@@ -1558,6 +1569,8 @@ impl Vm {
                         let len = match &self.get_reg_ref(src).borrow().value {
                             Value::Array(v) => v.len(),
                             Value::Dict(v) => v.len(),
+                            Value::Instance { items, .. } => items.len(),
+                            Value::Module { exports, .. } => exports.len(),
                             Value::String(v) => v.len(),
                             _ => {
                                 unreachable!()
@@ -2112,21 +2125,25 @@ impl Vm {
                     }
                 }
 
-                for (i, arg) in fill.iter().enumerate() {
-                    if let ArgFill::Single(None, name, ..) = arg {
-                        return Multi::new_single(
-                            ctx,
-                            Err(RuntimeError::ArgumentNotSatisfied {
-                                call_area: call_area.clone(),
-                                macro_def_area: base_area,
-                                arg: if let Some(name) = name {
-                                    Either::Left(name.to_string())
-                                } else {
-                                    Either::Right(i)
-                                },
-                                call_stack: self.get_call_stack(),
-                            }),
-                        );
+                for (i, arg) in fill.iter_mut().enumerate() {
+                    if let ArgFill::Single(opt @ None, name, ..) = arg {
+                        if let Some(v) = &data.defaults[i] {
+                            *opt = Some(v.clone());
+                        } else {
+                            return Multi::new_single(
+                                ctx,
+                                Err(RuntimeError::ArgumentNotSatisfied {
+                                    call_area: call_area.clone(),
+                                    macro_def_area: base_area,
+                                    arg: if let Some(name) = name {
+                                        Either::Left(name.to_string())
+                                    } else {
+                                        Either::Right(i)
+                                    },
+                                    call_stack: self.get_call_stack(),
+                                }),
+                            );
+                        }
                     }
                 }
 

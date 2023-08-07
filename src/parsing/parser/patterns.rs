@@ -39,14 +39,23 @@ impl<'a> Parser<'a> {
                         }
                     };
 
+                    let key_span = self.span();
+
                     let elem = if self.next_is(Token::Colon)? {
                         self.next()?;
-                        Some(self.parse_pattern()?)
+                        self.parse_pattern()?
                     } else {
-                        None
+                        PatternNode {
+                            pat: Box::new(Pattern::Path {
+                                var: key,
+                                path: vec![],
+                                is_ref: false,
+                            }),
+                            span: key_span,
+                        }
                     };
 
-                    map.insert(key, elem);
+                    map.insert(key.spanned(key_span), elem);
                 });
 
                 map

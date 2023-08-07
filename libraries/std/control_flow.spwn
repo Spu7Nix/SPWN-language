@@ -1,4 +1,6 @@
 extract import "obj_ids.spwn"
+extract import "counter.spwn"
+extract import "item.spwn"
 
 wait = (duration: @int | @float | @epsilon) {
     if duration is @epsilon || duration > 0.0 {
@@ -24,23 +26,53 @@ call_with_delay = (
 	}, true)
 }
 
-// while_loop = (
-//     expr: () -> @bool,
-//     code: () -> (),
-// ) {
-//     func = !{
-//         if expr() {
-//             code()
-//             call_with_delay(ε, func)
-//         } else {
-//             -> return
-//         }
-//     }
+while_loop = (
+    expr: () -> @bool,
+    code: () -> (),
+) {
+    func = !{
+        if expr() {
+            code()
+            call_with_delay(ε, func)
+        } else {
+            -> return
+        }
+    }
 
-//     func!
-// }
+    func!
+}
+
+for_loop = (
+    range: @range,
+    code: @counter -> (),
+) {
+    mut i = @counter::new()
+    i += range.start
+
+    func = !{
+        code(i)
+        wait(ε)
+        i.add_const(range.step)
+        if range.step > 0 {
+            i.item.if_is(@comparison::SMALLER_THAN, range.end, func)
+            i.item.if_is(@comparison::LARGER_THAN, range.end - 1, !{
+                -> return
+            })
+        } else {
+            i.item.if_is(@comparison::LARGER_THAN, range.end, func)
+            i.item.if_is(@comparison::SMALLER_THAN, range.end + 1, !{
+                -> return
+            })
+        }
+    }
+
+    func!
+
+};
 
 return {
     wait,
     call_with_delay,
+    while_loop,
+    for_loop
 }

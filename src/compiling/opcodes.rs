@@ -172,6 +172,8 @@ opcodes! {
     PureEq { [a], [b], [to] },
     #[delve(display = |a, b, to| format!("pure {a} != {b} -> {to}"))]
     PureNeq { [a], [b], [to] },
+    #[delve(display = |a, b, to| format!("pure {a} >= {b} -> {to}"))]
+    PureGte { [a], [b], [to] },
 
     #[delve(display = |to| format!("to {to}"))]
     Jump { to: OpcodePos },

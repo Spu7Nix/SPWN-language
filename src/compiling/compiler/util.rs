@@ -5,8 +5,10 @@ use lasso::Spur;
 
 use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType};
 use crate::compiling::builder::{BlockID, CodeBuilder, JumpType};
-use crate::compiling::bytecode::UnoptRegister;
+use crate::compiling::bytecode::{OptRegister, UnoptRegister};
 use crate::compiling::error::CompileError;
+use crate::compiling::opcodes::Opcode;
+use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{
     DictItem, ExprNode, Expression, Import, ImportType, PatternNode, Vis, VisTrait,
@@ -367,5 +369,30 @@ impl Compiler<'_> {
             } => self.is_mut_expr(if_true, scope)? && self.is_mut_expr(if_false, scope)?,
             _ => false,
         })
+    }
+
+    pub fn new_trigger_fn_regs(
+        builder: &mut CodeBuilder,
+        span: CodeSpan,
+    ) -> (UnoptRegister, UnoptRegister) {
+        let group_reg = builder.next_reg();
+        let out_reg = builder.next_reg();
+
+        builder.push_raw_opcode(
+            Opcode::LoadArbitraryID {
+                class: IDClass::Group,
+                dest: group_reg,
+            },
+            span,
+        );
+        builder.push_raw_opcode(
+            Opcode::MakeTriggerFunc {
+                src: group_reg,
+                dest: out_reg,
+            },
+            span,
+        );
+
+        (group_reg, out_reg)
     }
 }

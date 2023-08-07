@@ -362,7 +362,82 @@ impl Compiler<'_> {
                     builder,
                 )?;
             },
-            Pattern::DictDestructure(_) => todo!(),
+            Pattern::DictDestructure(map) => {
+                self.and_op(
+                    &[
+                        &|_, builder| {
+                            let dict_typ = builder.next_reg();
+                            builder.load_const(ValueType::Dict, dict_typ, pattern.span);
+
+                            let expr_typ = builder.next_reg();
+                            builder.type_of(expr_reg, expr_typ, pattern.span);
+
+                            let eq_reg = builder.next_reg();
+                            builder.pure_eq(expr_typ, dict_typ, eq_reg, pattern.span);
+
+                            Ok(eq_reg)
+                        },
+                        &|_, builder| {
+                            let pat_len = builder.next_reg();
+                            builder.load_const(map.len() as i64, pat_len, pattern.span);
+
+                            let expr_len = builder.next_reg();
+                            builder.len(expr_reg, expr_len, pattern.span);
+
+                            let gte_reg = builder.next_reg();
+                            builder.pure_gte(expr_len, pat_len, gte_reg, pattern.span);
+
+                            Ok(gte_reg)
+                        },
+                        &|compiler, builder| {
+                            // todo!()
+                            let mut funcs = vec![];
+
+                            for (key, elem) in map.iter() {
+                                let f: Box<
+                                    dyn Fn(
+                                        &mut Compiler<'_>,
+                                        &mut CodeBuilder<'_>,
+                                    )
+                                        -> CompileResult<UnoptRegister>,
+                                > = Box::new(move |compiler, builder| {
+                                    let elem_reg = builder.next_reg();
+                                    builder.member(
+                                        expr_reg,
+                                        elem_reg,
+                                        key.map(|s| compiler.resolve_32(&s)),
+                                        false,
+                                        pattern.span,
+                                    );
+
+                                    compiler.compile_pattern_check(
+                                        elem_reg,
+                                        elem,
+                                        try_new_var,
+                                        scope,
+                                        builder,
+                                    )
+                                });
+                                funcs.push(f);
+                            }
+                            let all_reg = builder.next_reg();
+                            builder.load_const(true, all_reg, pattern.span);
+
+                            compiler.and_op(
+                                &funcs.iter().map(|e| &**e).collect_vec()[..],
+                                all_reg,
+                                pattern.span,
+                                builder,
+                            )?;
+
+                            Ok(all_reg)
+                        },
+                    ],
+                    out_reg,
+                    pattern.span,
+                    builder,
+                )?;
+            },
             Pattern::MaybeDestructure(_) => todo!(),
             Pattern::InstanceDestructure(..) => todo!(),
             Pattern::Path { var, path, is_ref } => {

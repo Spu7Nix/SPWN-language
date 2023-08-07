@@ -1,4 +1,4 @@
-extract import "libraries/std/lib.spwn"
+// extract import "libraries/std/lib.spwn"
 
 
 
@@ -30,3 +30,28 @@ extract import "libraries/std/lib.spwn"
 // // dbg 2;
 // // h();
 // // dbg 3;
+
+
+// a = {
+//     dick: [6, 3],
+//     fart: 69,
+// }
+
+// {dick: [j, g], fart: @string} = a
+// dbg j;
+// dbg g;
+// dbg fart;
+
+type @gug
+
+overload == {
+    (a: @gug, b: @int) {
+        -> return true
+        -> return false
+    }
+}
+match @gug::{} {
+    ==6 => dbg 6,
+    ==7 => dbg 7,
+    _ => dbg 9,
+}

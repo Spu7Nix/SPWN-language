@@ -5,7 +5,7 @@ use base64::Engine;
 use itertools::{Either, Itertools};
 use widestring::utf32str;
 
-use super::{CompileResult, Compiler, ScopeID};
+use super::{CompileResult, Compiler, DeferredTriggerFunc, ScopeID};
 use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::bytecode::{CallExpr, Constant, Register, UnoptRegister};
 use crate::compiling::compiler::{Scope, ScopeType, VarData};
@@ -434,9 +434,7 @@ impl Compiler<'_> {
 
                         match code {
                             MacroCode::Normal(stmts) => {
-                                for stmt in stmts {
-                                    self.compile_stmt(stmt, base_scope, builder)?;
-                                }
+                                self.compile_stmts(stmts, base_scope, builder)?;
                                 // let ret_reg = builder.next_reg();
                                 // builder.load_empty(ret_reg, expr.span);
                                 // self.compile_return(
@@ -527,16 +525,24 @@ impl Compiler<'_> {
                     expr.span,
                 );
 
-                builder.push_raw_opcode(Opcode::SetContextGroup { reg: group_reg }, expr.span);
-                builder.new_block(|builder| {
-                    let inner_scope =
-                        self.derive_scope(scope, Some(ScopeType::TriggerFunc(expr.span)));
-                    for s in code {
-                        self.compile_stmt(s, inner_scope, builder)?
-                    }
-                    Ok(())
-                })?;
-                builder.push_raw_opcode(Opcode::SetContextGroup { reg: out_reg }, expr.span);
+                self.deferred_trigger_func_stack
+                    .last_mut()
+                    .unwrap()
+                    .push(DeferredTriggerFunc {
+                        stmts: code.clone(),
+                        group_reg,
+                        fn_reg: out_reg,
+                        span: expr.span,
+                    });
+
+                // builder.push_raw_opcode(Opcode::SetContextGroup { reg: group_reg }, expr.span);
+                // builder.new_block(|builder| {
+                //     let inner_scope =
+                //         self.derive_scope(scope, Some(ScopeType::TriggerFunc(expr.span)));
+                //     self.compile_stmts(code, inner_scope, builder)?;
+                //     Ok(())
+                // })?;
+                // builder.push_raw_opcode(Opcode::SetContextGroup { reg: out_reg }, expr.span);
                 Ok(out_reg)
             },
             Expression::TriggerFuncCall(e) => {
@@ -649,9 +655,7 @@ impl Compiler<'_> {
                                 },
                                 MatchBranchCode::Block(stmts) => {
                                     builder.load_empty(out_reg, expr.span);
-                                    for s in stmts {
-                                        self.compile_stmt(s, derived, builder)?;
-                                    }
+                                    self.compile_stmts(stmts, derived, builder)?;
                                     builder.jump(Some(outer), JumpType::End, expr.span);
                                 },
                             }

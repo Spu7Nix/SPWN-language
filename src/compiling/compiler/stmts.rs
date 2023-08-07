@@ -8,7 +8,7 @@ use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::{FuncID, Opcode};
 use crate::interpreting::value::ValueType;
-use crate::parsing::ast::{Expression, Pattern, Statement, StmtNode, VisTrait};
+use crate::parsing::ast::{Expression, Pattern, Statement, Statements, StmtNode, VisTrait};
 use crate::parsing::operators::operators::{AssignOp, Operator};
 use crate::sources::Spannable;
 
@@ -19,26 +19,30 @@ impl<'a> Compiler<'a> {
         scope: ScopeID,
         builder: &mut CodeBuilder,
     ) -> CompileResult<()> {
+        self.deferred_trigger_func_stack.push(vec![]);
         match &*stmt.stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder)?;
             },
             Statement::Assign(left, right) => {
-                let right_reg = self.compile_expr(right, scope, builder)?;
-                let match_reg =
-                    self.compile_pattern_check(right_reg, left, false, scope, builder)?;
+                // match (&*left.pat, &*right.expr) {
+                //     (Pattern::)
+                // }
 
-                // let temp_reg = builder.next_reg();
-
-                // let marker = builder.mark_insert();
-
+                // let right_reg = self.compile_expr(right, scope, builder)?;
                 // let match_reg =
-                //     self.compile_pattern_check(temp_reg, left, false, scope, builder)?;
+                //     self.compile_pattern_check(right_reg, left, false, scope, builder)?;
 
-                // let right_reg = self.compile_expr(right, scope, &mut marker.with(builder))?;
-                // marker
-                //     .with(builder)
-                //     .copy_mem(right_reg, temp_reg, right.span);
+                let temp_reg = builder.next_reg();
+                let marker = builder.mark_insert();
+
+                let match_reg =
+                    self.compile_pattern_check(temp_reg, left, false, scope, builder)?;
+
+                let right_reg = self.compile_expr(right, scope, &mut marker.with(builder))?;
+                marker
+                    .with(builder)
+                    .copy_ref(right_reg, temp_reg, right.span);
 
                 builder.mismatch_throw_if_false(match_reg, right_reg, left.span);
             },
@@ -96,9 +100,7 @@ impl<'a> Compiler<'a> {
                             let cond_reg = self.compile_expr(cond, derived, b)?;
                             b.jump(None, JumpType::EndIfFalse(cond_reg), cond.span);
 
-                            for s in code {
-                                self.compile_stmt(s, derived, b)?;
-                            }
+                            self.compile_stmts(code, derived, b)?;
                             b.jump(Some(outer), JumpType::End, stmt.span);
                             Ok(())
                         })?;
@@ -107,9 +109,7 @@ impl<'a> Compiler<'a> {
                     if let Some(code) = else_branch {
                         let derived = self.derive_scope(scope, None);
 
-                        for s in code {
-                            self.compile_stmt(s, derived, b)?;
-                        }
+                        self.compile_stmts(code, derived, b)?;
                     }
 
                     Ok(())
@@ -122,9 +122,7 @@ impl<'a> Compiler<'a> {
                     let cond_reg = self.compile_expr(cond, derived, builder)?;
                     builder.jump(None, JumpType::EndIfFalse(cond_reg), cond.span);
 
-                    for s in code {
-                        self.compile_stmt(s, derived, builder)?;
-                    }
+                    self.compile_stmts(code, derived, builder)?;
                     builder.jump(None, JumpType::Start, stmt.span);
 
                     Ok(())
@@ -156,9 +154,7 @@ impl<'a> Compiler<'a> {
                     let match_reg = self.compile_pattern_check(next_reg, iter, true, derived, b)?;
                     b.mismatch_throw_if_false(match_reg, next_reg, iter.span);
 
-                    for s in code {
-                        self.compile_stmt(s, derived, b)?;
-                    }
+                    self.compile_stmts(code, derived, b)?;
                     b.jump(None, JumpType::Start, stmt.span);
 
                     Ok(())
@@ -407,9 +403,7 @@ impl<'a> Compiler<'a> {
                         builder.jump(None, JumpType::PushTryCatchEnd(err_reg), stmt.span);
                         let derived = self.derive_scope(scope, None);
 
-                        for s in try_code {
-                            self.compile_stmt(s, derived, builder)?;
-                        }
+                        self.compile_stmts(try_code, derived, builder)?;
 
                         builder.jump(Some(outer), JumpType::End, stmt.span);
 
@@ -423,13 +417,44 @@ impl<'a> Compiler<'a> {
                         builder.mismatch_throw_if_false(matches_reg, err_reg, catch_pat.span);
                     }
 
-                    for s in catch_code {
-                        self.compile_stmt(s, derived, builder)?;
-                    }
+                    self.compile_stmts(catch_code, derived, builder)?;
 
                     Ok(())
                 })?;
             },
+        }
+
+        for trigger_fn in self.deferred_trigger_func_stack.pop().unwrap() {
+            builder.push_raw_opcode(
+                Opcode::SetContextGroup {
+                    reg: trigger_fn.group_reg,
+                },
+                trigger_fn.span,
+            );
+            builder.new_block(|builder| {
+                let inner_scope =
+                    self.derive_scope(scope, Some(ScopeType::TriggerFunc(trigger_fn.span)));
+                self.compile_stmts(&trigger_fn.stmts, inner_scope, builder)?;
+                Ok(())
+            })?;
+            builder.push_raw_opcode(
+                Opcode::SetContextGroup {
+                    reg: trigger_fn.fn_reg,
+                },
+                trigger_fn.span,
+            );
+        }
+        Ok(())
+    }
+
+    pub fn compile_stmts(
+        &mut self,
+        stmts: &Statements,
+        scope: ScopeID,
+        builder: &mut CodeBuilder,
+    ) -> CompileResult<()> {
+        for s in stmts {
+            self.compile_stmt(s, scope, builder)?;
         }
         Ok(())
     }

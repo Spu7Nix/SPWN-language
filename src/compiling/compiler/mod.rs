@@ -20,7 +20,7 @@ use super::error::CompileError;
 use crate::cli::{BuildSettings, DocSettings};
 use crate::compiling::builder::ProtoBytecode;
 use crate::new_id_wrapper;
-use crate::parsing::ast::{Ast, PatternNode, Vis};
+use crate::parsing::ast::{Ast, PatternNode, Statements, Vis};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap};
 use crate::util::{ImmutStr, ImmutStr32, ImmutVec, Interner, SlabMap, Str32, String32};
 
@@ -67,6 +67,13 @@ pub struct TypeDef<S> {
     pub name: S,
 }
 
+pub struct DeferredTriggerFunc {
+    pub stmts: Statements,
+    pub group_reg: UnoptRegister,
+    pub fn_reg: UnoptRegister,
+    pub span: CodeSpan,
+}
+
 pub struct Compiler<'a> {
     src: Rc<SpwnSource>,
     interner: Rc<RefCell<Interner>>,
@@ -82,6 +89,8 @@ pub struct Compiler<'a> {
 
     pub local_type_defs: SlabMap<LocalTypeID, Vis<TypeDef<Spur>>>,
     available_custom_types: AHashMap<Spur, CustomTypeID>,
+
+    deferred_trigger_func_stack: Vec<Vec<DeferredTriggerFunc>>,
 }
 
 impl<'a> Compiler<'a> {
@@ -106,6 +115,7 @@ impl<'a> Compiler<'a> {
             is_doc_gen,
             bytecode_map,
             type_def_map,
+            deferred_trigger_func_stack: vec![],
         }
     }
 }
@@ -192,9 +202,7 @@ impl Compiler<'_> {
                 //     }
                 // }
 
-                for stmt in &ast.statements {
-                    self.compile_stmt(stmt, base_scope, b)?;
-                }
+                self.compile_stmts(&ast.statements, base_scope, b)?;
 
                 Ok(())
             },

@@ -482,7 +482,7 @@ fn lt(
     })
 }
 
-fn gte(
+pub fn gte(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
