@@ -137,6 +137,7 @@ impl<'a> Parser<'a> {
                     let typ = self.intern_string(&self.slice()[1..]);
                     let span = self.span();
                     if self.skip_tok(Token::DoubleColon)? {
+                        self.expect_tok(Token::LBracket)?;
                         let map = dictlike_destructure!();
                         Pattern::InstanceDestructure(typ, map)
                     } else if self.skip_tok(Token::Arrow)? {

@@ -1,9 +1,25 @@
-// extract import "libraries/std/lib.spwn"
+
+// mut ctr = counter(5)
+
+// ctr.display(45, 45)
+
+// mut ctr2 = counter(-4)
+
+// ctr2.display(105, 45)
+
+// wait(1)
+
+// ctr *= -1
+
+// wait(1)
+
+// ctr *= ctr2
+
+dbg @error::TYPE_MISMATCH + 5;
 
 
-
-g = (a, &mut b) {
-    
-}
-mut b = 6
-g(1, b)
+// dbg [
+//     {ctr: "dgdf", factor: 5},
+//     {ctr: "dgdf", factor: 5},
+//     {ctr: "dgdf", factor: 5}
+// ] is @string | {ctr: @string, factor: @int}[_]

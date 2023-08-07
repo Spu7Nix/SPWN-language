@@ -12,22 +12,117 @@ overload += {
     (a: @counter, b: @counter) => b.copy_to(a),
 }
 
+overload *= {
+    (a: @counter, b: @int | @counter) => a.multiply(b),
+}
+
 overload -= {
     (a: @counter, b: @int) => a.add_const(-b),
     (a: @counter, b: @counter) => b.copy_to([{ctr: a, factor: -1}]),
 }
 
+compare_int_counter = (ret_false_func, ret_true_func) {
+    ret_false = !{
+        -> return false
+    }
+    ret_true_func(!{
+        ret_false.start_group.toggle_off()
+        -> return true
+    })
+    ret_false_func(ret_false)
+    ret_false.start_group.toggle_on()
+}
+
+overload == {
+    (a: @counter, b: @counter) => a.compare(b) == 0,
+    (a: @counter, b: @int) => compare_int_counter(
+        (ret_false) {
+            a.item.if_is(@comparison::LARGER_THAN, b, ret_false)
+            a.item.if_is(@comparison::SMALLER_THAN, b, ret_false)
+        },
+        ret_true => a.item.if_is(@comparison::EQUAL_TO, b, ret_true)
+    ),
+    (a: @int, b: @counter) => compare_int_counter(
+        (ret_false) {
+            b.item.if_is(@comparison::LARGER_THAN, a, ret_false)
+            b.item.if_is(@comparison::SMALLER_THAN, a, ret_false)
+        },
+        ret_true => b.item.if_is(@comparison::EQUAL_TO, a, ret_true)
+    ),
+}
+
+overload > {
+    (a: @counter, b: @counter) => a.compare(b) == 1,
+    (a: @counter, b: @int) => compare_int_counter(
+        ret_false => a.item.if_is(@comparison::SMALLER_THAN, b + 1, ret_false),
+        ret_true => a.item.if_is(@comparison::LARGER_THAN, b, ret_true)
+    ),
+    (a: @int, b: @counter) => compare_int_counter(
+        ret_false => b.item.if_is(@comparison::LARGER_THAN, a - 1, ret_false),
+        ret_true => b.item.if_is(@comparison::SMALLER_THAN, a, ret_true)
+    )
+}
+
+overload < {
+    (a: @counter, b: @counter) => a.compare(b) == -1,
+    (a: @counter, b: @int) => compare_int_counter(
+        ret_false => a.item.if_is(@comparison::LARGER_THAN, b - 1, ret_false),
+        ret_true => a.item.if_is(@comparison::SMALLER_THAN, b, ret_true)
+    ),
+    (a: @int, b: @counter) => compare_int_counter(
+        ret_false => b.item.if_is(@comparison::SMALLER_THAN, a + 1, ret_false),
+        ret_true => b.item.if_is(@comparison::LARGER_THAN, a, ret_true)
+    )
+}
+
+overload >= {
+    (a: @counter, b: @counter) => a.compare(b) >= 0,
+    (a: @counter, b: @int) => compare_int_counter(
+        ret_false => a.item.if_is(@comparison::SMALLER_THAN, b, ret_false),
+        ret_true => a.item.if_is(@comparison::LARGER_THAN, b - 1, ret_true)
+    ),
+    (a: @int, b: @counter) => compare_int_counter(
+        ret_false => b.item.if_is(@comparison::LARGER_THAN, a, ret_false),
+        ret_true => b.item.if_is(@comparison::SMALLER_THAN, a + 1, ret_true)
+    ),
+}
+
+overload <= {
+    (a: @counter, b: @counter) => a.compare(b) <= 0,
+    (a: @counter, b: @int) => compare_int_counter(
+        ret_false => a.item.if_is(@comparison::LARGER_THAN, b, ret_false),
+        ret_true => a.item.if_is(@comparison::SMALLER_THAN, b + 1, ret_true)
+    ),
+    (a: @int, b: @counter) => compare_int_counter(
+        ret_false => b.item.if_is(@comparison::SMALLER_THAN, a, ret_false),
+        ret_true => b.item.if_is(@comparison::LARGER_THAN, a - 1, ret_true)
+    )
+}
+
+
 overload + {
     (a: @counter, b: @counter) {
-        mut new = @counter::new([])
-        a.copy_to(new)
-        b.copy_to(new)
+        mut new = @counter::new(reset = false);
+        a.copy_to(new);
+        b.copy_to(new);
+        return new
+    },
+
+    (a: @int, b: @counter) {
+        mut new = @counter::new(a, reset = false);
+        b.copy_to(new);
+        return new
+    },
+
+    (a: @counter, b: @int) {
+        mut new = @counter::new(b, reset = false);
+        a.copy_to(new);
         return new
     },
 
     (mut a: @array, b: @array) -> @array {
         for i in b {
-            a.push(b)
+            a.push(i)
         }
         return a
     }
@@ -44,13 +139,19 @@ overload = {
 
 
 impl @counter {
-    new: (binds = []) -> @counter {
-        return @counter::{
-            item: ?i,
+    new: (value: @int = 0, reset: @bool = true) -> @counter {
+        item = ?i
+        out = @counter::{
+            item,
             pos_bits: 10,
             neg_bits: 6,
-            binds,
+            binds: [],
         }
+        if reset {
+            out.reset()
+        }
+        item.add(value)
+        return out
     },
 
     add_bind: (mut self, action: @int -> ()) {
@@ -68,6 +169,26 @@ impl @counter {
         }
     },
 
+    display: (&self, x: @int | @float, y: @int | @float) {
+        $.add(obj {
+            OBJ_ID: 1615,
+            X: x,
+            Y: y,
+            ITEM: self.item,
+            COLOR: 1c,
+            GROUPS: 999g
+        })
+    },
+
+    to_obj: (&self) -> @object {
+        return obj {
+            OBJ_ID: 1615,
+            ITEM: self.item,
+            COLOR: 1c,
+            GROUPS: 999g
+        }
+    },
+
     reset: (
         mut self, 
         for_each: @int -> () = (n){}
@@ -78,7 +199,7 @@ impl @counter {
             x = 2^i
             self.item.if_is(@comparison::LARGER_THAN, x - 1, !{
                 self.add_const(-x)
-                for_each(-x)
+                for_each(x)
             })
         }
 
@@ -86,57 +207,85 @@ impl @counter {
             x = 2^i
             self.item.if_is(@comparison::SMALLER_THAN, -x + 1, !{
                 self.add_const(x)
-                for_each(x)
+                for_each(-x)
             })
         }
     },
 
     add_to: (
         &self, 
-        mut counters: _,
-        // @counter | {ctr: @counter, factor: @int}[_],
-        for_each: @number -> () = (n){}
+        mut counters: @counter | ({ctr: @counter, factor: @int}[_]),
+        for_each: @int -> () = (n){}
     ) {
         self.reset((n) {
-            
             match counters {
-                @counter => {counters -= n},
-                _ => {
-                    for mut item in counters {
-                        item.ctr -= n * item.factor
-                    }
-                }
-                // {ctr, factor} => {ctr += n * factor}
-            }
-            
-            // Huffing paint thinner makes you invincible.
-            // Watch me drive this Toyota 100mph + fucking zoinked out of my gourd.
+                @counter => {counters += n},
+                _ => counters.map((mut item) {item.ctr += n * item.factor})
+            }    
             for_each(-n)
         })
     },
 
-    // subtract_from: (
-    //     &self,
-    //     items: @counter | {ctr: @counter, factor: @int}[_],
-    //     for_each: @number -> () = (n){}
-    // ) {
-    //     self.add_to(match items {
-    //         @counter => [{ctr: items, factor: -1}],
-    //         a => a.map(({ctr, factor}) => {ctr, factor: -factor})
-    //     })
-    // }
+    subtract_from: (
+        &self,
+        counters: @counter | ({ctr: @counter, factor: @int}[_]),
+        for_each: @int -> () = (n){}
+    ) {
+        self.add_to(match counters {
+            @counter => [{ctr: counters, factor: -1}],
+            a => a.map(({ctr, factor}) => {ctr, factor: -factor})
+        })
+    },
 
-    copy_to:
-    (
+    copy_to: (
         self,
-        counters: _,
-    ) -> @NULL {
-        temp_storage = @counter::new([])
+        counters: @counter | ({ctr: @counter, factor: @int}[_]),
+    ) {
+        temp_storage = @counter::new(reset = false)
+        
         self.add_to(match counters {
             @counter => [{ctr: counters, factor: 1}, {ctr: temp_storage, factor: 1}],
             _ => counters + [{ctr: temp_storage, factor: 1}]
-        }, (n) {})
-        temp_storage.add_to(self, (n) {})
+        })
+        
+        temp_storage.add_to(self)
+    },
+
+    multiply: (self, factor: @counter | @int) {
+
+        if factor is @int {
+            dbg "a";
+            // const
+            temp = @counter::new(0, reset = false)
+            self.add_to([{ctr: temp, factor}])
+            temp.add_to(self)
+
+        } else if factor is @counter {
+            dbg "b";
+            result = @counter::new(0, reset = false)
+            self.reset((n) {
+                factor.copy_to([{ctr: result, factor: n}])
+            })
+            result.add_to(self)
+        }
+    },
+
+    compare: (self, other: @counter) -> ==(-1) | ==0 | ==1 {
+        mut comp = @counter::new(0, reset = false)
+        comp += self
+        comp -= other
+
+        comp.item.if_is(@comparison::LARGER_THAN, 0, !{
+            -> return 1
+        })
+
+        comp.item.if_is(@comparison::EQUAL_TO, 0, !{
+            -> return 0
+        })
+
+        comp.item.if_is(@comparison::SMALLER_THAN, 0, !{
+            -> return -1
+        })
     },
 }
 

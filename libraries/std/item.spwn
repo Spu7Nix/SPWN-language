@@ -46,5 +46,19 @@ impl @item {
             ITEM: self,
         }, true)
     },
+
+    compare: (self, other: @int) -> ==(-1) | ==0 | ==1 {
+        self.if_is(@comparison::LARGER_THAN, other, !{
+            -> return 1
+        })
+
+        self.if_is(@comparison::EQUAL_TO, other, !{
+            -> return 0
+        })
+
+        self.if_is(@comparison::SMALLER_THAN, other, !{
+            -> return -1
+        })
+    }
 }
     

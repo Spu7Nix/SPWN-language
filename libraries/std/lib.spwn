@@ -1,45 +1,13 @@
 extract import "item.spwn"
 extract import "group.spwn"
 extract import "easing.spwn"
-
-import "../core/builtins.spwn"
-import "../core/array.spwn"
-
 extract import "counter.spwn"
 extract import "control_flow.spwn"
 
-
-// for x in 0..1000 {
-//     for y in 0..100 {
-//         $.add(obj {
-//             OBJ_ID: 5,
-//             X: 15 + x * 30,
-//             Y: 15 + y * 30,
-//             ROTATION: 30,
-//         }, true);
-//     }
-// }
-
-// wait(1)
-
-// for_loop(0..10, (i) {
-//     10g.move(10, 0, 0.2, @easing::EASE_IN_OUT, 2.0)
-//     wait(0.1)
-// })
-
-// mut c = @counter::new([(n) {
-//     -> 10g.move(10 * n, 0, 0.5, @easing::EASE_IN_OUT, 2.0)
-// }])
-// mut c2 = @counter::new([])
-
-
-// c2 += 10
-// c -= 5
-
-// wait(1)
-
-// c += c2
-
-wait(1)
-mut c2 = @counter::new([])
-c2.add_bind((n) {})
+return {
+    wait,
+    call_with_delay,
+    while_loop,
+    for_loop,
+    counter: @counter::new,
+}

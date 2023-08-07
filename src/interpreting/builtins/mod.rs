@@ -156,7 +156,7 @@ macro_rules! impl_type {
                 $(#[doc = $fn_doc:expr])+
                 fn $func_name:ident($($args:tt)*)
                 
-                $(-> $ret_type:ident)? {
+                $(-> $ret_type:literal)? {
                     $($code:tt)*
                 }
             )*
@@ -167,7 +167,7 @@ macro_rules! impl_type {
                 
                 $(
 
-                    $crate::interpreting::builtins::raw_macro! { fn $func_name($($args)*){ $($code)* } $ctx $vm $program $area}
+                    $crate::interpreting::builtins::raw_macro! { fn $func_name($($args)*) { $($code)* } $ctx $vm $program $area}
                     // #[allow(unused)]
                     // fn $func_name(
                     //     mut args: Vec<$crate::interpreting::vm::ValueRef>,
@@ -237,7 +237,7 @@ macro_rules! impl_type {
                                     out
                                 },
                                 macro_ret = {
-                                    " " $(; format!(" -> @{} ", stringify!([<$ret_type:snake>])))?
+                                    " " $(; format!(" -> {} ", $ret_type))?
                                 }
                             )
                         ),*
@@ -290,7 +290,7 @@ macro_rules! impl_type {
     (
         @ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident)
 
-        ...$var:ident : $typ:ident $(if $pattern:literal)? $(as $spwn_name:literal)?
+        ...$var:ident $(: $typ:ident)? $(if $pattern:literal)? $(as $spwn_name:literal)?
 
         // rest
         $(, $($t:tt)*)?
@@ -299,7 +299,15 @@ macro_rules! impl_type {
             randsym::randsym! {
                 let /?@v/ = $args[$idx].borrow();
                 let $var = match &/?@v/.value {
-                    $crate::interpreting::value::Value::Array(v) => itertools::Itertools::collect_vec(v.iter().map(|v| [< $typ Getter >]::<'_, false>::make_from(v))),
+                    $crate::interpreting::value::Value::Array(v) => itertools::Itertools::collect_vec(v.iter().map(|v| {
+                        {
+                            v
+                            $(;
+                                [< $typ Getter >]::<'_, $mut>::make_from(v)
+                            )?
+                        }
+                        // [< $typ Getter >]::<'_, false>::make_from(v)
+                    })),
                     _ => panic!("scock"),
                 };
             }
@@ -449,7 +457,7 @@ macro_rules! impl_type {
     (
         @SpwnArgsGenA($out:ident)
 
-        ...$var:ident : $typ:ident $(if $pattern:literal)? $(as $spwn_name:literal)?
+        ...$var:ident $(: $typ:ident)? $(if $pattern:literal)? $(as $spwn_name:literal)?
 
         // rest
         $(, $($t:tt)*)?
@@ -463,7 +471,21 @@ macro_rules! impl_type {
                 )?
             };
 
-            $out += &format!("...{}: (@{}", arg_name, stringify!([< $typ:snake >]))
+            // $out += &format!("...{}: (@{}", arg_name, stringify!([< $typ:snake >]))
+            $out += &format!("...{}: (", arg_name);
+            $out += &{
+                "_".to_string()
+                $(;
+                    format!("@{}", stringify!([< $typ:snake >]))
+                )?
+            };
+
+            // &{
+            //     ": _".to_string()
+            //     $(;
+            //         format!(": @{}", stringify!([< $typ:snake >]))
+            //     )?
+            // }
         }
 
         $(
@@ -471,30 +493,6 @@ macro_rules! impl_type {
         )?
         $out += ")[],";
         
-        $crate::interpreting::builtins::impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
-    };
-
-    (
-        @SpwnArgsGenB($out:ident)
-        
-        $variant:ident $( ( $($t1:tt)* ) )? $( { $($t2:tt)* } )? $(if $pattern:literal)? as $spwn_name:literal $( = $default:literal )?
-        
-        // rest
-        $(, $($t:tt)*)?
-    ) => {
-        paste::paste! {
-            $out += &format!("{}: @{}", $spwn_name, stringify!([< $variant:snake >]))
-
-        }
-
-        $(
-            $out += &format!(" & ({})", $pattern);
-        )?
-
-        $(
-            $out += &format!(" = {}", $default);
-        )?
-        $out += ",";
         $crate::interpreting::builtins::impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
     };
     (
@@ -528,6 +526,28 @@ macro_rules! impl_type {
             $out += &format!(" & ({})", $pattern);
         )?
         
+        $(
+            $out += &format!(" = {}", $default);
+        )?
+        $out += ",";
+        $crate::interpreting::builtins::impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
+    };
+    (
+        @SpwnArgsGenB($out:ident)
+        
+        $variant:ident $( ( $($t1:tt)* ) )? $( { $($t2:tt)* } )? $(if $pattern:literal)? as $spwn_name:literal $( = $default:literal )?
+        
+        // rest
+        $(, $($t:tt)*)?
+    ) => {
+        paste::paste! {
+            $out += &format!("{}: @{}", $spwn_name, stringify!([< $variant:snake >]))
+        }
+
+        $(
+            $out += &format!(" & ({})", $pattern);
+        )?
+
         $(
             $out += &format!(" = {}", $default);
         )?
@@ -602,7 +622,7 @@ macro_rules! impl_type {
     (
         @ArgsCheckCloneA[$idx:expr]($args:ident, $vm:ident)
 
-        ...$var:ident : $typ:ident $(if $pattern:literal)? $(as $spwn_name:literal)?
+        ...$var:ident $(:$typ:ident)? $(if $pattern:literal)? $(as $spwn_name:literal)?
 
         // rest
         $(, $($t:tt)*)?

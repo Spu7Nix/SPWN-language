@@ -2,15 +2,18 @@ use std::rc::Rc;
 
 use delve::VariantNames;
 use itertools::Itertools;
+use lasso::Spur;
 
 use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType, TypeDef, VarData};
 use crate::compiling::builder::{CodeBuilder, JumpType};
+use crate::compiling::bytecode::UnoptRegister;
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::{FuncID, Opcode};
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{Expression, Pattern, Statement, Statements, StmtNode, Vis, VisTrait};
 use crate::parsing::operators::operators::{AssignOp, Operator};
-use crate::sources::Spannable;
+use crate::sources::{CodeSpan, Spannable, SpwnSource};
+use crate::util::{ImmutStr, ImmutVec};
 
 impl<'a> Compiler<'a> {
     pub fn compile_stmt(
@@ -313,35 +316,15 @@ impl<'a> Compiler<'a> {
             },
             Statement::ExtractImport(import) => {
                 let import_reg = builder.next_reg();
-                let (names, s, types) =
-                    self.compile_import(import, stmt.span, Rc::clone(&self.src))?;
+                let (names, s, types) = self.compile_import(
+                    import,
+                    stmt.span,
+                    Rc::clone(&self.src),
+                    self.src.get_variant(),
+                )?;
                 builder.import(import_reg, s, stmt.span);
 
-                for name in &*names {
-                    let var_reg = builder.next_reg();
-                    let spur = self.intern(name);
-
-                    self.scopes[scope].vars.insert(
-                        spur,
-                        VarData {
-                            mutable: false,
-                            def_span: stmt.span,
-                            reg: var_reg,
-                        },
-                    );
-
-                    builder.member(
-                        import_reg,
-                        var_reg,
-                        self.resolve_32(&spur).spanned(stmt.span),
-                        false,
-                        stmt.span,
-                    )
-                }
-
-                for (id, name) in types.iter() {
-                    self.available_custom_types.insert(*name, Vis::Public(*id));
-                }
+                self.extract_import(names, types, scope, import_reg, builder, stmt.span);
             },
             Statement::Impl { name, items } => {
                 let mut new_items = items.clone();

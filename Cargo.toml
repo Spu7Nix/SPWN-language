@@ -3,6 +3,11 @@ name = "spwn"
 version = "0.9.0"
 edition = "2021"
 
+[profile.dev]
+opt-level = 1
+incremental = true
+# rustflags = ["link-args=-zstack-size=4194304"]
+
 [dependencies]
 ariadne = { git = "https://github.com/zesterer/ariadne.git", features = [
     "auto-color",
@@ -48,6 +53,9 @@ heuristic-graph-coloring = "0.1.0"
 randsym = "0.1.1"
 once_cell = "1.18.0"
 widestring = { git = "https://github.com/FlowVix/widestring-rs.git" }
+
+[dev-dependencies]
+stacker = "0.1.15"
 
 # dont actually know if this condition dep actually works
 [target.'cfg(target_os = "windows")'.dependencies]

@@ -9,5 +9,6 @@
         "2021",
         "--"
     ],
-    "rust-analyzer.showUnlinkedFileNotification": false
+    "rust-analyzer.showUnlinkedFileNotification": false,
+    "cmake.sourceDirectory": "${workspaceFolder}/Dexter/Documents/vcpkg/vcpkg/ports/angle"
 }

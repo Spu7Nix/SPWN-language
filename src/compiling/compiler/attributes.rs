@@ -28,6 +28,10 @@ impl Compiler<'_> {
         self.find_attr_by_str_name(attrs, attr_names::BUILTIN)
     }
 
+    pub fn find_no_std_attr(&self, attrs: &[Attribute]) -> bool {
+        self.find_attr_by_str_name(attrs, attr_names::NO_STD)
+    }
+
     pub fn find_alias_attr(&self, attrs: &[Attribute]) -> CompileResult<Option<Spanned<Alias>>> {
         for attr in attrs {
             if self.interner.borrow().resolve(&*attr.item.name) != attr_names::ALIAS {

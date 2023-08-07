@@ -1,7 +1,10 @@
-gag = import "test3.spwn"
+type @a
 
+// #[no_std]
 
-dbg 2;
-dbg gag.@teest;
-
+overload + {
+    (a: @a | @int, b: @a | @int) {
+        return 1
+    }
+}
 return {}

@@ -1,9 +1,10 @@
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
 
 use lasso::Spur;
 
-use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType};
+use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType, VarData};
 use crate::compiling::builder::{BlockID, CodeBuilder, JumpType};
 use crate::compiling::bytecode::{OptRegister, UnoptRegister};
 use crate::compiling::error::CompileError;
@@ -14,7 +15,7 @@ use crate::parsing::ast::{
     DictItem, ExprNode, Expression, Import, ImportType, PatternNode, Vis, VisTrait,
 };
 use crate::parsing::parser::Parser;
-use crate::sources::{CodeSpan, SpwnSource};
+use crate::sources::{CodeSpan, Spannable, SpwnSource};
 use crate::util::{ImmutStr, ImmutVec};
 
 impl Compiler<'_> {
@@ -142,6 +143,7 @@ impl Compiler<'_> {
         import: &Import,
         span: CodeSpan,
         importer_src: Rc<SpwnSource>,
+        src_variant: fn(PathBuf) -> SpwnSource,
     ) -> CompileResult<(
         ImmutVec<ImmutStr>,
         SpwnSource,
@@ -161,7 +163,7 @@ impl Compiler<'_> {
 
         let is_file = matches!(import.typ, ImportType::File);
 
-        let new_src = Rc::new(SpwnSource::File(path.clone()));
+        let new_src = Rc::new(src_variant(path.clone()));
 
         let import_name = path.file_name().unwrap().to_str().unwrap();
         let import_base = path.parent().unwrap();
@@ -253,6 +255,42 @@ impl Compiler<'_> {
         //         }
         //     }
         // }
+    }
+
+    pub fn extract_import(
+        &mut self,
+        names: ImmutVec<ImmutStr>,
+        types: ImmutVec<(CustomTypeID, Spur)>,
+        scope: ScopeID,
+        import_reg: UnoptRegister,
+        builder: &mut CodeBuilder,
+        span: CodeSpan,
+    ) {
+        for name in &*names {
+            let var_reg = builder.next_reg();
+            let spur = self.intern(name);
+
+            self.scopes[scope].vars.insert(
+                spur,
+                VarData {
+                    mutable: false,
+                    def_span: span,
+                    reg: var_reg,
+                },
+            );
+
+            builder.member(
+                import_reg,
+                var_reg,
+                self.resolve_32(&spur).spanned(span),
+                false,
+                span,
+            )
+        }
+
+        for (id, name) in types.iter() {
+            self.available_custom_types.insert(*name, Vis::Public(*id));
+        }
     }
 
     #[allow(clippy::type_complexity)]

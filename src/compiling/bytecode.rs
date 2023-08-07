@@ -235,6 +235,10 @@ mod debug_bytecode {
 
     impl Bytecode {
         pub fn debug_str(&self, src: &Rc<SpwnSource>, debug_funcs: Option<&[FuncID]>) {
+            if matches!(&**src, SpwnSource::Core(..) | SpwnSource::Std(..)) {
+                return;
+            }
+
             println!(
                 "{}\n",
                 format!(

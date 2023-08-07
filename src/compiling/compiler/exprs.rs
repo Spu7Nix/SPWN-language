@@ -598,7 +598,12 @@ impl Compiler<'_> {
             },
             Expression::Import(import) => {
                 let out = builder.next_reg();
-                let (_, s, _) = self.compile_import(import, expr.span, Rc::clone(&self.src))?;
+                let (_, s, _) = self.compile_import(
+                    import,
+                    expr.span,
+                    Rc::clone(&self.src),
+                    self.src.get_variant(),
+                )?;
                 builder.import(out, s, expr.span);
 
                 Ok(out)

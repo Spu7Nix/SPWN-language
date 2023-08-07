@@ -22,6 +22,14 @@ pub enum SpwnSource {
 }
 
 impl SpwnSource {
+    pub fn get_variant(&self) -> fn(PathBuf) -> Self {
+        match self {
+            SpwnSource::File(_) => SpwnSource::File,
+            SpwnSource::Core(_) => SpwnSource::Core,
+            SpwnSource::Std(_) => SpwnSource::Std,
+        }
+    }
+
     pub fn area(&self, span: CodeSpan) -> CodeArea {
         CodeArea {
             src: Rc::new(self.clone()),
@@ -95,7 +103,11 @@ impl CodeArea {
 
 pub const ZEROSPAN: CodeSpan = CodeSpan { start: 0, end: 0 };
 
-#[allow(renamed_and_removed_lints, unknown_lints)]
+#[allow(
+    renamed_and_removed_lints,
+    unknown_lints,
+    clippy::derived_hash_with_manual_eq
+)]
 #[derive(Clone, Eq, Copy, Default, Serialize, Deserialize, Hash, derive_more::Display)]
 #[cfg_attr(not(test), derive(PartialEq))]
 #[display(fmt = "{}..{}", start, end)]

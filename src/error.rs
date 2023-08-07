@@ -1,6 +1,7 @@
 use std::io::{BufWriter, Write};
 
 use ariadne::{sources, CharSet, Config, Label, Report, ReportKind};
+use colored::Colorize;
 
 use crate::sources::CodeArea;
 use crate::util::hsv_to_rgb;
@@ -11,6 +12,22 @@ pub struct ErrorReport {
     pub message: String,
     pub labels: Vec<(CodeArea, String)>,
     pub note: Option<String>,
+}
+
+impl ErrorReport {
+    pub fn fuck(&self) {
+        println!("TITLE: {}", self.title);
+        println!("MESSAGE: {}", self.message);
+        println!("------------------------------");
+        for (area, label) in &self.labels {
+            let snippet = area.src.read().unwrap()[area.span.start..area.span.end].bright_red();
+            println!("{} -> {}", snippet, label);
+        }
+        println!("------------------------------");
+        if let Some(n) = &self.note {
+            println!("NOTE: {}", n);
+        }
+    }
 }
 
 impl std::error::Error for ErrorReport {}

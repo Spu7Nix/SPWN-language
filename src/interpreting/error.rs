@@ -16,8 +16,8 @@ error_maker! {
     Extra: {
         vm: &Vm,
     }
-    #[derive(strum::EnumDiscriminants, PartialEq)]
-    #[strum_discriminants(name(ErrorDiscriminants), derive(delve::EnumVariantNames), delve(rename_variants = "SCREAMING_SNAKE_CASE"))]
+    #[derive(PartialEq, delve::EnumVariantNames)]
+    #[delve(rename_variants = "SCREAMING_SNAKE_CASE")]
     pub enum RuntimeError {
 
         // ==================================================================
@@ -576,6 +576,31 @@ error_maker! {
         // // ============================ BUILTIN FUNC ERRORS ============================
 
 
+        // ==================================================================
+        #[
+            Message: "Assertion failed", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "Assertion happened here";
+            ]
+        ]
+        AssertionFailed {
+            area: CodeArea,
+            [call_stack]
+        },
+
+        // ==================================================================
+        #[
+            Message: "Equality assertion failed", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "Left side is not equal to right side";
+            ]
+        ]
+        EqAssertionFailed {
+            area: CodeArea,
+            [call_stack]
+        },
 
         // // ==================================================================
         // #[

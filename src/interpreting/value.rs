@@ -10,7 +10,6 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::context::{CloneMap, Context};
-use super::error::ErrorDiscriminants;
 use super::multi::Multi;
 use super::vm::{FuncCoord, Program, RuntimeResult, Vm};
 use crate::compiling::bytecode::Constant;
@@ -513,7 +512,11 @@ impl ValueType {
         format!(
             "@{}",
             match self {
-                Self::Custom(t) => vm.type_def_map[&t].name.as_ref().to_string(),
+                Self::Custom(t) => format!(
+                    "<{}: {:?}>",
+                    vm.type_def_map[&t].name.as_ref().to_string(),
+                    t
+                ),
                 _ => <ValueType as Into<&str>>::into(self).into(),
             }
         )

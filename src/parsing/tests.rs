@@ -768,8 +768,8 @@ fn test_is_pattern() -> ParseResult<()> {
         t,
         St::Assign(
             Pt::DictDestructure(AHashMap::from([(
-                spur!("x"),
-                Some(Pt::Type(spur!("float")).into())
+                span!(spur!("x")),
+                Pt::Type(spur!("float")).into()
             )]))
             .into(),
             Ex::Empty.into()

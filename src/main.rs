@@ -396,21 +396,64 @@ fn run_spwn(
 
     // let t = Instant::now();
 
-    let out = vm.run_function(
-        Context::new(),
-        CallInfo {
-            func: start,
-            call_area: None,
-            is_builtin: None,
-        },
-        Box::new(|_| {}),
-    );
+    // #[cfg(debug_assertions)]
+    // {
+    //     return stacker::maybe_grow(32 * 1024, 1024 * 1024, || {
+    //         let out = vm.run_function(
+    //             Context::new(),
+    //             CallInfo {
+    //                 func: start,
+    //                 call_area: None,
+    //                 is_builtin: None,
+    //             },
+    //             Box::new(|_| {}),
+    //         );
 
-    for (_, v) in out {
-        if let Err(e) = v {
-            println!("{:#?}", e);
-            Err(e.to_report(&vm))?
+    //         for (_, v) in out {
+    //             if let Err(e) = v {
+    //                 // let s = format!("{:#?}", e);
+    //                 // println!("{}", &s[..500]);
+    //                 let report = e.to_report(&vm);
+    //                 report.fuck();
+    //                 Err(report)?
+    //             }
+    //         }
+
+    //         Ok(SpwnOutput {
+    //             objects: vm.objects,
+    //             triggers: vm.triggers,
+    //             id_counters: vm.id_counters,
+    //         })
+    //     });
+    // }
+
+    //.    #[cfg(not(debug_assertions))]
+    {
+        let out = vm.run_function(
+            Context::new(),
+            CallInfo {
+                func: start,
+                call_area: None,
+                is_builtin: None,
+            },
+            Box::new(|_| {}),
+        );
+
+        for (_, v) in out {
+            if let Err(e) = v {
+                // let s = format!("{:#?}", e);
+                // println!("{}", &s[..500]);
+                let report = e.to_report(&vm);
+                report.fuck();
+                Err(report)?
+            }
         }
+
+        return Ok(SpwnOutput {
+            objects: vm.objects,
+            triggers: vm.triggers,
+            id_counters: vm.id_counters,
+        });
     }
 
     // vm.objects
@@ -419,10 +462,4 @@ fn run_spwn(
 
     // println!("\n{}", "══════════════════════════════════".dimmed().bold());
     // println!("{}", t.elapsed().as_secs_f64());
-
-    Ok(SpwnOutput {
-        objects: vm.objects,
-        triggers: vm.triggers,
-        id_counters: vm.id_counters,
-    })
 }

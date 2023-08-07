@@ -632,6 +632,12 @@ impl Vm {
                         assign_op!(= true, to, from);
                     },
                     Opcode::Plus { a, b, to } => {
+                        println!(
+                            "{:#?}",
+                            self.overloads
+                                .get(&Operator::Bin(BinOp::Plus))
+                                .map(|v| v.len())
+                        );
                         bin_op!(Plus, a, b, to);
                     },
                     Opcode::Minus { a, b, to } => {
@@ -1469,42 +1475,61 @@ impl Vm {
                             _ => unreachable!(),
                         };
 
+                        let key_str: String = key.as_ref().into();
+
                         let value = self.get_reg_ref(from).borrow();
 
-                        match &value.value {
-                            Value::Type(t) => {
-                                macro_rules! error {
-                                    () => {
-                                        return Err(RuntimeError::NonexistentAssociatedMember {
-                                            area: self.make_area(opcode_span, &program),
-                                            member: key.as_ref().into(),
-                                            base_type: *t,
-                                            call_stack: self.get_call_stack(),
-                                        })
-                                    };
-                                }
-                                match self.impls.get(t) {
-                                    Some(members) => match members.get(&key) {
-                                        Some(elem) => {
-                                            let v = elem.value().clone();
+                        match (&value.value, &key_str[..]) {
+                            (Value::Type(ValueType::Error), k)
+                                if RuntimeError::VARIANT_NAMES.contains(&k) =>
+                            {
+                                mem::drop(value);
+                                self.change_reg(
+                                    dest,
+                                    Value::Error(
+                                        RuntimeError::VARIANT_NAMES
+                                            .iter()
+                                            .position(|v| *v == k)
+                                            .unwrap(),
+                                    )
+                                    .into_stored(self.make_area(opcode_span, &program)),
+                                );
+                            },
+                            _ => match &value.value {
+                                Value::Type(t) => {
+                                    macro_rules! error {
+                                        () => {
+                                            return Err(RuntimeError::NonexistentAssociatedMember {
+                                                area: self.make_area(opcode_span, &program),
+                                                member: key.as_ref().into(),
+                                                base_type: *t,
+                                                call_stack: self.get_call_stack(),
+                                            })
+                                        };
+                                    }
+                                    match self.impls.get(t) {
+                                        Some(members) => match members.get(&key) {
+                                            Some(elem) => {
+                                                let v = elem.value().clone();
 
-                                            mem::drop(value);
+                                                mem::drop(value);
 
-                                            self.change_reg(dest, v);
+                                                self.change_reg(dest, v);
+                                            },
+                                            None => error!(),
                                         },
                                         None => error!(),
-                                    },
-                                    None => error!(),
-                                }
-                            },
-                            _ => {
-                                return Err(RuntimeError::TypeMismatch {
-                                    value_type: value.value.get_type(),
-                                    value_area: value.area.clone(),
-                                    area: self.make_area(opcode_span, &program),
-                                    expected: &[ValueType::Type],
-                                    call_stack: self.get_call_stack(),
-                                })
+                                    }
+                                },
+                                _ => {
+                                    return Err(RuntimeError::TypeMismatch {
+                                        value_type: value.value.get_type(),
+                                        value_area: value.area.clone(),
+                                        area: self.make_area(opcode_span, &program),
+                                        expected: &[ValueType::Type],
+                                        call_stack: self.get_call_stack(),
+                                    })
+                                },
                             },
                         }
                     },
@@ -2887,10 +2912,7 @@ impl Vm {
             },
             Value::TriggerFunction { .. } => "!{...}".to_string(),
             Value::Error(id) => {
-                format!(
-                    "{} {{...}}",
-                    crate::interpreting::error::ErrorDiscriminants::VARIANT_NAMES[*id]
-                )
+                format!("{} {{...}}", RuntimeError::VARIANT_NAMES[*id])
             },
             Value::ObjectKey(k) => format!("$.obj_props.{}", <ObjectKey as Into<&str>>::into(*k)),
             Value::Epsilon => "$.epsilon()".to_string(),

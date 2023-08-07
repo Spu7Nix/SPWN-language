@@ -20,9 +20,11 @@ use super::error::CompileError;
 use crate::cli::{BuildSettings, DocSettings};
 use crate::compiling::builder::ProtoBytecode;
 use crate::new_id_wrapper;
-use crate::parsing::ast::{Ast, PatternNode, Statements, Vis};
-use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap};
-use crate::util::{ImmutStr, ImmutStr32, ImmutVec, Interner, SlabMap, Str32, String32};
+use crate::parsing::ast::{Ast, Import, ImportType, PatternNode, Statements, Vis};
+use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap, ZEROSPAN};
+use crate::util::{
+    ImmutStr, ImmutStr32, ImmutVec, Interner, SlabMap, Str32, String32, BUILTIN_DIR,
+};
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
@@ -181,28 +183,46 @@ impl Compiler<'_> {
     pub fn compile(&mut self, ast: &Ast, span: CodeSpan) -> CompileResult<()> {
         let mut code = ProtoBytecode::new();
         code.new_func(
-            |b| {
+            |builder| {
                 let base_scope = self.scopes.insert(Scope {
                     vars: Default::default(),
                     parent: None,
                     typ: Some(ScopeType::Global),
                 });
 
-                // if entry.is_some() {
-                //     let import_type =
-                //         ImportType::Module(BUILTIN_DIR.join("core/lib.spwn"), ModuleImport::Core);
+                if !matches!(&*self.src, SpwnSource::Core(..) | SpwnSource::Std(..)) {
+                    let import_reg = builder.next_reg();
+                    // println!("fgfgdfgdfgd");
+                    let (names, s, types) = self.compile_import(
+                        &Import {
+                            typ: ImportType::File,
+                            path: BUILTIN_DIR.join("core/lib.spwn"),
+                        },
+                        span,
+                        Rc::clone(&self.src),
+                        SpwnSource::Core,
+                    )?;
+                    builder.import(import_reg, s, ZEROSPAN);
+                    self.extract_import(names, types, base_scope, import_reg, builder, ZEROSPAN);
 
-                //     // self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
-                // }
-                // if let Some(attrs) = entry {
-                //     if !attrs.iter().any(|a| *a == FileAttribute::NoStd) {
-                //         let import_type =
-                //             ImportType::Module(BUILTIN_DIR.join("std/lib.spwn"), ModuleImport::Std);
-                //         // self.extract_import(&import_type, CodeSpan::internal(), f, base_scope)?;
-                //     }
-                // }
+                    if !self.find_no_std_attr(&ast.file_attributes) {
+                        let (names, s, types) = self.compile_import(
+                            &Import {
+                                typ: ImportType::File,
+                                path: BUILTIN_DIR.join("std/lib.spwn"),
+                            },
+                            span,
+                            Rc::clone(&self.src),
+                            SpwnSource::Std,
+                        )?;
+                        builder.import(import_reg, s, ZEROSPAN);
+                        self.extract_import(
+                            names, types, base_scope, import_reg, builder, ZEROSPAN,
+                        );
+                    }
+                }
 
-                self.compile_stmts(&ast.statements, base_scope, b)?;
+                self.compile_stmts(&ast.statements, base_scope, builder)?;
 
                 Ok(())
             },
