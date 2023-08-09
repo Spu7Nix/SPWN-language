@@ -6,10 +6,12 @@ use itertools::Itertools;
 use semver::Version;
 use slab::Slab;
 
-use super::bytecode::{Bytecode, CallExpr, Constant, Mutability, Register, UnoptRegister};
+use super::bytecode::{
+    Bytecode, CallExpr, Constant, Mutability, OptBytecode, Register, UnoptBytecode, UnoptRegister,
+};
 use super::compiler::{CompileResult, Compiler};
 use super::opcodes::{FuncID, Opcode, UnoptOpcode};
-use crate::compiling::bytecode::Function;
+use crate::compiling::bytecode::{Function, UnoptFunction};
 use crate::compiling::compiler::CustomTypeID;
 use crate::compiling::opcodes::OptOpcode;
 use crate::gd::ids::IDClass;
@@ -135,19 +137,19 @@ impl ProtoBytecode {
         Ok(func.into())
     }
 
-    pub fn build(mut self, src: &Rc<SpwnSource>, compiler: &Compiler) -> Result<Bytecode, ()> {
+    pub fn build(mut self, src: &Rc<SpwnSource>, compiler: &Compiler) -> Result<UnoptBytecode, ()> {
         type BlockPos = (u16, u16);
 
         let constants = self.consts.make_vec();
         let call_exprs = self.call_exprs.make_vec();
 
-        let mut funcs = vec![];
+        let mut funcs: Vec<UnoptFunction> = vec![];
 
         for (func_id, func) in self.functions.iter().enumerate() {
             let mut block_positions = AHashMap::new();
             let mut code_len = 0;
 
-            let mut opcodes = vec![];
+            let mut opcodes: Vec<Spanned<UnoptOpcode>> = vec![];
 
             fn get_block_pos(
                 code: &ProtoBytecode,
@@ -171,7 +173,7 @@ impl ProtoBytecode {
             fn build_block(
                 code: &ProtoBytecode,
                 block: BlockID,
-                opcodes: &mut Vec<Spanned<OptOpcode>>,
+                opcodes: &mut Vec<Spanned<UnoptOpcode>>,
                 positions: &AHashMap<BlockID, BlockPos>,
             ) -> Result<(), ()> {
                 let get_jump_pos = |jump: JumpTo| -> u16 {
@@ -212,7 +214,7 @@ impl ProtoBytecode {
                                 },
                             });
                             opcodes.push(Spanned {
-                                value: opcode.value.try_into().unwrap(),
+                                value: opcode.value,
                                 span: opcode.span,
                             })
                         },
@@ -226,18 +228,12 @@ impl ProtoBytecode {
             build_block(&self, func.code, &mut opcodes, &block_positions)?;
 
             funcs.push(Function {
-                regs_used: func.regs_used.try_into().unwrap(),
+                regs_used: func.regs_used,
                 opcodes: opcodes.into(),
                 span: func.span,
                 args: func.args.clone(),
                 spread_arg: func.spread_arg,
-                captured_regs: func
-                    .captured_regs
-                    .iter()
-                    .copied()
-                    .map(|(a, b)| (a.try_into().unwrap(), b.try_into().unwrap()))
-                    .collect_vec()
-                    .into(),
+                captured_regs: func.captured_regs.clone().into(),
             })
         }
 
@@ -250,20 +246,6 @@ impl ProtoBytecode {
             version: Version::parse(env!("CARGO_PKG_VERSION")).unwrap(),
             constants: constants.into(),
             functions: funcs.into(),
-            // custom_types: compiler
-            //     .local_type_defs
-            //     .iter()
-            //     .map(|(id, v)| {
-            //         (
-            //             CustomTypeID {
-            //                 local: id,
-            //                 source_hash: src_hash,
-            //             },
-            //             v.as_ref()
-            //                 .map(|def| compiler.resolve(&def.name).spanned(def.def_span)),
-            //         )
-            //     })
-            //     .collect(),
             custom_types: compiler
                 .available_custom_types
                 .iter()
@@ -280,32 +262,60 @@ impl ProtoBytecode {
                 .collect(),
             export_names: match &compiler.global_return {
                 Some(v) => v.iter().map(|s| compiler.resolve(&s.value)).collect(),
-                None => Box::new([]),
+                None => vec![],
             },
             import_paths: import_paths.into(),
             debug_funcs: self.debug_funcs.into(),
-            call_exprs: call_exprs
-                .into_iter()
-                .map(|ce| CallExpr {
-                    positional: ce
-                        .positional
-                        .iter()
-                        .cloned()
-                        .map(|(r, m)| (r.try_into().unwrap(), m))
-                        .collect_vec()
-                        .into(),
-                    named: ce
-                        .named
-                        .iter()
-                        .cloned()
-                        .map(|(s, r, m)| (s, r.try_into().unwrap(), m))
-                        .collect_vec()
-                        .into(),
-                    dest: ce.dest.map(|r| r.try_into().unwrap()),
-                })
-                .collect_vec()
-                .into(),
+            call_exprs: call_exprs.into(),
         })
+
+        // Ok(Bytecode {
+        //     source_hash: md5::compute(src.read().unwrap()).into(),
+        //     version: Version::parse(env!("CARGO_PKG_VERSION")).unwrap(),
+        //     constants: constants.into(),
+        //     functions: funcs.into(),
+        //     custom_types: compiler
+        //         .available_custom_types
+        //         .iter()
+        //         .map(|(name, id_vis)| {
+        //             (
+        //                 *id_vis.value(),
+        //                 id_vis.as_ref().map(|id| {
+        //                     compiler
+        //                         .resolve(name)
+        //                         .spanned(compiler.type_def_map[id].def_span)
+        //                 }),
+        //             )
+        //         })
+        //         .collect(),
+        //     export_names: match &compiler.global_return {
+        //         Some(v) => v.iter().map(|s| compiler.resolve(&s.value)).collect(),
+        //         None => Box::new([]),
+        //     },
+        //     import_paths: import_paths.into(),
+        //     debug_funcs: self.debug_funcs.into(),
+        //     call_exprs: call_exprs
+        //         .into_iter()
+        //         .map(|ce| CallExpr {
+        //             positional: ce
+        //                 .positional
+        //                 .iter()
+        //                 .cloned()
+        //                 .map(|(r, m)| (r, m))
+        //                 .collect_vec()
+        //                 .into(),
+        //             named: ce
+        //                 .named
+        //                 .iter()
+        //                 .cloned()
+        //                 .map(|(s, r, m)| (s, r.try_into().unwrap(), m))
+        //                 .collect_vec()
+        //                 .into(),
+        //             dest: ce.dest.map(|r| r.try_into().unwrap()),
+        //         })
+        //         .collect_vec()
+        //         .into(),
+        // })
     }
 }
 

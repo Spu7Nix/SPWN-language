@@ -177,7 +177,7 @@ impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
     }
 }
 
-impl<T: std::hash::Hash + Eq + Clone> UniqueRegister<T> {
+impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
     pub fn make_vec(&mut self) -> Vec<T> {
         unsafe {
             let mut ve: Vec<MaybeUninit<T>> =
@@ -187,7 +187,7 @@ impl<T: std::hash::Hash + Eq + Clone> UniqueRegister<T> {
                 ve[v].write(k);
             }
 
-            std::mem::transmute::<_, Vec<T>>(ve)
+            std::mem::transmute(ve)
         }
     }
 }
@@ -289,7 +289,7 @@ macro_rules! new_id_wrapper {
     ($($name:ident : $inner:ty;)*) => {
         $(
             #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Deref, derive_more::DerefMut, serde::Serialize, serde::Deserialize)]
-            pub struct $name($inner);
+            pub struct $name(pub $inner);
 
             impl std::fmt::Display for $name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

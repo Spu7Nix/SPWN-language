@@ -9,7 +9,7 @@ use derive_more::{Deref, DerefMut, Index, IndexMut};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::compiling::bytecode::Bytecode;
+use crate::compiling::bytecode::{Bytecode, OptBytecode};
 use crate::compiling::compiler::{CustomTypeID, TypeDef};
 use crate::new_id_wrapper;
 use crate::util::{hyperlink, ImmutStr, ImmutStr32, ImmutVec, SlabMap};
@@ -206,7 +206,7 @@ impl Debug for CodeArea {
 }
 
 #[derive(Default, Deref, DerefMut)]
-pub struct BytecodeMap(AHashMap<SpwnSource, Rc<Bytecode>>);
+pub struct BytecodeMap(AHashMap<SpwnSource, Rc<OptBytecode>>);
 
 #[derive(Default, Deref, DerefMut, Index, IndexMut)]
 pub struct TypeDefMap(AHashMap<CustomTypeID, TypeDef<ImmutStr32>>);

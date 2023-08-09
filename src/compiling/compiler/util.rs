@@ -219,7 +219,7 @@ impl Compiler<'_> {
             std::fs::write(spwnc_path, bytes).unwrap();
         }
 
-        Ok((export_names, (*new_src).clone(), custom_types))
+        Ok((export_names.into(), (*new_src).clone(), custom_types))
 
         // todo: caching
         // 'from_cache: {

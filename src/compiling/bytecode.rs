@@ -128,6 +128,10 @@ impl PartialEq for Constant {
 }
 impl Eq for Constant {}
 
+pub trait RegNum: Copy + Display {}
+impl RegNum for usize {}
+impl RegNum for u8 {}
+
 #[derive(
     Clone,
     Copy,
@@ -144,7 +148,15 @@ impl Eq for Constant {}
     Deserialize,
 )]
 #[display(fmt = "R{_0}")]
-pub struct Register<T: Copy + Display>(pub T);
+pub struct Register<T: RegNum>(pub T);
+
+// trait RegTrait {
+//     type InnerType;
+// }
+
+// impl<T> Register<T> {
+//     pub type InnerType = T;
+// }
 
 pub type UnoptRegister = Register<usize>;
 pub type OptRegister = Register<u8>;
@@ -162,35 +174,39 @@ impl TryFrom<UnoptRegister> for OptRegister {
 pub type Mutability = bool;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Function {
-    pub regs_used: u8,
-    pub opcodes: ImmutVec<Spanned<OptOpcode>>,
+pub struct Function<T: RegNum> {
+    pub regs_used: T,
+    pub opcodes: ImmutVec<Spanned<Opcode<Register<T>>>>,
 
     pub span: CodeSpan,
 
     pub args: ImmutVec<Spanned<(Option<ImmutStr>, Mutability)>>,
     pub spread_arg: Option<u8>,
-    pub captured_regs: ImmutVec<(OptRegister, OptRegister)>,
+    pub captured_regs: ImmutVec<(Register<T>, Register<T>)>,
 }
+pub type OptFunction = Function<u8>;
+pub type UnoptFunction = Function<usize>;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Bytecode {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Bytecode<T: RegNum> {
     pub source_hash: Digest,
     pub version: Version,
 
-    pub constants: ImmutVec<Constant>,
+    pub constants: Vec<Constant>,
 
-    pub functions: ImmutVec<Function>,
+    pub functions: Vec<Function<T>>,
 
     pub custom_types: AHashMap<CustomTypeID, Vis<Spanned<ImmutStr>>>,
 
-    pub export_names: ImmutVec<ImmutStr>,
-    pub import_paths: ImmutVec<SpwnSource>,
+    pub export_names: Vec<ImmutStr>,
+    pub import_paths: Vec<SpwnSource>,
 
-    pub debug_funcs: ImmutVec<FuncID>,
+    pub debug_funcs: Vec<FuncID>,
 
-    pub call_exprs: ImmutVec<CallExpr<OptRegister, OptRegister, ImmutStr>>,
+    pub call_exprs: Vec<CallExpr<Register<T>, Register<T>, ImmutStr>>,
 }
+pub type OptBytecode = Bytecode<u8>;
+pub type UnoptBytecode = Bytecode<usize>;
 
 mod debug_bytecode {
     use std::borrow::Cow;
@@ -233,7 +249,7 @@ mod debug_bytecode {
         }
     }
 
-    impl Bytecode {
+    impl OptBytecode {
         pub fn debug_str(&self, src: &Rc<SpwnSource>, debug_funcs: Option<&[FuncID]>) {
             if matches!(&**src, SpwnSource::Core(..) | SpwnSource::Std(..)) {
                 return;

@@ -18,7 +18,8 @@ use super::multi::Multi;
 use super::value::{MacroTarget, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::{
-    Bytecode, CallExpr, Constant, Function, Mutability, OptRegister, Register,
+    Bytecode, CallExpr, Constant, Function, Mutability, OptBytecode, OptFunction, OptRegister,
+    Register,
 };
 use crate::compiling::opcodes::{CallExprID, ConstID, Opcode, RuntimeStringFlag};
 use crate::gd::gd_object::{make_spawn_trigger, GdObject, TriggerObject, TriggerOrder};
@@ -92,7 +93,7 @@ impl ValueRef {
 #[derive(Debug)]
 pub struct Program {
     pub src: Rc<SpwnSource>,
-    pub bytecode: Rc<Bytecode>,
+    pub bytecode: Rc<OptBytecode>,
 }
 
 impl Program {
@@ -104,7 +105,7 @@ impl Program {
         &self.bytecode.call_exprs[*id as usize]
     }
 
-    pub fn get_function(&self, id: usize) -> &Function {
+    pub fn get_function(&self, id: usize) -> &OptFunction {
         &self.bytecode.functions[id]
     }
 }
@@ -130,7 +131,7 @@ impl Hash for FuncCoord {
 }
 
 impl FuncCoord {
-    pub fn get_func(&self) -> &Function {
+    pub fn get_func(&self) -> &OptFunction {
         self.program.get_function(self.func)
     }
 }
@@ -634,12 +635,12 @@ impl Vm {
                         assign_op!(= true, to, from, left_mut);
                     },
                     Opcode::Plus { a, b, to } => {
-                        println!(
-                            "{:#?}",
-                            self.overloads
-                                .get(&Operator::Bin(BinOp::Plus))
-                                .map(|v| v.len())
-                        );
+                        // println!(
+                        //     "{:#?}",
+                        //     self.overloads
+                        //         .get(&Operator::Bin(BinOp::Plus))
+                        //         .map(|v| v.len())
+                        // );
                         bin_op!(Plus, a, b, to);
                     },
                     Opcode::Minus { a, b, to } => {
@@ -1877,8 +1878,22 @@ impl Vm {
                 }
                 Ok(LoopFlow::Normal)
             };
+            let run = run_opcode(opcode);
 
-            match run_opcode(opcode) {
+            // println!(
+            //     "{ip}: {:?}",
+            //     self.context_stack
+            //         .current()
+            //         .stack
+            //         .last()
+            //         .unwrap()
+            //         .registers
+            //         .iter()
+            //         .map(|v| format!("{:?}", v.borrow().value))
+            //         .join(", ")
+            // );
+
+            match run {
                 Ok(flow) => match flow {
                     LoopFlow::ContinueLoop => {
                         continue;

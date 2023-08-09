@@ -15,8 +15,9 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::builder::BlockID;
-use super::bytecode::UnoptRegister;
+use super::bytecode::{CallExpr, OptBytecode, OptFunction, UnoptRegister};
 use super::error::CompileError;
+use super::optimizer::optimize_code;
 use crate::cli::{BuildSettings, DocSettings};
 use crate::compiling::builder::ProtoBytecode;
 use crate::new_id_wrapper;
@@ -190,37 +191,37 @@ impl Compiler<'_> {
                     typ: Some(ScopeType::Global),
                 });
 
-                if !matches!(&*self.src, SpwnSource::Core(..) | SpwnSource::Std(..)) {
-                    let import_reg = builder.next_reg();
-                    // println!("fgfgdfgdfgd");
-                    let (names, s, types) = self.compile_import(
-                        &Import {
-                            typ: ImportType::File,
-                            path: BUILTIN_DIR.join("core/lib.spwn"),
-                        },
-                        span,
-                        Rc::clone(&self.src),
-                        SpwnSource::Core,
-                    )?;
-                    builder.import(import_reg, s, ZEROSPAN);
-                    self.extract_import(names, types, base_scope, import_reg, builder, ZEROSPAN);
+                // if !matches!(&*self.src, SpwnSource::Core(..) | SpwnSource::Std(..)) {
+                //     let import_reg = builder.next_reg();
+                //     // println!("fgfgdfgdfgd");
+                //     let (names, s, types) = self.compile_import(
+                //         &Import {
+                //             typ: ImportType::File,
+                //             path: BUILTIN_DIR.join("core/lib.spwn"),
+                //         },
+                //         span,
+                //         Rc::clone(&self.src),
+                //         SpwnSource::Core,
+                //     )?;
+                //     builder.import(import_reg, s, ZEROSPAN);
+                //     self.extract_import(names, types, base_scope, import_reg, builder, ZEROSPAN);
 
-                    if !self.find_no_std_attr(&ast.file_attributes) {
-                        let (names, s, types) = self.compile_import(
-                            &Import {
-                                typ: ImportType::File,
-                                path: BUILTIN_DIR.join("std/lib.spwn"),
-                            },
-                            span,
-                            Rc::clone(&self.src),
-                            SpwnSource::Std,
-                        )?;
-                        builder.import(import_reg, s, ZEROSPAN);
-                        self.extract_import(
-                            names, types, base_scope, import_reg, builder, ZEROSPAN,
-                        );
-                    }
-                }
+                //     if !self.find_no_std_attr(&ast.file_attributes) {
+                //         let (names, s, types) = self.compile_import(
+                //             &Import {
+                //                 typ: ImportType::File,
+                //                 path: BUILTIN_DIR.join("std/lib.spwn"),
+                //             },
+                //             span,
+                //             Rc::clone(&self.src),
+                //             SpwnSource::Std,
+                //         )?;
+                //         builder.import(import_reg, s, ZEROSPAN);
+                //         self.extract_import(
+                //             names, types, base_scope, import_reg, builder, ZEROSPAN,
+                //         );
+                //     }
+                // }
 
                 self.compile_stmts(&ast.statements, base_scope, builder)?;
 
@@ -230,13 +231,70 @@ impl Compiler<'_> {
             vec![],
             span,
         )?;
-        let code = code.build(&self.src, self).unwrap();
+        let mut unopt_code = code.build(&self.src, self).unwrap();
 
-        if !self.build_settings.debug_bytecode && !code.debug_funcs.is_empty() {
-            code.debug_str(&self.src, Some(&code.debug_funcs))
+        // optimize_code(&mut unopt_code);
+
+        let opt_code = OptBytecode {
+            source_hash: unopt_code.source_hash,
+            version: unopt_code.version,
+            constants: unopt_code.constants,
+            functions: unopt_code
+                .functions
+                .iter()
+                .map(|f| {
+                    let opt_func = OptFunction {
+                        regs_used: f.regs_used.try_into().unwrap(),
+                        opcodes: f
+                            .opcodes
+                            .iter()
+                            .map(|&v| v.map(|o| o.try_into().unwrap()))
+                            .collect_vec()
+                            .into(),
+                        span: f.span,
+                        args: f.args.clone(),
+                        spread_arg: f.spread_arg,
+                        captured_regs: f
+                            .captured_regs
+                            .iter()
+                            .map(|&(a, b)| (a.try_into().unwrap(), b.try_into().unwrap()))
+                            .collect_vec()
+                            .into(),
+                    };
+                    opt_func
+                })
+                .collect_vec(),
+            custom_types: unopt_code.custom_types,
+            export_names: unopt_code.export_names,
+            import_paths: unopt_code.import_paths,
+            debug_funcs: unopt_code.debug_funcs,
+            call_exprs: unopt_code
+                .call_exprs
+                .iter()
+                .map(|v| CallExpr {
+                    dest: v.dest.map(|v| v.try_into().unwrap()),
+                    positional: v
+                        .positional
+                        .iter()
+                        .map(|&(r, b)| (r.try_into().unwrap(), b))
+                        .collect_vec()
+                        .into(),
+                    named: v
+                        .named
+                        .iter()
+                        .map(|(s, r, b)| (s.clone(), (*r).try_into().unwrap(), *b))
+                        .collect_vec()
+                        .into(),
+                })
+                .collect_vec(),
+        };
+
+        if !self.build_settings.debug_bytecode && !opt_code.debug_funcs.is_empty() {
+            opt_code.debug_str(&self.src, Some(&opt_code.debug_funcs))
         }
 
-        self.bytecode_map.insert((*self.src).clone(), Rc::new(code));
+        self.bytecode_map
+            .insert((*self.src).clone(), Rc::new(opt_code));
 
         Ok(())
     }

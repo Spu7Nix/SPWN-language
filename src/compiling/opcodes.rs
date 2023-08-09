@@ -59,6 +59,30 @@ macro_rules! opcodes {
             }
         }
 
+        impl Opcode<UnoptRegister> {
+            pub fn get_used_regs(&mut self) -> Vec<&mut UnoptRegister> {
+                #[allow(unused_assignments)]
+                match self {
+                    $(
+                        Self::$name $({
+                            $(
+                                $($reg_field,)?
+                            )+
+                            ..
+                        })? => {
+                            vec![$(
+                                $(
+                                    $(
+                                        $reg_field,
+                                    )?
+                                )+
+                            )?]
+                        }
+                    )+
+                }
+            }
+        }
+
     };
 }
 
