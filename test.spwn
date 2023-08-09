@@ -1,25 +1,20 @@
 
-// mut ctr = counter(5)
-
-// ctr.display(45, 45)
-
-// mut ctr2 = counter(-4)
-
-// ctr2.display(105, 45)
-
-// wait(1)
-
-// ctr *= -1
-
-// wait(1)
-
-// ctr *= ctr2
-
-dbg @error::TYPE_MISMATCH + 5;
 
 
-// dbg [
-//     {ctr: "dgdf", factor: 5},
-//     {ctr: "dgdf", factor: 5},
-//     {ctr: "dgdf", factor: 5}
-// ] is @string | {ctr: @string, factor: @int}[_]
+
+
+a = counter(234534, reset = false, bits = 16)
+b = counter(372, reset = false, bits = 16)
+c = counter(0, reset = false, bits = 16)
+a.display(45, 45)
+b.display(45 + 60, 45)
+c.display(45 + 120, 45)
+
+while_loop(() => a > 0, () {
+    a -= b
+    c += 1;
+})
+
+c -= 1;
+
+

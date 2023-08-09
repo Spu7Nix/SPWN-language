@@ -1,3 +1,4 @@
+use ahash::AHashMap;
 use itertools::Itertools;
 use lasso::Spur;
 
@@ -10,6 +11,11 @@ use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{AssignPath, ExprNode, Pattern, PatternNode};
 use crate::sources::{CodeSpan, Spannable};
 
+pub struct PathInfo {
+    pub reg: UnoptRegister,
+    pub exists: Option<bool>,
+}
+
 impl Compiler<'_> {
     pub fn get_path_reg(
         &mut self,
@@ -19,18 +25,22 @@ impl Compiler<'_> {
         scope: ScopeID,
         builder: &mut CodeBuilder,
         span: CodeSpan,
-    ) -> CompileResult<(UnoptRegister, bool)> {
+    ) -> CompileResult<PathInfo> {
         macro_rules! normal_access {
             () => {
                 match self.get_var(var, scope) {
-                    Some(v) if v.mutable => (v.reg, false),
-                    Some(v) => {
-                        return Err(CompileError::ImmutableAssign {
-                            area: self.make_area(span),
-                            def_area: self.make_area(v.def_span),
-                            var: self.resolve(&var),
-                        })
+                    Some(v) => PathInfo {
+                        reg: v.reg,
+                        exists: Some(v.mutable),
                     },
+                    // Some(v) if v.mutable => (v.reg, false),
+                    // Some(v) => {
+                    //     return Err(CompileError::ImmutableAssign {
+                    //         area: self.make_area(span),
+                    //         def_area: self.make_area(v.def_span),
+                    //         var: self.resolve(&var),
+                    //     })
+                    // },
                     None => {
                         let r = builder.next_reg();
                         if path.is_empty() {
@@ -42,7 +52,10 @@ impl Compiler<'_> {
                                     reg: r,
                                 },
                             );
-                            (r, true)
+                            PathInfo {
+                                reg: r,
+                                exists: None,
+                            }
                         } else {
                             return Err(CompileError::NonexistentVariable {
                                 area: self.make_area(span),
@@ -54,7 +67,7 @@ impl Compiler<'_> {
             };
         }
 
-        let (var_reg, is_new) = if !try_new {
+        let path_info = if !try_new {
             normal_access!()
         } else if path.is_empty() {
             let r = builder.next_reg();
@@ -66,14 +79,17 @@ impl Compiler<'_> {
                     reg: r,
                 },
             );
-            (r, true)
+            PathInfo {
+                reg: r,
+                exists: None,
+            }
         } else {
             normal_access!()
         };
 
         if !path.is_empty() {
             let path_reg = builder.next_reg();
-            builder.copy_ref(var_reg, path_reg, span);
+            builder.copy_ref(path_info.reg, path_reg, span);
             for i in path {
                 match i {
                     AssignPath::Index(v) => {
@@ -100,9 +116,12 @@ impl Compiler<'_> {
                 }
             }
 
-            Ok((path_reg, false))
+            Ok(PathInfo {
+                reg: path_reg,
+                exists: path_info.exists,
+            })
         } else {
-            Ok((var_reg, is_new))
+            Ok(path_info)
         }
         // println!("{}", path_reg);
     }
@@ -271,6 +290,7 @@ impl Compiler<'_> {
                                         Opcode::PlusEq {
                                             a: i_reg,
                                             b: one_reg,
+                                            left_mut: true,
                                         },
                                         pattern.span,
                                     );
@@ -448,23 +468,23 @@ impl Compiler<'_> {
                 }
                 // println!("{}", try_new_var);
 
-                let (path_reg, is_new) =
+                let path_info =
                     self.get_path_reg(*var, try_new_var, path, scope, builder, pattern.span)?;
 
                 if *is_ref {
-                    let f = if is_new {
-                        CodeBuilder::copy_ref
-                    } else {
-                        CodeBuilder::assign_ref
-                    };
-                    f(builder, expr_reg, path_reg, pattern.span);
+                    match path_info.exists {
+                        Some(mutable) => {
+                            builder.assign_ref(expr_reg, path_info.reg, mutable, pattern.span)
+                        },
+                        None => builder.copy_ref(expr_reg, path_info.reg, pattern.span),
+                    }
                 } else {
-                    let f = if is_new {
-                        CodeBuilder::write_deep
-                    } else {
-                        CodeBuilder::assign_deep
-                    };
-                    f(builder, expr_reg, path_reg, pattern.span);
+                    match path_info.exists {
+                        Some(mutable) => {
+                            builder.assign_deep(expr_reg, path_info.reg, mutable, pattern.span)
+                        },
+                        None => builder.write_deep(expr_reg, path_info.reg, pattern.span),
+                    }
                 }
                 builder.load_const(true, out_reg, pattern.span);
             },

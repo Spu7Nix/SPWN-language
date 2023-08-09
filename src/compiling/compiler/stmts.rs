@@ -52,12 +52,16 @@ impl<'a> Compiler<'a> {
             Statement::AssignOp(left, op, right) => {
                 macro_rules! assign_op {
                     ($opcode_name:ident) => {{
-                        let (var, _) = match &*left.pat {
+                        let var_name;
+                        let path_info = match &*left.pat {
                             Pattern::Path {
                                 var,
                                 path,
                                 is_ref: false,
-                            } => self.get_path_reg(*var, false, path, scope, builder, stmt.span)?,
+                            } => {
+                                var_name = *var;
+                                self.get_path_reg(*var, false, path, scope, builder, stmt.span)?
+                            },
                             _ => {
                                 return Err(CompileError::IllegalAugmentedAssign {
                                     area: self.make_area(left.span),
@@ -68,8 +72,16 @@ impl<'a> Compiler<'a> {
 
                         builder.push_raw_opcode(
                             Opcode::$opcode_name {
-                                a: var,
+                                a: path_info.reg,
                                 b: right_reg,
+                                left_mut: if let Some(m) = path_info.exists {
+                                    m
+                                } else {
+                                    return Err(CompileError::NonexistentVariable {
+                                        area: self.make_area(stmt.span),
+                                        var: self.resolve(&var_name),
+                                    });
+                                },
                             },
                             stmt.span,
                         )

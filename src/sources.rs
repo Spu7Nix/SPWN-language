@@ -103,13 +103,8 @@ impl CodeArea {
 
 pub const ZEROSPAN: CodeSpan = CodeSpan { start: 0, end: 0 };
 
-#[allow(
-    renamed_and_removed_lints,
-    unknown_lints,
-    clippy::derived_hash_with_manual_eq
-)]
-#[derive(Clone, Eq, Copy, Default, Serialize, Deserialize, Hash, derive_more::Display)]
-#[cfg_attr(not(test), derive(PartialEq))]
+#[derive(Clone, Eq, Copy, Default, Serialize, Deserialize, derive_more::Display)]
+#[cfg_attr(not(test), derive(PartialEq, Hash))]
 #[display(fmt = "{}..{}", start, end)]
 pub struct CodeSpan {
     pub start: usize,
@@ -121,6 +116,10 @@ impl PartialEq for CodeSpan {
     fn eq(&self, _: &Self) -> bool {
         true
     }
+}
+#[cfg(test)]
+impl std::hash::Hash for CodeSpan {
+    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
 }
 
 impl From<Range<usize>> for CodeSpan {

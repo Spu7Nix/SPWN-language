@@ -79,8 +79,14 @@ impl Compiler<'_> {
                                     )
                                 },
                             }
-                            builder
-                                .push_raw_opcode(Opcode::PlusEq { a: out_reg, b: s_r }, expr.span)
+                            builder.push_raw_opcode(
+                                Opcode::PlusEq {
+                                    a: out_reg,
+                                    b: s_r,
+                                    left_mut: true,
+                                },
+                                expr.span,
+                            )
                         }
                         if content.flags.unindent {
                             builder.push_raw_opcode(

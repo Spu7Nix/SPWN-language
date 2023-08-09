@@ -107,7 +107,7 @@ impl_type! {
         }
 
         /// gg
-        fn assert_eq(&Builtins{} as "self", left as "left", right as "right") {
+        fn assert_eq(&Builtins{} as "self", left, right) {
             if !value_ops::equality(&left.borrow().value, &right.borrow().value) {
                 return Multi::new_single(ctx, Err(RuntimeError::EqAssertionFailed { area, call_stack: vm.get_call_stack() }));
             }
@@ -115,7 +115,7 @@ impl_type! {
         }
 
         /// gfg
-        fn hash(&Builtins{} as "self", &value as "value") -> "@int" {
+        fn hash(&Builtins{} as "self", &value) -> "@int" {
             let mut state = DefaultHasher::default();
             vm.hash_value(value, &mut state);
             let hash = state.finish();

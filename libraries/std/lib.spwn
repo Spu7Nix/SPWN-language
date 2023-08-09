@@ -3,11 +3,13 @@ extract import "group.spwn"
 extract import "easing.spwn"
 extract import "counter.spwn"
 extract import "control_flow.spwn"
-
+extract import "event.spwn"
 return {
     wait,
     call_with_delay,
     while_loop,
     for_loop,
     counter: @counter::new,
+    on,
+    touch,
 }

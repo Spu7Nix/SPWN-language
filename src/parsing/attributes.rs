@@ -142,12 +142,6 @@ pub(crate) mod attr_names {
 pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
     Arc::new(vec![
         // ================================================================== file attributes
-        // Attribute {
-        //     namespace: None,
-        //     name: "cache_output",
-        //     template: AttributeTemplate::WORD,
-        //     duplicates: AttributeDuplicates::ErrorFollowing,
-        // },
         Attribute {
             namespace: None,
             name: attr_names::NO_STD,
@@ -156,16 +150,6 @@ pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
             style: &[AttrStyle::Inner],
             targets: &[],
         },
-        // Attribute {
-        //     namespace: None,
-        //     name: "doc",
-        //     template: AttributeTemplate {
-        //         word: true,
-        //         list: None,
-        //         name_value: true,
-        //     },
-        //     duplicates: AttributeDuplicates::DuplicatesOk,
-        // },
         // ================================================================== attributes
         Attribute {
             namespace: None,

@@ -550,12 +550,13 @@ impl Vm {
                     }};
                 }
                 macro_rules! assign_op {
-                    ($op:ident, $a:ident, $b:ident) => {{
+                    ($op:ident, $a:ident, $b:ident, $left_mut:expr) => {{
                         let mut top = self.context_stack.last_mut().yeet_current().unwrap();
                         top.ip += 1;
 
                         self.assign_op(
                             Either::Left(AssignOp::$op),
+                            $left_mut,
                             &program,
                             $a,
                             $b,
@@ -565,12 +566,13 @@ impl Vm {
                         );
                         return Ok(LoopFlow::ContinueLoop);
                     }};
-                    (= $deep:expr, $a:ident, $b:ident) => {{
+                    (= $deep:expr, $a:ident, $b:ident, $left_mut:expr) => {{
                         let mut top = self.context_stack.last_mut().yeet_current().unwrap();
                         top.ip += 1;
 
                         self.assign_op(
                             Either::Right($deep),
+                            $left_mut,
                             &program,
                             $a,
                             $b,
@@ -625,11 +627,11 @@ impl Vm {
                         self.write_pointee(to, v)
                     },
                     Opcode::WriteDeep { from, to } => self.write_pointee(to, self.deep_clone(from)),
-                    Opcode::AssignRef { from, to } => {
-                        assign_op!(= false, to, from);
+                    Opcode::AssignRef { from, to, left_mut } => {
+                        assign_op!(= false, to, from, left_mut);
                     },
-                    Opcode::AssignDeep { from, to } => {
-                        assign_op!(= true, to, from);
+                    Opcode::AssignDeep { from, to, left_mut } => {
+                        assign_op!(= true, to, from, left_mut);
                     },
                     Opcode::Plus { a, b, to } => {
                         println!(
@@ -751,35 +753,35 @@ impl Vm {
                             });
                         }
                     },
-                    Opcode::PlusEq { a, b } => {
-                        assign_op!(PlusEq, a, b);
+                    Opcode::PlusEq { a, b, left_mut } => {
+                        assign_op!(PlusEq, a, b, left_mut);
                     },
-                    Opcode::MinusEq { a, b } => {
-                        assign_op!(MinusEq, a, b);
+                    Opcode::MinusEq { a, b, left_mut } => {
+                        assign_op!(MinusEq, a, b, left_mut);
                     },
-                    Opcode::MultEq { a, b } => {
-                        assign_op!(MultEq, a, b);
+                    Opcode::MultEq { a, b, left_mut } => {
+                        assign_op!(MultEq, a, b, left_mut);
                     },
-                    Opcode::DivEq { a, b } => {
-                        assign_op!(DivEq, a, b);
+                    Opcode::DivEq { a, b, left_mut } => {
+                        assign_op!(DivEq, a, b, left_mut);
                     },
-                    Opcode::PowEq { a, b } => {
-                        assign_op!(PowEq, a, b);
+                    Opcode::PowEq { a, b, left_mut } => {
+                        assign_op!(PowEq, a, b, left_mut);
                     },
-                    Opcode::ModEq { a, b } => {
-                        assign_op!(ModEq, a, b);
+                    Opcode::ModEq { a, b, left_mut } => {
+                        assign_op!(ModEq, a, b, left_mut);
                     },
-                    Opcode::BinAndEq { a, b } => {
-                        assign_op!(BinAndEq, a, b);
+                    Opcode::BinAndEq { a, b, left_mut } => {
+                        assign_op!(BinAndEq, a, b, left_mut);
                     },
-                    Opcode::BinOrEq { a, b } => {
-                        assign_op!(BinOrEq, a, b);
+                    Opcode::BinOrEq { a, b, left_mut } => {
+                        assign_op!(BinOrEq, a, b, left_mut);
                     },
-                    Opcode::ShiftLeftEq { a, b } => {
-                        assign_op!(ShiftLeftEq, a, b);
+                    Opcode::ShiftLeftEq { a, b, left_mut } => {
+                        assign_op!(ShiftLeftEq, a, b, left_mut);
                     },
-                    Opcode::ShiftRightEq { a, b } => {
-                        assign_op!(ShiftRightEq, a, b);
+                    Opcode::ShiftRightEq { a, b, left_mut } => {
+                        assign_op!(ShiftRightEq, a, b, left_mut);
                     },
                     Opcode::Not { v, to } => {
                         unary_op!(ExclMark, v, to);
@@ -1319,6 +1321,10 @@ impl Vm {
                             (Value::Range { start, .. }, "start") => Some(Value::Int(*start)),
                             (Value::Range { end, .. }, "end") => Some(Value::Int(*end)),
                             (Value::Range { step, .. }, "step") => Some(Value::Int(*step)),
+
+                            (Value::TriggerFunction { group, .. }, "start_group") => {
+                                Some(Value::Group(*group))
+                            },
 
                             (Value::Array(v), "length") => Some(Value::Int(v.len() as i64)),
                             (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
@@ -1867,6 +1873,7 @@ impl Vm {
                     Opcode::IncMismatchIdCount => {
                         self.pattern_mismatch_id_count += 1;
                     },
+                    // Opcode::TestEq { a, b, .. } => todo!(),
                 }
                 Ok(LoopFlow::Normal)
             };
@@ -2394,6 +2401,7 @@ impl Vm {
         // left: any assign eq
         // right: normal assign, bool: is by ref
         op: Either<AssignOp, bool>,
+        left_mut: bool,
         program: &Rc<Program>,
         left: OptRegister,
         right: OptRegister,
@@ -2428,7 +2436,7 @@ impl Vm {
                         self.call_value(
                             ctx,
                             base.clone(),
-                            &[(left_ref, true), (right_ref, false)],
+                            &[(left_ref, left_mut), (right_ref, false)],
                             &[],
                             self.make_area(span, program),
                             program,
@@ -2461,16 +2469,41 @@ impl Vm {
                 Some(Ok(_)) => Ok(Either::Left(None)),
                 Some(Err(err)) => Err(err),
                 None => match op {
-                    Either::Left(op) => op.get_fn()(
-                        &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
-                        &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
-                        span,
-                        self,
-                        program,
-                    )
-                    .map(|v| v.into_stored(self.make_area(span, program)))
-                    .map(|v| Either::Left(Some(v))),
-                    Either::Right(deep) => Ok(Either::Right(deep)),
+                    Either::Left(op) => {
+                        // println!("usumyd {}", left_mut);
+                        if left_mut {
+                            op.get_fn()(
+                                &ctx.stack.last().unwrap().registers[*left as usize].borrow(),
+                                &ctx.stack.last().unwrap().registers[*right as usize].borrow(),
+                                span,
+                                self,
+                                program,
+                            )
+                            .map(|v| v.into_stored(self.make_area(span, program)))
+                            .map(|v| Either::Left(Some(v)))
+                        } else {
+                            Err(RuntimeError::ImmutableAssign {
+                                area: self.make_area(span, program),
+                                def_area: ctx.stack.last().unwrap().registers[*left as usize]
+                                    .borrow()
+                                    .area
+                                    .clone(),
+                            })
+                        }
+                    },
+                    Either::Right(deep) => {
+                        if !left_mut {
+                            Err(RuntimeError::ImmutableAssign {
+                                area: self.make_area(span, program),
+                                def_area: ctx.stack.last().unwrap().registers[*left as usize]
+                                    .borrow()
+                                    .area
+                                    .clone(),
+                            })
+                        } else {
+                            Ok(Either::Right(deep))
+                        }
+                    },
                 },
             };
             (ctx, v)

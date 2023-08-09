@@ -20,7 +20,7 @@ call_with_delay = (
 	function: @trigger_function | @group
 ) {
 	$.add(trigger {
-		OBJ_ID: 1268,
+		OBJ_ID: @obj_id::triggers.SPAWN,
 		SPAWN_DURATION: time,
 		TARGET: function,
 	}, true)

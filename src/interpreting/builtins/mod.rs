@@ -382,7 +382,7 @@ macro_rules! impl_type {
             paste::paste! {
                 enum Union<'a> {
                     $(
-                        $typ( [< $typ Getter >]<'a> ),
+                        $typ( [< $typ Getter >]<'a, false> ),
                     )+
                 }
                 #[allow(unused)]

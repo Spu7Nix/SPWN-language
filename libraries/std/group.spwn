@@ -9,7 +9,7 @@ impl @group {
         y: @int,
         duration: @float | @int = 0,
         easing: @easing = @easing::NONE,
-        easing_rate: @float = 2,
+        easing_rate: @float | @int = 2.0,
     ) {
         $.add(trigger {
             OBJ_ID: @obj_id::triggers.MOVE,
@@ -19,7 +19,7 @@ impl @group {
             DURATION: duration,
             EASING: easing.id,
             EASING_RATE: easing_rate,
-        }, true)
+        })
         
         wait(duration)
     },
@@ -33,7 +33,7 @@ impl @group {
 
     alpha: (
         &self,
-        opacity: @float = 1.0,
+        opacity: @float & >= 0.0 & <= 1.0 = 1.0,
         duration: @int | @float = 0
     ) {
         $.add(trigger {
@@ -45,11 +45,19 @@ impl @group {
         wait(duration)
     },
 
-    toggle: (&self, state: @bool) {
+    toggle_off: (&self) {
         $.add(trigger {
             OBJ_ID: @obj_id::triggers.TOGGLE,
             TARGET: self,
-            ACTIVATE_GROUP: state,
+            ACTIVATE_GROUP: false,
+        })
+    },
+
+    toggle_on: (&self) {
+        $.add(trigger {
+            OBJ_ID: @obj_id::triggers.TOGGLE,
+            TARGET: self,
+            ACTIVATE_GROUP: true,
         })
     },
 
@@ -288,7 +296,7 @@ impl @group {
         fade_out: @float | @int = 0,
         exclusive: @bool = false,
     ) {
-        $.add( trigger{
+        $.add(trigger {
             OBJ_ID: @obj_id::triggers.PULSE,
             COPIED_COLOR_HVS: f"{h}a{s}a{b}a{s_checked as @int}a{b_checked as @int}",
             EXCLUSIVE: exclusive,

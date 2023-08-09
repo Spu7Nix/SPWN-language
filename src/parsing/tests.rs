@@ -21,28 +21,41 @@ use crate::sources::{CodeSpan, Spanned, SpwnSource};
 use crate::util::Interner;
 use crate::RandomState;
 
-impl Into<ExprNode> for Ex {
-    fn into(self) -> ExprNode {
+type Pt = Pattern<Spur, PatternNode, ExprNode, Spur>;
+
+trait IntoNode<T>
+where
+    Self: Sized,
+{
+    fn node(self) -> T {
+        self.node_attrs(vec![])
+    }
+
+    fn node_attrs(self, attrs: Vec<Attribute>) -> T;
+}
+
+impl IntoNode<ExprNode> for Ex {
+    fn node_attrs(self, attributes: Vec<Attribute>) -> ExprNode {
         ExprNode {
             expr: Box::new(self),
-            attributes: vec![],
-            span: CodeSpan::internal(),
-        }
-    }
-}
-impl Into<StmtNode> for St {
-    fn into(self) -> StmtNode {
-        StmtNode {
-            stmt: Box::new(self),
-            attributes: vec![],
+            attributes,
             span: CodeSpan::internal(),
         }
     }
 }
 
-type Pt = Pattern<Spur, PatternNode, ExprNode, Spur>;
-impl Into<PatternNode> for Pt {
-    fn into(self) -> PatternNode {
+impl IntoNode<StmtNode> for St {
+    fn node_attrs(self, attributes: Vec<Attribute>) -> StmtNode {
+        StmtNode {
+            stmt: Box::new(self),
+            attributes,
+            span: CodeSpan::internal(),
+        }
+    }
+}
+
+impl IntoNode<PatternNode> for Pt {
+    fn node_attrs(self, _: Vec<Attribute>) -> PatternNode {
         PatternNode {
             pat: Box::new(self),
             span: CodeSpan::internal(),
@@ -53,7 +66,7 @@ impl Into<PatternNode> for Pt {
 static mut INTERNER: Option<Rc<RefCell<Interner>>> = None;
 
 macro_rules! expr_eq {
-    ($ast:ident,[$($exprs:expr),*]) => {
+    ($ast:ident,[$($exprs:expr),*] $(, attrs:$attrs:expr)?) => {
         let _exprs = &[$($exprs),*];
         for (i, stmt) in $ast.statements.iter().enumerate() {
             match &*stmt.stmt {
@@ -65,8 +78,8 @@ macro_rules! expr_eq {
         }
     };
 
-    ($ast:ident, $expr:expr) => {
-        expr_eq!($ast, [$expr])
+    ($ast:ident, $expr:expr $(, attrs:$attrs:expr)?) => {
+        expr_eq!($ast, [$expr] $(, attrs:$attrs)?)
     };
 }
 
@@ -119,19 +132,19 @@ macro_rules! string {
 #[rustfmt::skip]
 const _: () = {
     match Ex::Empty {
-        Ex::Int(_) => (),
-        Ex::Float(_) => (),
-        Ex::String(_) => (),
-        Ex::Bool(_) => (),
-        Ex::Id(_, _) => (),
-        Ex::Op(_, _, _) => (),
-        Ex::Unary(_, _) => (),
-        Ex::Var(_) => (),
-        Ex::Type(_) => (),
-        Ex::Array(_) => (),
-        Ex::Dict(_) => (),
-        Ex::Maybe(_) => (),
-        Ex::Is(_, _) => (),
+        Ex::Int(..) => (),
+        Ex::Float(..) => (),
+        Ex::String(..) => (),
+        Ex::Bool(..) => (),
+        Ex::Id(..) => (),
+        Ex::Op(..) => (),
+        Ex::Unary(..) => (),
+        Ex::Var(..) => (),
+        Ex::Type(..) => (),
+        Ex::Array(..) => (),
+        Ex::Dict(..) => (),
+        Ex::Maybe(..) => (),
+        Ex::Is(..) => (),
         Ex::Index { .. } => (),
         Ex::Member { .. } => (),
         Ex::TypeMember { .. } => (),
@@ -139,35 +152,35 @@ const _: () = {
         Ex::Call { .. } => (),
         Ex::Macro { .. } => (),
         Ex::TriggerFunc { .. } => (),
-        Ex::TriggerFuncCall(_) => (),
+        Ex::TriggerFuncCall(..) => (),
         Ex::Ternary { .. } => (),
-        Ex::Typeof(_) => (),
+        Ex::Typeof(..) => (),
         Ex::Builtins => (),
         Ex::Empty => (),
         Ex::Epsilon => (),
-        Ex::Import(_) => (),
+        Ex::Import(..) => (),
         Ex::Instance { .. } => (),
-        Ex::Obj(_, _) => (),
-        Ex::Dbg(_, _) => todo!(),
-        Ex::Match { value, branches } => todo!(),
+        Ex::Obj(..) => (),
+        Ex::Dbg(..) => todo!(),
+        Ex::Match { .. } => todo!(),
     }
     match St::Break {
-        St::Expr(_) => (),
-        St::AssignOp(_, _, _) => (),
-        St::Assign(_, _) => todo!(),
+        St::Expr(..) => (),
+        St::AssignOp(..) => (),
+        St::Assign(..) => todo!(),
         St::If { .. } => (),
         St::While { .. } => (),
         St::For { .. } => (),
         St::TryCatch { .. } => (),
-        St::Arrow(_) => (),
-        St::Return(_) => (),
+        St::Arrow(..) => (),
+        St::Return(..) => (),
         St::Break => (),
         St::Continue => (),
         St::TypeDef { .. } => (),
-        St::ExtractImport(_) => (),
+        St::ExtractImport(..) => (),
         St::Impl { .. } => (),
         St::Overload { .. } => (),
-        St::Throw(_) => (),
+        St::Throw(..) => (),
     }
 };
 
@@ -201,6 +214,22 @@ fn test_file_attrs() -> ParseResult<()> {
             span: CodeSpan::internal()
         }]
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_attrs() -> ParseResult<()> {
+    /*
+       DOC: &str = "doc";
+       pub const DEBUG_BYTECODE: &str = "debug_bytecode";
+       pub const BUILTIN: &str = "builtin";
+       pub const ALIAS: &str = "alias";
+       pub const NO_STD: &str = "no_std";
+    */
+
+    let t = parse("")?;
+    expr_eq!(t, Ex::Int(1));
 
     Ok(())
 }
@@ -292,9 +321,10 @@ fn test_string() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::String(StringContent {
-            s: StringType::FString(vec![Either::Right(
-                Ex::Op(Ex::Int(1).into(), BinOp::Plus, Ex::Int(1).into()).into()
-            )]),
+            s: StringType::FString(vec![
+                Either::Left(spur!("")),
+                Either::Right(Ex::Op(Ex::Int(1).node(), BinOp::Plus, Ex::Int(1).node()).node())
+            ]),
             flags: StringFlags {
                 ..Default::default()
             }
@@ -305,9 +335,10 @@ fn test_string() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::String(StringContent {
-            s: StringType::FString(vec![Either::Right(
-                Ex::Op(Ex::Int(1).into(), BinOp::Plus, Ex::Int(1).into()).into()
-            )]),
+            s: StringType::FString(vec![
+                Either::Left(spur!("")),
+                Either::Right(Ex::Op(Ex::Int(1).node(), BinOp::Plus, Ex::Int(1).node()).node())
+            ]),
             flags: StringFlags {
                 base64: true,
                 unindent: true,
@@ -378,115 +409,115 @@ fn test_ops() -> ParseResult<()> {
     let t = parse("5..100")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(5).into(), BinOp::Range, Ex::Int(100).into())
+        Ex::Op(Ex::Int(5).node(), BinOp::Range, Ex::Int(100).node())
     );
     let t = parse("2..4..20")?;
     expr_eq!(
         t,
         Ex::Op(
-            Ex::Op(Ex::Int(2).into(), BinOp::Range, Ex::Int(4).into()).into(),
+            Ex::Op(Ex::Int(2).node(), BinOp::Range, Ex::Int(4).node()).node(),
             BinOp::Range,
-            Ex::Int(20).into()
+            Ex::Int(20).node()
         )
     );
 
     let t = parse("1.2 in 2.2")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Float(1.2).into(), BinOp::In, Ex::Float(2.2).into())
+        Ex::Op(Ex::Float(1.2).node(), BinOp::In, Ex::Float(2.2).node())
     );
 
     let t = parse("0b01 | 0b10")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(1).into(), BinOp::BinOr, Ex::Int(2).into())
+        Ex::Op(Ex::Int(1).node(), BinOp::BinOr, Ex::Int(2).node())
     );
     let t = parse("true || false")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Bool(true).into(), BinOp::Or, Ex::Bool(false).into())
+        Ex::Op(Ex::Bool(true).node(), BinOp::Or, Ex::Bool(false).node())
     );
 
     let t = parse("0b10 & 0b01")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(2).into(), BinOp::BinAnd, Ex::Int(1).into())
+        Ex::Op(Ex::Int(2).node(), BinOp::BinAnd, Ex::Int(1).node())
     );
     let t = parse("false && false")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Bool(false).into(), BinOp::And, Ex::Bool(false).into())
+        Ex::Op(Ex::Bool(false).node(), BinOp::And, Ex::Bool(false).node())
     );
 
     let t = parse("0x9DE == true")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(2526).into(), BinOp::Eq, Ex::Bool(true).into())
+        Ex::Op(Ex::Int(2526).node(), BinOp::Eq, Ex::Bool(true).node())
     );
     let t = parse(r#""a" != 2"#)?;
     expr_eq!(
         t,
-        Ex::Op(string!("a").into(), BinOp::Neq, Ex::Int(2).into())
+        Ex::Op(string!("a").node(), BinOp::Neq, Ex::Int(2).node())
     );
     let t = parse("5.3_2 > ?g")?;
     expr_eq!(
         t,
         Ex::Op(
-            Ex::Float(5.32).into(),
+            Ex::Float(5.32).node(),
             BinOp::Gt,
-            Ex::Id(IDClass::Group, None).into()
+            Ex::Id(IDClass::Group, None).node()
         )
     );
     let t = parse("10 >= 5")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(10).into(), BinOp::Gte, Ex::Int(5).into(),)
+        Ex::Op(Ex::Int(10).node(), BinOp::Gte, Ex::Int(5).node(),)
     );
     let t = parse("10 < 5")?;
-    expr_eq!(t, Ex::Op(Ex::Int(10).into(), BinOp::Lt, Ex::Int(5).into(),));
+    expr_eq!(t, Ex::Op(Ex::Int(10).node(), BinOp::Lt, Ex::Int(5).node(),));
     let t = parse("10 <= 5")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(10).into(), BinOp::Lte, Ex::Int(5).into(),)
+        Ex::Op(Ex::Int(10).node(), BinOp::Lte, Ex::Int(5).node(),)
     );
 
     let t = parse("0b01 << 2")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(1).into(), BinOp::ShiftLeft, Ex::Int(2).into(),)
+        Ex::Op(Ex::Int(1).node(), BinOp::ShiftLeft, Ex::Int(2).node(),)
     );
     let t = parse("0b01 >> 2")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(1).into(), BinOp::ShiftRight, Ex::Int(2).into(),)
+        Ex::Op(Ex::Int(1).node(), BinOp::ShiftRight, Ex::Int(2).node(),)
     );
 
     let t = parse("1 + 1")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(1).into(), BinOp::Plus, Ex::Int(1).into(),)
+        Ex::Op(Ex::Int(1).node(), BinOp::Plus, Ex::Int(1).node(),)
     );
     let t = parse("1 - 1")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(1).into(), BinOp::Minus, Ex::Int(1).into(),)
+        Ex::Op(Ex::Int(1).node(), BinOp::Minus, Ex::Int(1).node(),)
     );
     let t = parse("1 * 1")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(1).into(), BinOp::Mult, Ex::Int(1).into(),)
+        Ex::Op(Ex::Int(1).node(), BinOp::Mult, Ex::Int(1).node(),)
     );
     let t = parse("1 / 1")?;
-    expr_eq!(t, Ex::Op(Ex::Int(1).into(), BinOp::Div, Ex::Int(1).into(),));
+    expr_eq!(t, Ex::Op(Ex::Int(1).node(), BinOp::Div, Ex::Int(1).node(),));
     let t = parse("1 % 1")?;
-    expr_eq!(t, Ex::Op(Ex::Int(1).into(), BinOp::Mod, Ex::Int(1).into(),));
+    expr_eq!(t, Ex::Op(Ex::Int(1).node(), BinOp::Mod, Ex::Int(1).node(),));
     let t = parse("1 ^ 1")?;
-    expr_eq!(t, Ex::Op(Ex::Int(1).into(), BinOp::Pow, Ex::Int(1).into(),));
+    expr_eq!(t, Ex::Op(Ex::Int(1).node(), BinOp::Pow, Ex::Int(1).node(),));
 
     let t = parse("2 as false")?;
     expr_eq!(
         t,
-        Ex::Op(Ex::Int(2).into(), BinOp::As, Ex::Bool(false).into(),)
+        Ex::Op(Ex::Int(2).node(), BinOp::As, Ex::Bool(false).node(),)
     );
 
     Ok(())
@@ -502,10 +533,10 @@ fn test_unary_op() -> ParseResult<()> {
     }
 
     let t = parse("!0")?;
-    expr_eq!(t, Ex::Unary(UnaryOp::ExclMark, Ex::Int(0).into()));
+    expr_eq!(t, Ex::Unary(UnaryOp::ExclMark, Ex::Int(0).node()));
 
     let t = parse("-10.2")?;
-    expr_eq!(t, Ex::Unary(UnaryOp::Minus, Ex::Float(10.2).into()));
+    expr_eq!(t, Ex::Unary(UnaryOp::Minus, Ex::Float(10.2).node()));
 
     Ok(())
 }
@@ -541,26 +572,26 @@ fn test_type() -> ParseResult<()> {
 #[test]
 fn test_array() -> ParseResult<()> {
     let t = parse(r#"[10,]"#)?;
-    expr_eq!(t, Ex::Array(vec![Ex::Int(10).into(),]));
+    expr_eq!(t, Ex::Array(vec![Ex::Int(10).node(),]));
 
     let t = parse(r#"[10, a, true, "aa", 1.2, @a, [1, 2], a in b, !false]"#)?;
     expr_eq!(
         t,
         Ex::Array(vec![
-            Ex::Int(10).into(),
-            Ex::Var(spur!("a")).into(),
-            Ex::Bool(true).into(),
-            string!("aa").into(),
-            Ex::Float(1.2).into(),
-            Ex::Type(spur!("a")).into(),
-            Ex::Array(vec![Ex::Int(1).into(), Ex::Int(2).into(),]).into(),
+            Ex::Int(10).node(),
+            Ex::Var(spur!("a")).node(),
+            Ex::Bool(true).node(),
+            string!("aa").node(),
+            Ex::Float(1.2).node(),
+            Ex::Type(spur!("a")).node(),
+            Ex::Array(vec![Ex::Int(1).node(), Ex::Int(2).node(),]).node(),
             Ex::Op(
-                Ex::Var(spur!("a")).into(),
+                Ex::Var(spur!("a")).node(),
                 BinOp::In,
-                Ex::Var(spur!("b")).into()
+                Ex::Var(spur!("b")).node()
             )
-            .into(),
-            Ex::Unary(UnaryOp::ExclMark, Ex::Bool(false).into()).into(),
+            .node(),
+            Ex::Unary(UnaryOp::ExclMark, Ex::Bool(false).node()).node(),
         ])
     );
 
@@ -587,12 +618,12 @@ fn test_dict() -> ParseResult<()> {
             Vis::Public(DictItem {
                 name: span!(spur!("b")),
                 attributes: vec![],
-                value: Some(Ex::Int(10).into()),
+                value: Some(Ex::Int(10).node()),
             }),
             Vis::Public(DictItem {
                 name: span!(spur!("c")),
                 attributes: vec![],
-                value: Some(string!("a").into()),
+                value: Some(string!("a").node()),
             })
         ])
     );
@@ -606,7 +637,7 @@ fn test_maybe() -> ParseResult<()> {
     expr_eq!(t, Ex::Maybe(None));
 
     let t = parse("10?")?;
-    expr_eq!(t, Ex::Maybe(Some(Ex::Int(10).into())));
+    expr_eq!(t, Ex::Maybe(Some(Ex::Int(10).node())));
 
     Ok(())
 }
@@ -641,13 +672,13 @@ fn test_is_pattern() -> ParseResult<()> {
         Pattern::Empty => (),
     };
 
-    let e: ExprNode = Ex::Int(1).into();
+    let e: ExprNode = Ex::Int(1).node();
 
     let t = parse("1 is _")?;
-    expr_eq!(t, Ex::Is(e.clone(), Pt::Any.into()));
+    expr_eq!(t, Ex::Is(e.clone(), Pt::Any.node()));
 
     let t = parse("1 is @test")?;
-    expr_eq!(t, Ex::Is(e.clone(), Pt::Type(spur!("test")).into()));
+    expr_eq!(t, Ex::Is(e.clone(), Pt::Type(spur!("test")).node()));
 
     let t = parse("1 is @int | @float")?;
     expr_eq!(
@@ -655,31 +686,38 @@ fn test_is_pattern() -> ParseResult<()> {
         Ex::Is(
             e.clone(),
             Pt::Either(
-                Pt::Type(spur!("int")).into(),
-                Pt::Type(spur!("float")).into(),
+                Pt::Type(spur!("int")).node(),
+                Pt::Type(spur!("float")).node(),
             )
-            .into()
+            .node()
         )
     );
 
     let t = parse("1 is ==1")?;
-    expr_eq!(t, Ex::Is(e.clone(), Pt::Eq(Ex::Int(1).into()).into()));
+    expr_eq!(t, Ex::Is(e.clone(), Pt::Eq(Ex::Int(1).node()).node()));
     let t = parse("1 is !=1")?;
-    expr_eq!(t, Ex::Is(e.clone(), Pt::Neq(Ex::Int(1).into()).into()));
+    expr_eq!(t, Ex::Is(e.clone(), Pt::Neq(Ex::Int(1).node()).node()));
     let t = parse("1 is <1")?;
-    expr_eq!(t, Ex::Is(e.clone(), Pt::Lt(Ex::Int(1).into()).into()));
+    expr_eq!(t, Ex::Is(e.clone(), Pt::Lt(Ex::Int(1).node()).node()));
     let t = parse("1 is <=1")?;
-    expr_eq!(t, Ex::Is(e.clone(), Pt::Lte(Ex::Int(1).into()).into()));
+    expr_eq!(t, Ex::Is(e.clone(), Pt::Lte(Ex::Int(1).node()).node()));
     let t = parse("1 is >1")?;
-    expr_eq!(t, Ex::Is(e.clone(), Pt::Gt(Ex::Int(1).into()).into()));
+    expr_eq!(t, Ex::Is(e.clone(), Pt::Gt(Ex::Int(1).node()).node()));
     let t = parse("1 is >=1")?;
-    expr_eq!(t, Ex::Is(e.clone(), Pt::Gte(Ex::Int(1).into()).into()));
+    expr_eq!(t, Ex::Is(e.clone(), Pt::Gte(Ex::Int(1).node()).node()));
 
-    // let t = parse("() -> ()")?;
-    // expr_eq!(t, Pt::MacroPattern {
-    //     args: vec![],
-    //     ret: Pt::
-    // }.into());
+    let t = parse("1 is () -> ()")?;
+    expr_eq!(
+        t,
+        Ex::Is(
+            e.clone(),
+            Pt::MacroPattern {
+                args: vec![],
+                ret: Pt::Empty.node(),
+            }
+            .node()
+        )
+    );
     let t = parse("1 is () -> _")?;
     expr_eq!(
         t,
@@ -687,9 +725,9 @@ fn test_is_pattern() -> ParseResult<()> {
             e.clone(),
             Pt::MacroPattern {
                 args: vec![],
-                ret: Pt::Any.into(),
+                ret: Pt::Any.node(),
             }
-            .into()
+            .node()
         )
     );
     let t = parse("1 is (@foo | @bar) -> @int")?;
@@ -699,13 +737,13 @@ fn test_is_pattern() -> ParseResult<()> {
             e.clone(),
             Pt::MacroPattern {
                 args: vec![Pt::Either(
-                    Pt::Type(spur!("foo")).into(),
-                    Pt::Type(spur!("bar")).into()
+                    Pt::Type(spur!("foo")).node(),
+                    Pt::Type(spur!("bar")).node()
                 )
-                .into()],
-                ret: Pt::Type(spur!("int")).into(),
+                .node()],
+                ret: Pt::Type(spur!("int")).node(),
             }
-            .into()
+            .node()
         )
     );
 
@@ -714,7 +752,7 @@ fn test_is_pattern() -> ParseResult<()> {
         t,
         Ex::Is(
             e.clone(),
-            Pt::In(Ex::Array(vec![Ex::Int(1).into(), Ex::Int(2).into()]).into()).into()
+            Pt::In(Ex::Array(vec![Ex::Int(1).node(), Ex::Int(2).node()]).node()).node()
         )
     );
 
@@ -724,10 +762,10 @@ fn test_is_pattern() -> ParseResult<()> {
         Ex::Is(
             e.clone(),
             Pt::ArrayPattern(
-                Pt::Type(spur!("string")).into(),
-                Pt::Eq(Ex::Int(2).into()).into()
+                Pt::Type(spur!("string")).node(),
+                Pt::Eq(Ex::Int(2).node()).node()
             )
-            .into()
+            .node()
         )
     );
 
@@ -736,7 +774,7 @@ fn test_is_pattern() -> ParseResult<()> {
         t,
         Ex::Is(
             e.clone(),
-            Pt::DictPattern(Pt::Type(spur!("int")).into()).into()
+            Pt::DictPattern(Pt::Type(spur!("int")).node()).node()
         )
     );
 
@@ -750,16 +788,16 @@ fn test_is_pattern() -> ParseResult<()> {
                     path: vec![],
                     is_ref: false
                 }
-                .into(),
+                .node(),
                 Pt::Path {
                     var: spur!("y"),
                     path: vec![],
                     is_ref: true
                 }
-                .into()
+                .node()
             ])
-            .into(),
-            Ex::Array(vec![Ex::Int(1).into(), Ex::Int(2).into()]).into()
+            .node(),
+            Ex::Array(vec![Ex::Int(1).node(), Ex::Int(2).node()]).node()
         )
     );
 
@@ -769,20 +807,32 @@ fn test_is_pattern() -> ParseResult<()> {
         St::Assign(
             Pt::DictDestructure(AHashMap::from([(
                 span!(spur!("x")),
-                Pt::Type(spur!("float")).into()
+                Pt::Type(spur!("float")).node()
             )]))
-            .into(),
-            Ex::Empty.into()
+            .node(),
+            Ex::Empty.node()
         )
     );
-    // let t = parse("@a::{ x } = ()")?;
-    // stmt_eq!(
-    //     t,
-    //     St::Assign(
-    //         Pt::InstanceDestructure(spur!("a"), AHashMap::from([(spur!("x"), None)])).into(),
-    //         Ex::Empty.into()
-    //     )
-    // );
+    let t = parse("@a::{ x } = ()")?;
+    stmt_eq!(
+        t,
+        St::Assign(
+            Pt::InstanceDestructure(
+                spur!("a"),
+                AHashMap::from([(
+                    span!(spur!("x")),
+                    Pt::Path {
+                        var: spur!("x"),
+                        path: vec![],
+                        is_ref: false
+                    }
+                    .node()
+                )])
+            )
+            .node(),
+            Ex::Empty.node()
+        )
+    );
 
     let t = parse("x? = ?")?;
     stmt_eq!(
@@ -794,16 +844,16 @@ fn test_is_pattern() -> ParseResult<()> {
                     path: vec![],
                     is_ref: false
                 }
-                .into()
+                .node()
             ))
-            .into(),
-            Ex::Maybe(None).into()
+            .node(),
+            Ex::Maybe(None).node()
         )
     );
     let t = parse("? = ?")?;
     stmt_eq!(
         t,
-        St::Assign(Pt::MaybeDestructure(None).into(), Ex::Maybe(None).into())
+        St::Assign(Pt::MaybeDestructure(None).node(), Ex::Maybe(None).node())
     );
 
     let t = parse("&x = 1")?;
@@ -815,8 +865,8 @@ fn test_is_pattern() -> ParseResult<()> {
                 path: vec![],
                 is_ref: true
             }
-            .into(),
-            Ex::Int(1).into()
+            .node(),
+            Ex::Int(1).node()
         )
     );
     let t = parse("x[0].y::z = 1")?;
@@ -826,14 +876,14 @@ fn test_is_pattern() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("x"),
                 path: vec![
-                    AssignPath::Index(Ex::Int(0).into()),
+                    AssignPath::Index(Ex::Int(0).node()),
                     AssignPath::Member(spur!("y")),
                     AssignPath::Associated(spur!("z"))
                 ],
                 is_ref: false
             }
-            .into(),
-            Ex::Int(1).into()
+            .node(),
+            Ex::Int(1).node()
         )
     );
 
@@ -845,8 +895,8 @@ fn test_is_pattern() -> ParseResult<()> {
                 name: spur!("x"),
                 is_ref: true
             }
-            .into(),
-            Ex::Int(1).into()
+            .node(),
+            Ex::Int(1).node()
         )
     );
     let t = parse("mut x = 1")?;
@@ -857,8 +907,8 @@ fn test_is_pattern() -> ParseResult<()> {
                 name: spur!("x"),
                 is_ref: false
             }
-            .into(),
-            Ex::Int(1).into()
+            .node(),
+            Ex::Int(1).node()
         )
     );
 
@@ -866,16 +916,16 @@ fn test_is_pattern() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Is(
-            e.clone(),
+            e,
             Pt::IfGuard {
                 pat: Pt::Either(
-                    Pt::Type(spur!("int")).into(),
-                    Pt::Type(spur!("float")).into()
+                    Pt::Type(spur!("int")).node(),
+                    Pt::Type(spur!("float")).node()
                 )
-                .into(),
-                cond: Ex::Op(Ex::Var(spur!("x")).into(), BinOp::Gt, Ex::Int(2).into()).into()
+                .node(),
+                cond: Ex::Op(Ex::Var(spur!("x")).node(), BinOp::Gt, Ex::Int(2).node()).node()
             }
-            .into()
+            .node()
         )
     );
 
@@ -888,8 +938,8 @@ fn test_index() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Index {
-            base: Ex::Var(spur!("a")).into(),
-            index: Ex::Int(200).into()
+            base: Ex::Var(spur!("a")).node(),
+            index: Ex::Int(200).node()
         }
     );
 
@@ -902,7 +952,7 @@ fn test_member() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Member {
-            base: Ex::Var(spur!("foo")).into(),
+            base: Ex::Var(spur!("foo")).node(),
             name: span!(spur!("bar")),
         }
     );
@@ -916,7 +966,7 @@ fn test_type_member() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::TypeMember {
-            base: Ex::Var(spur!("foo")).into(),
+            base: Ex::Var(spur!("foo")).node(),
             name: span!(spur!("bar")),
         }
     );
@@ -930,7 +980,7 @@ fn test_associated_member() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Associated {
-            base: Ex::Type(spur!("foo")).into(),
+            base: Ex::Type(spur!("foo")).node(),
             name: span!(spur!("bar")),
         }
     );
@@ -944,7 +994,7 @@ fn test_call() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Call {
-            base: Ex::Var(spur!("a")).into(),
+            base: Ex::Var(spur!("a")).node(),
             params: vec![],
             named_params: vec![],
         }
@@ -954,8 +1004,8 @@ fn test_call() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Call {
-            base: Ex::Var(spur!("a")).into(),
-            params: vec![Ex::Int(10).into()],
+            base: Ex::Var(spur!("a")).node(),
+            params: vec![Ex::Int(10).node()],
             named_params: vec![],
         }
     );
@@ -964,9 +1014,9 @@ fn test_call() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Call {
-            base: Ex::Var(spur!("a")).into(),
+            base: Ex::Var(spur!("a")).node(),
             params: vec![],
-            named_params: vec![(span!(spur!("foo")), Ex::Int(20).into())],
+            named_params: vec![(span!(spur!("foo")), Ex::Int(20).node())],
         }
     );
 
@@ -974,9 +1024,9 @@ fn test_call() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Call {
-            base: Ex::Var(spur!("a")).into(),
-            params: vec![Ex::Int(10).into(), Ex::Int(20).into()],
-            named_params: vec![(span!(spur!("foo")), Ex::Int(30).into())],
+            base: Ex::Var(spur!("a")).node(),
+            params: vec![Ex::Int(10).node(), Ex::Int(20).node()],
+            named_params: vec![(span!(spur!("foo")), Ex::Int(30).node())],
         }
     );
 
@@ -985,94 +1035,91 @@ fn test_call() -> ParseResult<()> {
 
 #[test]
 fn test_macro() -> ParseResult<()> {
-    //c = 20, d: @bool = true
-    // let t = parse("(a, &b: @int, c = 20, d: @bool = true) {}")?;
-    // expr_eq!(
-    //     t,
-    //     Ex::Macro {
-    //         args: vec![
-    //             MacroArg::Single {
-    //                 pattern: Pt::Path {
-    //                     var: spur!("a"),
-    //                     path: vec![],
-    //                     is_ref: false
-    //                 }
-    //                 .into(),
-    //                 default: None,
-    //             },
-    //             MacroArg::Single {
-    //                 pattern: Pt::Both(
-    //                     Pt::Path {
-    //                         var: spur!("b"),
-    //                         path: vec![],
-    //                         is_ref: true
-    //                     }
-    //                     .into(),
-    //                     Pt::Type(spur!("int")).into()
-    //                 )
-    //                 .into(),
-    //                 default: None,
-    //             },
-    //             MacroArg::Single {
-    //                 pattern: Pt::Path {
-    //                     var: spur!("c"),
-    //                     path: vec![],
-    //                     is_ref: false
-    //                 }
-    //                 .into(),
-    //                 default: Some(Ex::Int(20).into()),
-    //             },
-    //             // MacroArg::Single {
-    //             //     pattern: Pt::Both(
-    //             //         Pt::Path {
-    //             //             var: spur!("d"),
-    //             //             path: vec![],
-    //             //             is_ref: false
-    //             //         }
-    //             //         .into(),
-    //             //         Pt::Type(spur!("bool")).into()
-    //             //     )
-    //             //     .into(),
-    //             //     default: Some(Ex::Bool(true).into()),
-    //             // }
-    //         ],
-    //         ret_pat: None,
-    //         code: MacroCode::Normal(vec![])
-    //     }
-    // );
+    let t = parse("(a, &b: @int, c = 20, d: @bool = true) {}")?;
+    expr_eq!(
+        t,
+        Ex::Macro {
+            args: vec![
+                MacroArg::Single {
+                    pattern: Pt::Path {
+                        var: spur!("a"),
+                        path: vec![],
+                        is_ref: false
+                    }
+                    .node(),
+                    default: None,
+                },
+                MacroArg::Single {
+                    pattern: Pt::Both(
+                        Pt::Path {
+                            var: spur!("b"),
+                            path: vec![],
+                            is_ref: true
+                        }
+                        .node(),
+                        Pt::Type(spur!("int")).node()
+                    )
+                    .node(),
+                    default: None,
+                },
+                MacroArg::Single {
+                    pattern: Pt::Path {
+                        var: spur!("c"),
+                        path: vec![],
+                        is_ref: false
+                    }
+                    .node(),
+                    default: Some(Ex::Int(20).node()),
+                },
+                MacroArg::Single {
+                    pattern: Pt::Both(
+                        Pt::Path {
+                            var: spur!("d"),
+                            path: vec![],
+                            is_ref: false
+                        }
+                        .node(),
+                        Pt::Type(spur!("bool")).node()
+                    )
+                    .node(),
+                    default: Some(Ex::Bool(true).node()),
+                }
+            ],
+            ret_pat: None,
+            code: MacroCode::Normal(vec![])
+        }
+    );
 
-    // let t = parse("(...&b: @int) {}")?;
-    // expr_eq!(
-    //     t,
-    //     Ex::Macro {
-    //         args: vec![
-    //             MacroArg::Spread {
-    //                 pattern: Pt::Both(
-    //                     Pt::Path {
-    //                         var: spur!("b"),
-    //                         path: vec![],
-    //                         is_ref: true
-    //                     }
-    //                     .into(),
-    //                     Pt::Type(spur!("int")).into()
-    //                 )
-    //                 .into(),
-    //             }
-    //         ],
-    //         ret_pat: None,
-    //         code: MacroCode::Normal(vec![])
-    //     }
-    // );
+    let t = parse("(...&b: @int) {}")?;
+    expr_eq!(
+        t,
+        Ex::Macro {
+            args: vec![MacroArg::Spread {
+                pattern: Pt::Both(
+                    Pt::Path {
+                        var: spur!("b"),
+                        path: vec![],
+                        is_ref: true
+                    }
+                    .node(),
+                    Pt::Type(spur!("int")).node()
+                )
+                .node(),
+            }],
+            ret_pat: None,
+            code: MacroCode::Normal(vec![])
+        }
+    );
 
-    // let t = parse("() -> @string {}")?;
-    // expr_eq!(
-    //     t,
-    //     Ex::Macro {
-    //         args: vec![],
-    //         ret_pat: Some(Pt::Type(spur!("string")).into()),
-    //         code: MacroCode::Normal(vec![])
-    //     }
-    // );
+    let t = parse("() -> @string {}")?;
+    expr_eq!(
+        t,
+        Ex::Macro {
+            args: vec![],
+            ret_pat: Some(Pt::Type(spur!("string")).node()),
+            code: MacroCode::Normal(vec![])
+        }
+    );
 
     Ok(())
 }
@@ -1093,15 +1140,15 @@ fn test_trigger_func() -> ParseResult<()> {
                     path: vec![],
                     is_ref: false
                 }
-                .into(),
-                Ex::Int(10).into()
+                .node(),
+                Ex::Int(10).node()
             )
-            .into()]
+            .node()]
         }
     );
 
     let t = parse("a!")?;
-    expr_eq!(t, Ex::TriggerFuncCall(Ex::Var(spur!("a")).into()));
+    expr_eq!(t, Ex::TriggerFuncCall(Ex::Var(spur!("a")).node()));
 
     Ok(())
 }
@@ -1112,9 +1159,9 @@ fn test_ternary() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Ternary {
-            cond: Ex::Bool(true).into(),
-            if_true: Ex::Int(1).into(),
-            if_false: Ex::Int(2).into(),
+            cond: Ex::Bool(true).node(),
+            if_true: Ex::Int(1).node(),
+            if_false: Ex::Int(2).node(),
         }
     );
 
@@ -1124,7 +1171,7 @@ fn test_ternary() -> ParseResult<()> {
 #[test]
 fn test_typeof() -> ParseResult<()> {
     let t = parse("2.type")?;
-    expr_eq!(t, Ex::Typeof(Ex::Int(2).into()));
+    expr_eq!(t, Ex::Typeof(Ex::Int(2).node()));
 
     Ok(())
 }
@@ -1158,11 +1205,11 @@ fn test_instance() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Instance {
-            base: Ex::Type(spur!("foo")).into(),
+            base: Ex::Type(spur!("foo")).node(),
             items: vec![
                 Vis::Public(DictItem {
                     name: span!(spur!("a")),
-                    value: Some(Ex::Int(10).into()),
+                    value: Some(Ex::Int(10).node()),
                     attributes: vec![],
                 }),
                 Vis::Public(DictItem {
@@ -1193,13 +1240,13 @@ fn test_obj() -> ParseResult<()> {
             vec![
                 (
                     span!(ObjKeyType::Name(ObjectKey::ObjId)),
-                    Ex::Int(10).into()
+                    Ex::Int(10).node()
                 ),
                 (
                     span!(ObjKeyType::Name(ObjectKey::Groups)),
-                    Ex::Array(vec![Ex::Id(IDClass::Group, Some(20)).into()]).into()
+                    Ex::Array(vec![Ex::Id(IDClass::Group, Some(20)).node()]).node()
                 ),
-                (span!(ObjKeyType::Num(5)), Ex::Bool(false).into())
+                (span!(ObjKeyType::Num(5)), Ex::Bool(false).node())
             ]
         )
     );
@@ -1215,7 +1262,7 @@ fn test_obj() -> ParseResult<()> {
             ObjectType::Trigger,
             vec![(
                 span!(ObjKeyType::Name(ObjectKey::ObjId)),
-                Ex::Int(10).into()
+                Ex::Int(10).node()
             )],
         )
     );
@@ -1248,8 +1295,8 @@ fn test_assign() -> ParseResult<()> {
                 path: vec![],
                 is_ref: true
             }
-            .into(),
-            Ex::Int(10).into()
+            .node(),
+            Ex::Int(10).node()
         )
     );
 
@@ -1282,9 +1329,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::PlusEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1297,9 +1344,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::MinusEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1312,9 +1359,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::MultEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1327,9 +1374,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::DivEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1342,9 +1389,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::PowEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1357,9 +1404,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::ModEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1372,9 +1419,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::BinAndEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1387,9 +1434,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::BinOrEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1402,9 +1449,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::ShiftLeftEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1417,9 +1464,9 @@ fn test_assign_op() -> ParseResult<()> {
                 path: vec![],
                 is_ref: false
             }
-            .into(),
+            .node(),
             AssignOp::ShiftRightEq,
-            Ex::Int(1).into()
+            Ex::Int(1).node()
         )
     );
 
@@ -1433,8 +1480,8 @@ fn test_if() -> ParseResult<()> {
         t,
         St::If {
             branches: vec![
-                (Ex::Bool(false).into(), vec![]),
-                (Ex::Bool(true).into(), vec![])
+                (Ex::Bool(false).node(), vec![]),
+                (Ex::Bool(true).node(), vec![])
             ],
             else_branch: Some(vec![])
         }
@@ -1444,7 +1491,7 @@ fn test_if() -> ParseResult<()> {
     stmt_eq!(
         t,
         St::If {
-            branches: vec![(Ex::Bool(false).into(), vec![]),],
+            branches: vec![(Ex::Bool(false).node(), vec![]),],
             else_branch: None
         }
     );
@@ -1458,7 +1505,7 @@ fn test_while() -> ParseResult<()> {
     stmt_eq!(
         t,
         St::While {
-            cond: Ex::Bool(true).into(),
+            cond: Ex::Bool(true).node(),
             code: vec![]
         }
     );
@@ -1478,16 +1525,16 @@ fn test_for() -> ParseResult<()> {
                     path: vec![],
                     is_ref: false
                 }
-                .into(),
+                .node(),
                 Pt::Path {
                     var: spur!("y"),
                     path: vec![],
                     is_ref: false
                 }
-                .into()
+                .node()
             ])
-            .into(),
-            iterator: Ex::Array(vec![Ex::Int(1).into(), Ex::Int(2).into()]).into(),
+            .node(),
+            iterator: Ex::Array(vec![Ex::Int(1).node(), Ex::Int(2).node()]).node(),
             code: vec![]
         }
     );
@@ -1518,7 +1565,7 @@ fn test_try_catch() -> ParseResult<()> {
                     path: vec![],
                     is_ref: false
                 }
-                .into()
+                .node()
             ),
             catch_code: vec![],
         }
@@ -1539,10 +1586,10 @@ fn test_arrow() -> ParseResult<()> {
                     path: vec![],
                     is_ref: false
                 }
-                .into(),
-                Ex::Int(10).into()
+                .node(),
+                Ex::Int(10).node()
             )
-            .into()
+            .node()
         ))
     );
 
@@ -1552,7 +1599,7 @@ fn test_arrow() -> ParseResult<()> {
 #[test]
 fn test_control_flow() -> ParseResult<()> {
     let t = parse("return 20")?;
-    stmt_eq!(t, St::Return(Some(Ex::Int(20).into())));
+    stmt_eq!(t, St::Return(Some(Ex::Int(20).node())));
 
     let t = parse("return")?;
     stmt_eq!(t, St::Return(None));
@@ -1615,12 +1662,12 @@ fn test_impl() -> ParseResult<()> {
             items: vec![
                 Vis::Public(DictItem {
                     name: span!(spur!("a")),
-                    value: Some(Ex::Int(10).into()),
+                    value: Some(Ex::Int(10).node()),
                     attributes: vec![],
                 }),
                 Vis::Private(DictItem {
                     name: span!(spur!("b")),
-                    value: Some(Ex::Bool(false).into()),
+                    value: Some(Ex::Bool(false).node()),
                     attributes: vec![],
                 }),
             ],
@@ -1641,7 +1688,7 @@ fn test_throw() -> ParseResult<()> {
     let t = parse(r#"throw [1, 2]"#)?;
     stmt_eq!(
         t,
-        St::Throw(Ex::Array(vec![Ex::Int(1).into(), Ex::Int(2).into()]).into())
+        St::Throw(Ex::Array(vec![Ex::Int(1).node(), Ex::Int(2).node()]).node())
     );
 
     Ok(())

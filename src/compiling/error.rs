@@ -23,21 +23,21 @@ error_maker! {
             var: ImmutStr,
         },
 
-        // ==================================================================
-        #[
-            Message: "Tried to modify an immutable variable",
-            Note: Some(format!("Use `{}` to define a variable as mutable: `mut {var} = ...`", hyperlink("https://spu7nix.net/spwn/#/triggerlanguage/1variables?id=variables", Some("mut"))));
-            Main Area: area;
-            Labels: [
-                def_area => "Variable `{}` defined as immutable here": var;
-                area => "Tried to modify it here";
-            ]
-        ]
-        ImmutableAssign {
-            area: CodeArea,
-            def_area: CodeArea,
-            var: ImmutStr,
-        },
+        // // ==================================================================
+        // #[
+        //     Message: "Tried to modify an immutable variable",
+        //     Note: Some(format!("Use `{}` to define a variable as mutable: `mut {var} = ...`", hyperlink("https://spu7nix.net/spwn/#/triggerlanguage/1variables?id=variables", Some("mut"))));
+        //     Main Area: area;
+        //     Labels: [
+        //         def_area => "Variable `{}` defined as immutable here": var;
+        //         area => "Tried to modify it here";
+        //     ]
+        // ]
+        // ImmutableAssign {
+        //     area: CodeArea,
+        //     def_area: CodeArea,
+        //     var: ImmutStr,
+        // },
 
         // ==================================================================
         #[

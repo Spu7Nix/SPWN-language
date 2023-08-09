@@ -1,4 +1,4 @@
-
+extract import "event.spwn"
 type @comparison
 
 impl @comparison {
@@ -59,6 +59,30 @@ impl @item {
         self.if_is(@comparison::SMALLER_THAN, other, !{
             -> return -1
         })
-    }
+    },
+
+	#[doc(u"
+		Implementation of a count trigger. Returns an event that fires when an item ID reaches a specified number.
+
+		# Example
+		```spwn
+        on(4i.count(3), !{
+            BG.set(rgb(0, 0, 0))
+        })
+    	```
+	")]
+    count: (
+        self,
+        number: @int = 0
+    ) -> @event {
+        return @event::new(func => $.add(trigger {
+            OBJ_ID: @obj_id::triggers.COUNT,
+            TARGET: func,
+            COUNT: number,
+            ACTIVATE_GROUP: true,
+            ITEM: self,
+            COUNT_MULTI_ACTIVATE: true,
+        }))
+    },
 }
     

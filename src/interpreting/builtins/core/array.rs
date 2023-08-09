@@ -17,5 +17,11 @@ impl_type! {
             Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
         }
 
+        /// fgdfgdfg
+        fn is_empty(&Array(slf) as "self") {
+            let is_empty = slf.borrow().is_empty();
+            Multi::new_single(ctx, Ok(ValueRef::new(Value::Bool(is_empty).into_stored(area))))
+        }
+
     }
 }

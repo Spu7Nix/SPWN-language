@@ -1,11 +1,32 @@
 extract import "item.spwn"
+extract import "obj_ids.spwn"
+
+impl @int {
+    max: (self, v) {
+        if self > v {
+            return self
+        }
+        return v
+    }
+}
 
 #[doc(u"
     `@counter` is a wrapper around the item ID system in Geometry Dash. In practice, it works as a replacement for numbers.
-    The difference between numbers and counters, is that counters can be modified in the level's runtime. 
+    The difference between numbers and counters, is that counters can be modified in the level's runtime.
+
+    # Example
+    ```spwn
+    left = counter(9)
+    right = counter(10)
+
+    if left + right >= 21 {
+        10g.move(10, 0, 0.5)
+    } else {
+        10g.move(-10, 0, 0.5)
+    }
+    ```
 ")]
 type @counter
-
 
 overload += {
     (a: @counter, b: @int) => a.add_const(b),
@@ -49,6 +70,12 @@ overload == {
         },
         ret_true => b.item.if_is(@comparison::EQUAL_TO, a, ret_true)
     ),
+}
+
+overload != {
+    (a: @counter, b: @counter) => !(a == b),
+    (a: @counter, b: @int) => !(a == b),
+    (a: @int, b: @counter) => !(a == b),
 }
 
 overload > {
@@ -100,22 +127,37 @@ overload <= {
 }
 
 
+compound_counter = (counters: @counter[_], reset: @bool = true, value: @int = 0) {
+    mut max_pos_bits = 0
+    mut max_neg_bits = 0
+    for counter in counters {
+        max_pos_bits = max_pos_bits.max(counter.pos_bits)
+        max_neg_bits = max_neg_bits.max(counter.neg_bits)
+    }
+    return @counter::new(
+        value,
+        bits = max_pos_bits, 
+        neg_bits = max_neg_bits, 
+        reset = reset
+    )
+}
+
 overload + {
     (a: @counter, b: @counter) {
-        mut new = @counter::new(reset = false);
+        new = compound_counter([a, b]);
         a.copy_to(new);
         b.copy_to(new);
         return new
     },
 
     (a: @int, b: @counter) {
-        mut new = @counter::new(a, reset = false);
+        new = compound_counter([b], value = a);
         b.copy_to(new);
         return new
     },
 
     (a: @counter, b: @int) {
-        mut new = @counter::new(b, reset = false);
+        new = compound_counter([a], value = b);
         a.copy_to(new);
         return new
     },
@@ -130,7 +172,7 @@ overload + {
 
 overload = {
     (mut a: @counter, b: @int | @counter) {
-        a.reset((n){})
+        a.reset()
         a += b
     },
     
@@ -139,18 +181,28 @@ overload = {
 
 
 impl @counter {
-    new: (value: @int = 0, reset: @bool = true) -> @counter {
-        item = ?i
+    new: (
+        initial: @int | @item = 0, 
+        reset: @bool = true, 
+        bits: @int & >=0 = 10, 
+        neg_bits: @int & >=0 = 0
+    ) -> @counter {
+        item = match initial {
+            @item => initial,
+            _ => ?i
+        }
         out = @counter::{
             item,
-            pos_bits: 10,
-            neg_bits: 6,
+            pos_bits: bits,
+            neg_bits: neg_bits,
             binds: [],
         }
         if reset {
             out.reset()
         }
-        item.add(value)
+        if initial is @int {
+            item.add(initial)
+        }
         return out
     },
 
@@ -171,7 +223,7 @@ impl @counter {
 
     display: (&self, x: @int | @float, y: @int | @float) {
         $.add(obj {
-            OBJ_ID: 1615,
+            OBJ_ID: @obj_id::misc.ITEM_DISPLAY,
             X: x,
             Y: y,
             ITEM: self.item,
@@ -182,7 +234,7 @@ impl @counter {
 
     to_obj: (&self) -> @object {
         return obj {
-            OBJ_ID: 1615,
+            OBJ_ID: @obj_id::misc.ITEM_DISPLAY,
             ITEM: self.item,
             COLOR: 1c,
             GROUPS: 999g
@@ -241,7 +293,7 @@ impl @counter {
         self,
         counters: @counter | ({ctr: @counter, factor: @int}[_]),
     ) {
-        temp_storage = @counter::new(reset = false)
+        temp_storage = compound_counter([self], reset = false)
         
         self.add_to(match counters {
             @counter => [{ctr: counters, factor: 1}, {ctr: temp_storage, factor: 1}],
@@ -252,26 +304,24 @@ impl @counter {
     },
 
     multiply: (self, factor: @counter | @int) {
-
-        if factor is @int {
-            dbg "a";
-            // const
-            temp = @counter::new(0, reset = false)
-            self.add_to([{ctr: temp, factor}])
-            temp.add_to(self)
-
-        } else if factor is @counter {
-            dbg "b";
-            result = @counter::new(0, reset = false)
-            self.reset((n) {
-                factor.copy_to([{ctr: result, factor: n}])
-            })
-            result.add_to(self)
+        match factor {
+            @int => {
+                temp = compound_counter([self], reset = false)
+                self.add_to([{ctr: temp, factor}])
+                temp.add_to(self)
+            },
+            @counter => {
+                result = compound_counter([self], reset = false)
+                self.reset((n) {
+                    factor.copy_to([{ctr: result, factor: n}])
+                })
+                result.add_to(self)
+            }
         }
     },
 
     compare: (self, other: @counter) -> ==(-1) | ==0 | ==1 {
-        mut comp = @counter::new(0, reset = false)
+        mut comp = compound_counter([self, other])
         comp += self
         comp -= other
 
@@ -287,5 +337,81 @@ impl @counter {
             -> return -1
         })
     },
+
+    to_const: (self, range: @int[_] | @range) -> @int {
+        mut funcs = []
+
+        for val in range {
+            funcs.push([val, !{
+                -> return val
+            }])
+        }
+
+        for val in range {
+            self.item.if_is(@comparison::EQUAL_TO, val, !{
+                for [val2, func] in funcs {
+                    if val2 != val {
+                        func.start_group.toggle_off()
+                    } else {
+                        func!
+                    }
+                }
+            })
+        }
+
+        for func in funcs {
+            func[1].start_group.toggle_on()
+        }
+    },
+
+    to_const_enclosed: (
+        self,
+        range: @int[_] | @range,
+        closure: @int -> (),
+    ) {
+        -> () {
+            val = self.to_const(range)
+            closure(val)
+        } ()
+    },
+
+	// #[doc(u"
+	// 	Divides the value of the counter by some divisor
+
+	// 	# Example
+	// 	```spwn
+    //     c = counter(7)
+    //     r = counter(0)
+    //     wait(1)
+
+    //     c.divide(2, remainder = r)
+    //     // c is now 3, r is now 1
+    // 	```
+	// ")]
+    // divide: (
+    //     self,
+    //     divisor: @counter | @int,
+    //     remainder: @counter | @item = ?i,
+    // ) {
+    //     result = @counter::new(0, reset = false, bits = self.bits)
+    //     for i in self.bits..0 {
+    //         num = 2^i
+    //         if divisor is @number {
+    //             -> if self >= divisor * num {
+    //                 self.add(-divisor * num)
+    //                 result.add(num)
+    //             }
+    //         } else if divisor is @counter {
+    //             divisor.copy_to(self, factor = -num)
+    //             result.add(num)
+    //             -> if self < 0 {
+    //                 divisor.copy_to(self, factor = num)
+    //                 result.add(-num)
+    //             }
+    //         }
+    //     }
+    //     self.add_to(remainder)
+    //     result.add_to(self)
+    // },
 }
 

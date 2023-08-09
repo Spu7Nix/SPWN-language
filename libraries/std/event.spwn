@@ -1,0 +1,149 @@
+
+extract import "obj_ids.spwn"
+
+
+
+#[doc(u"
+    `@event` is an API for runtime events, such as player input and collisions.
+
+    # Example
+    ```spwn
+    on(touch(), !{
+        10g.move(10, 0)
+    })
+    ```
+")]
+type @event
+
+impl @event {
+    new: (on: @trigger_function -> ()) -> @event {
+        return @event::{ on }
+    },
+
+    on: (&self, func: @trigger_function) {
+        self.on(func)
+    }
+}
+
+return {
+    on: (
+        event: @event,
+        function,
+    ) => event.on(function),
+
+    #[doc(u"
+        Implementation of the touch trigger. Returns an event that fires on touch.
+
+        # Args
+        - `dual_side`: Dual mode (only check for touch on the dual side)
+
+        # Example
+        ```spwn
+        on(touch(), !{
+            10g.move(10, 0)
+        })
+        ```
+    ")]
+    touch: (
+        dual_side: @bool = false
+    ) -> @event {
+        return @event::new(func => $.add(trigger {
+            OBJ_ID: @obj_id::triggers.TOUCH,
+            HOLD_MODE: true,
+            TOGGLE_MODE: 1,
+            TARGET: func,
+            DUAL_MODE: dual_side,
+        }))
+    },
+
+    #[doc(u"
+        Implementation of the touch trigger. Returns an event that fires on touch end.
+
+        # Args
+        - `dual_side`: Dual mode (only check for touch on the dual side)
+
+        # Example
+        ```spwn
+        on(touch_end(), !{
+            10g.move(10, 0)
+        })
+        ```
+    ")]
+    touch_end: (
+        dual_side: @bool = false
+    ) -> @event {
+        return @event::new(func => $.add(trigger {
+            OBJ_ID: @obj_id::triggers.TOUCH,
+            HOLD_MODE: true,
+            TOGGLE_MODE: 2,
+            TARGET: func,
+            DUAL_MODE: dual_side,
+        }))
+    },
+
+	#[doc(u"
+		Implementation of the collision trigger. Returns an event that fires when block either block enters one another.
+
+		# Example
+		```spwn
+        on(collision(1b, 2b), !{
+            BG.set(rgb(0, 0, 0))
+        })
+    	```
+	")]
+    collision: (
+        block_a: @block,
+        block_b: @block
+    ) -> @event {
+        return @event::new(func => $.add(trigger {
+            OBJ_ID: @obj_id::triggers.COLLISION,
+            BLOCK_A: block_a,
+            BLOCK_B: block_b,
+            ACTIVATE_GROUP: true,
+            ACTIVATE_ON_EXIT: false,
+            TARGET: func,
+        }))
+    },
+
+	#[doc(u"
+        Implementation of the collision trigger. Returns an event that fires when block either block exits one another.
+
+		# Example
+		```spwn
+        on(collision_exit(1b, 2b), !{
+            BG.set(rgb(0, 0, 0))
+        })
+    	```
+	")]
+    collision_exit: (
+        block_a: @block,
+        block_b: @block
+    ) -> @event {
+        return @event::new(func => $.add(trigger {
+            OBJ_ID: @obj_id::triggers.COLLISION,
+            BLOCK_A: block_a,
+            BLOCK_B: block_b,
+            ACTIVATE_GROUP: true,
+            ACTIVATE_ON_EXIT: true,
+            TARGET: func,
+        }))
+    },
+
+	#[doc(u"
+        Implementation of the death trigger. Returns an event that fires when the player dies.
+
+		# Example
+		```spwn
+        on(death(), !{
+            BG.set(rgb(0, 0, 0))
+        })
+    	```
+	")]
+    death: () -> @event {
+        return @event::new(func => $.add(trigger {
+            OBJ_ID: @obj_id::triggers.ON_DEATH,
+            ACTIVATE_GROUP: true,
+            TARGET: func,
+        }))
+    },
+}
