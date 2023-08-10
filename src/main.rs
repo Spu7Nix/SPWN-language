@@ -463,8 +463,9 @@ fn run_spwn(
     // println!("\n{}", "══════════════════════════════════".dimmed().bold());
     // println!("{}", t.elapsed().as_secs_f64());
 }
-fn g(v: [u32; 5]) {
-    // match a {
-    //     1..=5 => todo!(),
-    // }
-}
+// fn g(v: [u32; 5]) {
+//     // match a {
+//     //     1..=5 => todo!(),
+//     // }
+//     Box::new(x)
+// }

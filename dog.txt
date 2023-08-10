@@ -1,0 +1,583 @@
+libraries/core\builtins.spwn
+regs: 19 -> 3
+regs: 38 -> 11
+regs: 22 -> 7
+regs: 11 -> 4
+regs: 11 -> 4
+regs: 15 -> 5
+regs: 18 -> 7
+regs: 16 -> 5
+------------------------
+
+libraries/core\array.spwn
+regs: 8 -> 3
+regs: 13 -> 5
+regs: 16 -> 8
+------------------------
+
+libraries/core\dict.spwn
+regs: 6 -> 3
+regs: 21 -> 6
+regs: 20 -> 6
+------------------------
+
+libraries/core/lib.spwn
+regs: 3 -> 1
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\event.spwn
+regs: 22 -> 3
+regs: 18 -> 5
+regs: 13 -> 6
+regs: 13 -> 6
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 8 -> 3
+regs: 14 -> 6
+------------------------
+
+libraries/std\item.spwn
+regs: 48 -> 11
+regs: 14 -> 10
+regs: 24 -> 10
+regs: 23 -> 13
+regs: 40 -> 17
+regs: 71 -> 14
+regs: 24 -> 12
+regs: 23 -> 14
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\easing.spwn
+regs: 67 -> 4
+regs: 12 -> 6
+regs: 9 -> 5
+regs: 67 -> 5
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\event.spwn
+regs: 22 -> 3
+regs: 18 -> 5
+regs: 13 -> 6
+regs: 13 -> 6
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 8 -> 3
+regs: 14 -> 6
+------------------------
+
+libraries/std\item.spwn
+regs: 48 -> 11
+regs: 14 -> 10
+regs: 24 -> 10
+regs: 23 -> 13
+regs: 40 -> 17
+regs: 71 -> 14
+regs: 24 -> 12
+regs: 23 -> 14
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\counter.spwn
+regs: 79 -> 5
+regs: 7 -> 5
+regs: 17 -> 6
+regs: 17 -> 6
+regs: 21 -> 6
+regs: 18 -> 6
+regs: 23 -> 7
+regs: 28 -> 9
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 22 -> 8
+regs: 14 -> 8
+regs: 18 -> 7
+regs: 22 -> 8
+regs: 14 -> 8
+regs: 17 -> 7
+regs: 17 -> 7
+regs: 17 -> 7
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 21 -> 7
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 64 -> 16
+regs: 27 -> 9
+regs: 24 -> 9
+regs: 24 -> 9
+regs: 26 -> 9
+regs: 23 -> 8
+regs: 72 -> 15
+regs: 21 -> 8
+regs: 24 -> 9
+regs: 41 -> 12
+regs: 18 -> 7
+regs: 89 -> 16
+regs: 5 -> 4
+regs: 57 -> 14
+regs: 19 -> 9
+regs: 14 -> 10
+regs: 5 -> 4
+regs: 72 -> 15
+regs: 27 -> 11
+regs: 5 -> 4
+regs: 74 -> 13
+regs: 52 -> 11
+regs: 15 -> 11
+regs: 81 -> 10
+regs: 94 -> 17
+regs: 40 -> 13
+regs: 12 -> 8
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\event.spwn
+regs: 22 -> 3
+regs: 18 -> 5
+regs: 13 -> 6
+regs: 13 -> 6
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 8 -> 3
+regs: 14 -> 6
+------------------------
+
+libraries/std\item.spwn
+regs: 48 -> 11
+regs: 14 -> 10
+regs: 24 -> 10
+regs: 23 -> 13
+regs: 40 -> 17
+regs: 71 -> 14
+regs: 24 -> 12
+regs: 23 -> 14
+------------------------
+
+libraries/std\control_flow.spwn
+regs: 25 -> 6
+regs: 36 -> 7
+regs: 39 -> 10
+regs: 50 -> 13
+regs: 99 -> 13
+------------------------
+
+libraries/std\group.spwn
+regs: 73 -> 8
+regs: 67 -> 20
+regs: 17 -> 10
+regs: 42 -> 14
+regs: 18 -> 10
+regs: 18 -> 10
+regs: 66 -> 22
+regs: 57 -> 18
+regs: 72 -> 20
+regs: 137 -> 22
+regs: 78 -> 20
+regs: 112 -> 28
+------------------------
+
+libraries/std\easing.spwn
+regs: 67 -> 4
+regs: 12 -> 6
+regs: 9 -> 5
+regs: 67 -> 5
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\event.spwn
+regs: 22 -> 3
+regs: 18 -> 5
+regs: 13 -> 6
+regs: 13 -> 6
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 8 -> 3
+regs: 14 -> 6
+------------------------
+
+libraries/std\item.spwn
+regs: 48 -> 11
+regs: 14 -> 10
+regs: 24 -> 10
+regs: 23 -> 13
+regs: 40 -> 17
+regs: 71 -> 14
+regs: 24 -> 12
+regs: 23 -> 14
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\counter.spwn
+regs: 79 -> 5
+regs: 7 -> 5
+regs: 17 -> 6
+regs: 17 -> 6
+regs: 21 -> 6
+regs: 18 -> 6
+regs: 23 -> 7
+regs: 28 -> 9
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 22 -> 8
+regs: 14 -> 8
+regs: 18 -> 7
+regs: 22 -> 8
+regs: 14 -> 8
+regs: 17 -> 7
+regs: 17 -> 7
+regs: 17 -> 7
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 21 -> 7
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 64 -> 16
+regs: 27 -> 9
+regs: 24 -> 9
+regs: 24 -> 9
+regs: 26 -> 9
+regs: 23 -> 8
+regs: 72 -> 15
+regs: 21 -> 8
+regs: 24 -> 9
+regs: 41 -> 12
+regs: 18 -> 7
+regs: 89 -> 16
+regs: 5 -> 4
+regs: 57 -> 14
+regs: 19 -> 9
+regs: 14 -> 10
+regs: 5 -> 4
+regs: 72 -> 15
+regs: 27 -> 11
+regs: 5 -> 4
+regs: 74 -> 13
+regs: 52 -> 11
+regs: 15 -> 11
+regs: 81 -> 10
+regs: 94 -> 17
+regs: 40 -> 13
+regs: 12 -> 8
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\event.spwn
+regs: 22 -> 3
+regs: 18 -> 5
+regs: 13 -> 6
+regs: 13 -> 6
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 8 -> 3
+regs: 14 -> 6
+------------------------
+
+libraries/std\item.spwn
+regs: 48 -> 11
+regs: 14 -> 10
+regs: 24 -> 10
+regs: 23 -> 13
+regs: 40 -> 17
+regs: 71 -> 14
+regs: 24 -> 12
+regs: 23 -> 14
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\counter.spwn
+regs: 79 -> 5
+regs: 7 -> 5
+regs: 17 -> 6
+regs: 17 -> 6
+regs: 21 -> 6
+regs: 18 -> 6
+regs: 23 -> 7
+regs: 28 -> 9
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 22 -> 8
+regs: 14 -> 8
+regs: 18 -> 7
+regs: 22 -> 8
+regs: 14 -> 8
+regs: 17 -> 7
+regs: 17 -> 7
+regs: 17 -> 7
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 21 -> 7
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 18 -> 7
+regs: 16 -> 8
+regs: 14 -> 8
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 20 -> 7
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 18 -> 7
+regs: 14 -> 8
+regs: 16 -> 8
+regs: 64 -> 16
+regs: 27 -> 9
+regs: 24 -> 9
+regs: 24 -> 9
+regs: 26 -> 9
+regs: 23 -> 8
+regs: 72 -> 15
+regs: 21 -> 8
+regs: 24 -> 9
+regs: 41 -> 12
+regs: 18 -> 7
+regs: 89 -> 16
+regs: 5 -> 4
+regs: 57 -> 14
+regs: 19 -> 9
+regs: 14 -> 10
+regs: 5 -> 4
+regs: 72 -> 15
+regs: 27 -> 11
+regs: 5 -> 4
+regs: 74 -> 13
+regs: 52 -> 11
+regs: 15 -> 11
+regs: 81 -> 10
+regs: 94 -> 17
+regs: 40 -> 13
+regs: 12 -> 8
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\event.spwn
+regs: 22 -> 3
+regs: 18 -> 5
+regs: 13 -> 6
+regs: 13 -> 6
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 8 -> 3
+regs: 14 -> 6
+------------------------
+
+libraries/std\item.spwn
+regs: 48 -> 11
+regs: 14 -> 10
+regs: 24 -> 10
+regs: 23 -> 13
+regs: 40 -> 17
+regs: 71 -> 14
+regs: 24 -> 12
+regs: 23 -> 14
+------------------------
+
+libraries/std\control_flow.spwn
+regs: 25 -> 6
+regs: 36 -> 7
+regs: 39 -> 10
+regs: 50 -> 13
+regs: 99 -> 13
+------------------------
+
+libraries/std\obj_ids.spwn
+regs: 114 -> 4
+------------------------
+
+libraries/std\event.spwn
+regs: 22 -> 3
+regs: 18 -> 5
+regs: 13 -> 6
+regs: 13 -> 6
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 15 -> 4
+regs: 16 -> 7
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 22 -> 6
+regs: 17 -> 8
+regs: 8 -> 3
+regs: 14 -> 6
+------------------------
+
+libraries/std/lib.spwn
+regs: 37 -> 8
+------------------------
+
+test.spwn
+regs: 39 -> 12
+regs: 11 -> 10
+regs: 17 -> 12
+------------------------
+
+test.spwn
+regs: 13 -> 4
+regs: 9 -> 6
+regs: 4 -> 4
+------------------------
+
+test.spwn
+regs: 13 -> 4
+regs: 9 -> 6
+regs: 4 -> 4
+------------------------
+
+test.spwn
+regs: 13 -> 4
+regs: 9 -> 6
+regs: 4 -> 4
+------------------------
+
+test.spwn
+regs: 13 -> 4
+regs: 9 -> 6
+regs: 4 -> 4
+------------------------
+
+test.spwn
+regs: 13 -> 4
+regs: 9 -> 6
+regs: 4 -> 4
+------------------------
+
+test.spwn
+regs: 13 -> 4
+regs: 9 -> 6
+regs: 4 -> 4
+------------------------
+

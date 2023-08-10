@@ -6,7 +6,9 @@ pub mod util;
 
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
+use std::fs::OpenOptions;
 use std::hash::{Hash, Hasher};
+use std::io::Write;
 use std::rc::Rc;
 
 use ahash::AHashMap;
@@ -232,9 +234,29 @@ impl Compiler<'_> {
             span,
         )?;
         let mut unopt_code = code.build(&self.src, self).unwrap();
-        unopt_code.debug_str(&self.src, None);
+        // unopt_code.debug_str(&self.src, None);
+
+        let mut s = String::new();
+
+        s += &format!("{}\n", self.src.name());
+        let mut v = vec![];
+        for func in &unopt_code.functions {
+            v.push(func.regs_used)
+        }
 
         optimize_code(&mut unopt_code);
+        for (idx, func) in unopt_code.functions.iter().enumerate() {
+            s += &format!("regs: {} -> {}\n", v[idx], func.regs_used)
+        }
+        s += &format!("------------------------\n\n");
+
+        let mut data_file = OpenOptions::new()
+            .append(true)
+            .open("dog.txt")
+            .expect("cannot open file");
+
+        // Write to a file
+        data_file.write(s.as_bytes()).expect("write failed");
 
         let opt_code = OptBytecode {
             source_hash: unopt_code.source_hash,
