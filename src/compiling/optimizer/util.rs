@@ -2,7 +2,7 @@ use crate::compiling::bytecode::{Bytecode, RegNum, Register};
 use crate::compiling::opcodes::{Opcode, OpcodePos};
 
 impl<T: RegNum> Opcode<Register<T>> {
-    pub fn get_successors(&self, idx: usize, len: usize) -> Vec<OpcodePos> {
+    pub fn get_successors(&self, idx: usize) -> Vec<OpcodePos> {
         let mut successors = match *self {
             Opcode::Jump { to } => return vec![to],
             Opcode::JumpIfFalse { check, to } => vec![to],
@@ -16,9 +16,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             Opcode::Throw { reg } => return vec![],
             _ => vec![],
         };
-        if idx < len - 1 {
-            successors.push((idx + 1).into());
-        }
+        successors.push((idx + 1).into());
         successors
     }
 
@@ -136,7 +134,7 @@ impl<T: RegNum> Opcode<Register<T>> {
                 v
             },
             Opcode::Impl { base, dict } => vec![base, dict],
-            Opcode::RunBuiltin { args, dest } => vec![],
+            Opcode::RunBuiltin { args, dest } => (0..args).map(|g| Register(g.into())).collect(),
             Opcode::MakeTriggerFunc { src, dest } => vec![src],
             Opcode::CallTriggerFunc { func } => vec![func],
             Opcode::SetContextGroup { reg } => vec![reg],

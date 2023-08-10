@@ -1,23 +1,63 @@
 
 
 
+// extract import "libraries/core/lib.spwn"
+// extract import "libraries/std/counter.spwn"
 
 
-// a = counter(0, reset = false, bits = 16)
-// b = counter(1, reset = false, bits = 16)
-// a.display(45, 45)
-// // bitchass shut youR BITCH ASS up life it never die woemtn are my favorite guy I am going yp EAT this listtle chinese boy how old are you 18 LOUDER 18 YOU ARE so yummy yummy yummy yummy fat fat fat!!!! HAHAHAHAHAHAH GET moley ON YOUR PhOne
-// // push bitch push
-
-// // on(touch(),)
-
-// while_loop(() => a < 200, () {
-//     c = a + b;
-//     a = b;
-//     b = c;
-// }, 0.25);
+type @counter
 
 
+compare_int_counter = "g"
+
+overload < {
+    (a: @counter, b: @string) => 5,
+    (a, b) => compare_int_counter(),
+}
+
+a = @counter::{};
+a < 200;
+
+// bitchass shut youR BITCH ASS up life it never die woemtn are my favorite guy I am going yp EAT this listtle chinese boy how old are you 18 LOUDER 18 YOU ARE so yummy yummy yummy yummy fat fat fat!!!! HAHAHAHAHAHAH GET moley ON YOUR PhOne
+// push bitch push
+
+// // // on(touch(),)
+// while_loop(() => (a < 200));
+
+// // dbg 6;
 
 
+
+// extract import "libraries/std/item.spwn"
+// extract import "libraries/std/obj_ids.spwn"
+
+// #[doc(u"
+//     `@counter` is a wrapper around the item ID system in Geometry Dash. In practice, it works as a replacement for numbers.
+//     The difference between numbers and counters, is that counters can be modified in the level's runtime.
+
+//     # Example
+//     ```spwn
+//     left = counter(9)
+//     right = counter(10)
+
+//     if left + right >= 21 {
+//         10g.move(10, 0, 0.5)
+//     } else {
+//         10g.move(-10, 0, 0.5)
+//     }
+//     ```
+// ")]
+// type @counter
+
+
+// impl @counter {
+    
+
+
+//     to_const_enclosed: (
+//         a
+//     ) {
+//         -> dbg a;
+//     },
+// }
 

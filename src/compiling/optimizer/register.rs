@@ -50,11 +50,14 @@ impl InterferenceGraph {
                 changed: &mut bool,
                 code: &UnoptBytecode,
             ) {
+                if *node_idx as usize >= nodes.len() {
+                    return;
+                }
                 // depth-first post-order traversal
                 visited.insert(node_idx);
                 let successors = nodes[*node_idx as usize]
                     .opcode
-                    .get_successors(node_idx.into(), nodes.len());
+                    .get_successors(node_idx.into());
                 for succ in successors.iter() {
                     if !visited.contains(succ) {
                         visit(*succ, visited, nodes, changed, code);
@@ -64,8 +67,10 @@ impl InterferenceGraph {
                 // `LiveOut` set
                 let mut out = AHashSet::new();
                 for succ in successors {
-                    for reg in &nodes[*succ as usize].live_in {
-                        out.insert(*reg);
+                    if let Some(node) = nodes.get(*succ as usize) {
+                        for reg in &node.live_in {
+                            out.insert(*reg);
+                        }
                     }
                 }
 
@@ -103,9 +108,11 @@ impl InterferenceGraph {
             }
 
             let mut out = AHashSet::new();
-            for succ in nodes[i].opcode.get_successors(i.into(), nodes.len()) {
-                for reg in &nodes[*succ as usize].live_in {
-                    out.insert(*reg);
+            for succ in nodes[i].opcode.get_successors(i) {
+                if let Some(node) = nodes.get(*succ as usize) {
+                    for reg in &node.live_in {
+                        out.insert(*reg);
+                    }
                 }
             }
             println!(
@@ -148,13 +155,22 @@ impl InterferenceGraph {
         //     }
         // }
 
-        for ((_, r1), (_, r2)) in func
+        println!("fancklen {}", func.opcodes.len());
+        for (r1, r2) in func
             .captured_regs
             .iter()
-            .cartesian_product(func.captured_regs.iter())
+            .map(|(_, r)| *r)
+            .cartesian_product(
+                func.captured_regs
+                    .iter()
+                    .map(|(_, r)| *r)
+                    .chain((0..func.args.len()).map(Register)),
+            )
         {
-            graph.add_edge(**r1, **r2)
+            println!("{} <-> {}", *r1, *r2);
+            graph.add_edge(*r1, *r2)
         }
+        println!("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-");
 
         // for r1 in func
         //     .capture_regs
@@ -182,23 +198,51 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
     let graph = InterferenceGraph::from_func(&code.functions[*func as usize], &*code);
     let mut coloring = color_rlf(graph);
 
+    if coloring.is_empty() {
+        return false;
+    }
+
     println!("{func}");
     println!("{:?}", coloring);
+
     {
         let arg_amount = code.functions[*func as usize].args.len();
         if !coloring.iter().take(arg_amount).all_unique() {
             panic!("gunkle fish bitch dick")
         }
-        let mut arg_swaps = AHashMap::new();
-        for (arg_idx, color) in coloring.iter_mut().enumerate() {
-            let r = *color;
-            if arg_idx < arg_amount && r != arg_idx {
-                arg_swaps.insert(r, arg_idx);
-                arg_swaps.insert(arg_idx, r);
+
+        let swap = |a: usize, b: usize, coloring: &mut [usize]| {
+            for i in coloring {
+                if *i == a {
+                    *i = b;
+                } else if *i == b {
+                    *i = a;
+                }
             }
-            *color = arg_swaps.get(&r).copied().unwrap_or(r);
+        };
+
+        for i in 0..arg_amount {
+            if coloring[i] != i {
+                swap(i, coloring[i], &mut coloring)
+            }
         }
     }
+
+    // {
+    //     let arg_amount = code.functions[*func as usize].args.len();
+    //     if !coloring.iter().take(arg_amount).all_unique() {
+    //         panic!("gunkle fish bitch dick")
+    //     }
+    //     let mut arg_swaps = AHashMap::new();
+    //     for (arg_idx, color) in coloring.iter_mut().enumerate() {
+    //         let r = *color;
+    //         if arg_idx < arg_amount && r != arg_idx {
+    //             arg_swaps.insert(r, arg_idx);
+    //             arg_swaps.insert(arg_idx, r);
+    //         }
+    //         *color = arg_swaps.get(&r).copied().unwrap_or(r);
+    //     }
+    // }
 
     println!("{:?}\n==================\n\n", coloring);
 
@@ -272,7 +316,7 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
             changed = true;
         }
     }
-    code.functions[*func as usize].regs_used = coloring.iter().unique().count();
+    code.functions[*func as usize].regs_used = coloring.iter().copied().max().unwrap_or(0) + 1;
 
     changed
 }

@@ -128,7 +128,7 @@ impl PartialEq for Constant {
 }
 impl Eq for Constant {}
 
-pub trait RegNum: Copy + Display {}
+pub trait RegNum: Copy + Display + From<u8> {}
 impl RegNum for usize {}
 impl RegNum for u8 {}
 

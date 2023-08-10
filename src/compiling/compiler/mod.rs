@@ -232,7 +232,7 @@ impl Compiler<'_> {
             span,
         )?;
         let mut unopt_code = code.build(&self.src, self).unwrap();
-        // unopt_code.debug_str(&self.src, None);
+        unopt_code.debug_str(&self.src, None);
 
         optimize_code(&mut unopt_code);
 
