@@ -29,11 +29,12 @@ call_with_delay = (
 while_loop = (
     expr: () -> @bool,
     code: () -> (),
+    delay: @float | @int | @epsilon = ε
 ) {
     func = !{
         if expr() {
             code()
-            call_with_delay(ε, func)
+            call_with_delay(delay, func)
         } else {
             -> return
         }

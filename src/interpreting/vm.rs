@@ -2202,7 +2202,11 @@ impl Vm {
                     } => {
                         let func = func.clone();
                         let is_builtin = *is_builtin;
-                        let captured = captured.clone();
+                        let captured = captured
+                            .iter()
+                            .zip(func.get_func().captured_regs.iter())
+                            .map(|(v, (_, to))| (v.clone(), *to))
+                            .collect_vec();
 
                         mem::drop(base_ref);
 
@@ -2236,8 +2240,8 @@ impl Vm {
                                 }
                                 // println!("babagaga3");
 
-                                for (i, v) in captured.iter().enumerate() {
-                                    vm.change_reg(Register((arg_amount + i) as u8), v.clone());
+                                for (i, (v, to)) in captured.into_iter().enumerate() {
+                                    vm.change_reg(to, v.clone());
                                 }
                                 // println!("babagaga4");
                             }),

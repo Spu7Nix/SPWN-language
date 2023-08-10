@@ -76,6 +76,7 @@ struct ProtoFunc {
     args: ImmutVec<Spanned<(Option<ImmutStr>, Mutability)>>,
     spread_arg: Option<u8>,
     captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
+    child_funcs: Vec<FuncID>,
 }
 
 // #[derive(Debug)]
@@ -127,6 +128,7 @@ impl ProtoBytecode {
             args: args.0,
             spread_arg: args.1,
             captured_regs,
+            child_funcs: vec![],
         });
         let func = self.functions.len() - 1;
         f(&mut CodeBuilder {
@@ -234,6 +236,7 @@ impl ProtoBytecode {
                 args: func.args.clone(),
                 spread_arg: func.spread_arg,
                 captured_regs: func.captured_regs.clone().into(),
+                child_funcs: func.child_funcs.clone().into(),
             })
         }
 
@@ -359,6 +362,10 @@ impl<'a> CodeBuilder<'a> {
         let r = Register(self.proto_bytecode.functions[self.func].regs_used);
         self.proto_bytecode.functions[self.func].regs_used += 1;
         r
+    }
+
+    pub fn add_child_func(&mut self, f: FuncID) {
+        self.proto_bytecode.functions[self.func].child_funcs.push(f)
     }
 
     pub fn new_block<F: FnOnce(&mut CodeBuilder) -> CompileResult<()>>(

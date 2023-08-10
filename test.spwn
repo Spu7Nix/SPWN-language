@@ -3,36 +3,21 @@
 
 
 
-// a = counter(234534, reset = false, bits = 16)
-// b = counter(372, reset = false, bits = 16)
-// c = counter(0, reset = false, bits = 16)
+// a = counter(0, reset = false, bits = 16)
+// b = counter(1, reset = false, bits = 16)
 // a.display(45, 45)
-// b.display(45 + 60, 45)
-// c.display(45 + 120, 45)
 // // bitchass shut youR BITCH ASS up life it never die woemtn are my favorite guy I am going yp EAT this listtle chinese boy how old are you 18 LOUDER 18 YOU ARE so yummy yummy yummy yummy fat fat fat!!!! HAHAHAHAHAHAH GET moley ON YOUR PhOne
 // // push bitch push
-// while_loop(() => a > 0, () {
-//     a -= b
-//     c += 1;
-// })
 
-// c -= 1;
+// // on(touch(),)
 
-
-
-
+// while_loop(() => a < 200, () {
+//     c = a + b;
+//     a = b;
+//     b = c;
+// }, 0.25);
 
 
-f = (a, b) {
-    dbg a;
-    dbg b;
-}
 
-f(1, 5)
 
-// a = 6;
-// dbg a;
-// &mut b = a;
-// dbg a;
-// b = 5;
-// dbg a;
+

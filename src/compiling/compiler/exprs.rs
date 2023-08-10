@@ -472,6 +472,8 @@ impl Compiler<'_> {
                     expr.span,
                 )?;
 
+                builder.add_child_func(func_id);
+
                 if is_debug {
                     builder.mark_func_debug(func_id)
                 }

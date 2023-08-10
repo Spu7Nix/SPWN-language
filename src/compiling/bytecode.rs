@@ -183,6 +183,8 @@ pub struct Function<T: RegNum> {
     pub args: ImmutVec<Spanned<(Option<ImmutStr>, Mutability)>>,
     pub spread_arg: Option<u8>,
     pub captured_regs: ImmutVec<(Register<T>, Register<T>)>,
+
+    pub child_funcs: ImmutVec<FuncID>,
 }
 pub type OptFunction = Function<u8>;
 pub type UnoptFunction = Function<usize>;
@@ -249,7 +251,7 @@ mod debug_bytecode {
         }
     }
 
-    impl OptBytecode {
+    impl<T: RegNum> Bytecode<T> {
         pub fn debug_str(&self, src: &Rc<SpwnSource>, debug_funcs: Option<&[FuncID]>) {
             if matches!(&**src, SpwnSource::Core(..) | SpwnSource::Std(..)) {
                 return;
@@ -504,6 +506,13 @@ mod debug_bytecode {
                                     to.to_string().bright_red().to_string(),
                                 )
                             })
+                            .join(", "),
+                    ),
+                    (
+                        "child funcs",
+                        func.child_funcs
+                            .iter()
+                            .map(|v| format!("F{}", **v).bright_magenta().bold())
                             .join(", "),
                     ),
                 ];

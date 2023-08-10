@@ -11,12 +11,9 @@ impl<T: RegNum> Opcode<Register<T>> {
             Opcode::Return { src, module_ret } => return vec![],
             // Opcode::PushContextGroup { src } => todo!(),
             // Opcode::PopGroupStack { fn_reg } => todo!(),
-            Opcode::SetContextGroup { reg } => todo!(),
             Opcode::YeetContext => return vec![],
             Opcode::EnterArrowStatement { skip } => vec![skip],
             Opcode::Throw { reg } => return vec![],
-            Opcode::PushTryCatch { reg, to } => todo!(),
-            Opcode::PopTryCatch => todo!(),
             _ => vec![],
         };
         if idx < len - 1 {
@@ -76,7 +73,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             Opcode::IntoIterator { src, dest } => vec![src],
             Opcode::IterNext { src, dest } => vec![src],
             Opcode::AllocArray { dest, len } => vec![],
-            Opcode::PushArrayElem { elem, dest } => vec![dest],
+            Opcode::PushArrayElem { elem, dest } => vec![elem, dest],
             Opcode::AllocDict { dest, capacity } => vec![],
             Opcode::InsertDictElem { elem, dest, key } => vec![elem, dest, key],
             Opcode::InsertPrivDictElem { elem, dest, key } => vec![elem, dest, key],
@@ -121,7 +118,11 @@ impl<T: RegNum> Opcode<Register<T>> {
             } => vec![check_reg, value_reg],
             Opcode::PushTryCatch { reg, to } => vec![reg],
             Opcode::PopTryCatch => vec![],
-            Opcode::CreateMacro { func, dest } => vec![],
+            Opcode::CreateMacro { func, dest } => code.functions[*func as usize]
+                .captured_regs
+                .iter()
+                .map(|(r, _)| *r)
+                .collect(),
             Opcode::PushMacroDefault { to, from, arg } => vec![to, from],
             Opcode::MarkMacroMethod { reg } => vec![reg],
             Opcode::Call { base, call } => {

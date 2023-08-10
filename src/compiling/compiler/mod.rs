@@ -232,8 +232,9 @@ impl Compiler<'_> {
             span,
         )?;
         let mut unopt_code = code.build(&self.src, self).unwrap();
+        // unopt_code.debug_str(&self.src, None);
 
-        // optimize_code(&mut unopt_code);
+        optimize_code(&mut unopt_code);
 
         let opt_code = OptBytecode {
             source_hash: unopt_code.source_hash,
@@ -260,6 +261,7 @@ impl Compiler<'_> {
                             .map(|&(a, b)| (a.try_into().unwrap(), b.try_into().unwrap()))
                             .collect_vec()
                             .into(),
+                        child_funcs: f.child_funcs.clone(),
                     };
                     opt_func
                 })
