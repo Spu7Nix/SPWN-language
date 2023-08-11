@@ -206,7 +206,7 @@ impl @counter {
         return out
     },
 
-    add_bind: (mut self, action: @int -> ()) {
+    add_bind: (&mut self, action: @int -> ()) {
         self.binds.push(action)
     },
 
@@ -373,6 +373,13 @@ impl @counter {
             val = self.to_const(range)
             closure(val)
         } ()
+    },
+
+    swap: (self, other: @counter) {
+        swap_tmp = compound_counter([self, other], reset = false);
+        self.add_to(swap_tmp)
+        other.add_to(self)
+        swap_tmp.add_to(other)
     },
 
 	// #[doc(u"

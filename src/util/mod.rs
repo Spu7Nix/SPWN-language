@@ -21,6 +21,11 @@ use serde::{Deserialize, Serialize};
 use slab::Slab;
 use widestring::{Utf32Str, Utf32String};
 
+use crate::interpreting::error::RuntimeError;
+use crate::interpreting::value::ValueType;
+use crate::interpreting::vm::{RuntimeResult, Vm};
+use crate::sources::CodeArea;
+
 pub type RandomState = ahash::RandomState;
 pub type Interner = lasso::Rodeo<lasso::Spur, RandomState>;
 
@@ -332,4 +337,26 @@ pub fn clear_ansi(s: &str) -> Cow<'_, str> {
 
 pub fn remove_quotes(s: &str) -> &str {
     &s[1..(s.len() - 1)]
+}
+
+pub fn index_wrap(
+    idx: i64,
+    len: usize,
+    typ: ValueType,
+    area: &CodeArea,
+    vm: &Vm,
+) -> RuntimeResult<usize> {
+    let index_calc = if idx >= 0 { idx } else { len as i64 + idx };
+
+    if index_calc < 0 || index_calc >= len as i64 {
+        return Err(RuntimeError::IndexOutOfBounds {
+            len,
+            index: idx,
+            area: area.clone(),
+            typ,
+            call_stack: vm.get_call_stack(),
+        });
+    }
+
+    Ok(index_calc as usize)
 }

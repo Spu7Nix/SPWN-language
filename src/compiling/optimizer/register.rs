@@ -159,8 +159,8 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
         return false;
     }
 
-    // println!("{func}");
-    // println!("{:?}", coloring);
+    println!("{func}");
+    println!("{:?}", coloring);
 
     {
         let arg_amount = code.functions[*func as usize].args.len();
@@ -185,7 +185,7 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
         }
     }
 
-    // println!("{:?}\n==================\n\n", coloring);
+    println!("{:?}\n==================\n\n", coloring);
 
     let mut changed = false;
 
@@ -233,6 +233,9 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
             _ => {},
         }
     }
+
+    // vec![1,2].remove(index)
+
     for (_, reg) in code.functions[*func as usize].captured_regs.iter_mut() {
         *reg = Register(coloring[**reg]);
     }

@@ -282,6 +282,10 @@ impl Vm {
     }
 
     pub fn next_id(&mut self, c: IDClass) -> u16 {
+        if self.id_counters[c as usize] == u16::MAX {
+            panic!("{:?}", c);
+        }
+
         self.id_counters[c as usize] += 1;
         self.id_counters[c as usize]
     }

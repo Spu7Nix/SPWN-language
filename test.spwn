@@ -1,20 +1,81 @@
 
 
+extract import "libraries/core/lib.spwn"
+extract import "libraries/std/lib.spwn"
 
 
+arr = [88,22,59,60,97,11,69,23,90]
+mut counters = []
+for i in 0..arr.length {
+    group = ?g
+    
+    $.add(obj {
+        OBJ_ID: 1753,
+        X: 45 + 30 * i,
+        Y: 45,
+        ROTATION: 90,
+        SCALING: 30,
+        GROUPS: [group],
+    }, true)
 
-bock = (x) {
-    mut n = 0;
-    return () {
-        n += x;
-        dbg n;
-    }
+    
+    counters.push(counter(reset = false))
+
+    counters[i].add_bind((x) {
+        -> group.move(0, x, 0.2, easing = @easing::EASE_IN_OUT)
+    })
+    counters[i].add_const(arr[i])
 }
+wait(1)
 
 
-hug = bock(5);
-hug();
-hug();
-hug();
-hug();
+while_loop(() => true, () {
+    for j in 0..(counters.length - 1) {
+        -> if counters[j] > counters[j+1] {
+            swap_tmp = counter(?i, reset = true);
+            counters[j].add_to(swap_tmp)
+            counters[j+1].add_to(counters[j])
+            swap_tmp.add_to(counters[j+1])
+        }
+        dbg j;
+        wait(0.1)
+    }
+})
+    
+// grug = !{
+//     for j in 0..(arr.length - 1) {
+//         -> if arr[j] > arr[j+1] {
+//             swap_tmp = counter(?i, reset = true);
+//             arr[j].add_to(swap_tmp)
+//             arr[j+1].add_to(arr[j])
+//             swap_tmp.add_to(arr[j+1])
+//         }
+//     }
+//     call_with_delay(0.)
+// }
+// grug!;
+
+
+// for_loop(0..arr.length, (i) {
+//     j = counter(0)
+
+//     while_loop(() => )
+    
+//     for_loop(0..arr.length, (i) {
+        
+//     })
+// })
+
+
+// mut a = [@counter::{ id: 0 }, @counter::{ id: 1 }, @counter::{ id: 2 }];
+// // dbg a.filter(x => x == 1);
+// dbg a;
+// dbg "jaj";
+// a.sort();
+// dbg a;
+
+// mut a = [7, 2, 81, -2, -1, 3, 3, -6, 8, 9, 3];
+// dbg a;
+// a.sort();
+// dbg a;
 

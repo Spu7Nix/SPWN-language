@@ -11,16 +11,72 @@ impl @array {
 		&mut self: @array,
 		elem: _,
 	) {},
-}
-
-impl @array {
-	map: (
-        mut self,
-        f
-    ) -> @array {
-        for &mut v in self {
-            v = f(v)
-        }
-        return self
-    }
+	
+	#[doc("\nfgdfgdfg")]
+	is_empty: #[builtin] (
+		&self: @array,
+	) {},
+	
+	#[doc("\nlolool")]
+	reverse: #[builtin] (
+		&mut self: @array,
+	) {},
+	
+	#[doc("\nlolool")]
+	clear: #[builtin] (
+		&mut self: @array,
+	) {},
+	
+	#[doc("\nlolool")]
+	pop: #[builtin] (
+		&mut self: @array,
+	) {},
+	
+	#[doc("\nlols")]
+	remove: #[builtin] (
+		&mut self: @array,
+		index: @int,
+	) {},
+	
+	#[doc("\t\nldlw")]
+	shift: #[builtin] (
+		&mut self: @array,
+	) {},
+	
+	#[doc("\nsds")]
+	unshift: #[builtin] (
+		&mut self: @array,
+		elem: _,
+	) {},
+	
+	#[doc("\nsdhefuh")]
+	insert: #[builtin] (
+		&mut self: @array,
+		index: @int,
+		elem: _,
+	) {},
+	
+	#[doc("\ndwhud")]
+	map: #[builtin] (
+		&self: @array,
+		func: @macro,
+	) {},
+	
+	#[doc("\nswuhd")]
+	all: #[builtin] (
+		&self: @array,
+		func: @macro,
+	) {},
+	
+	#[doc("\nswuhd")]
+	any: #[builtin] (
+		&self: @array,
+		func: @macro,
+	) {},
+	
+	#[doc("\ndds")]
+	filter: #[builtin] (
+		&self: @array,
+		func: @macro,
+	) {},
 }
