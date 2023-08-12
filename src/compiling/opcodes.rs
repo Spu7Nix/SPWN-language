@@ -362,6 +362,8 @@ opcodes! {
 
     #[delve(display = |from, op| format!("add {op:?} overload from {from}"))]
     AddOperatorOverload { [from], op: Operator },
+    #[delve(display = |from, op| format!("add private {op:?} overload from {from}"))]
+    AddPrivateOperatorOverload { [from], op: Operator },
     #[delve(display = "<internal>")]
     IncMismatchIdCount,
 }

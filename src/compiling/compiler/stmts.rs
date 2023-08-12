@@ -367,13 +367,23 @@ impl<'a> Compiler<'a> {
                     if matches!(&*v.value().expr, Expression::Macro { .. }) {
                         let macro_reg = self.compile_expr(v.value(), scope, builder)?;
 
-                        builder.push_raw_opcode(
-                            Opcode::AddOperatorOverload {
-                                from: macro_reg,
-                                op: *op,
-                            },
-                            stmt.span,
-                        );
+                        if v.is_priv() {
+                            builder.push_raw_opcode(
+                                Opcode::AddPrivateOperatorOverload {
+                                    from: macro_reg,
+                                    op: *op,
+                                },
+                                stmt.span,
+                            );
+                        } else {
+                            builder.push_raw_opcode(
+                                Opcode::AddOperatorOverload {
+                                    from: macro_reg,
+                                    op: *op,
+                                },
+                                stmt.span,
+                            );
+                        }
                     } else {
                         return Err(CompileError::UnexpectedItemInOverload {
                             area: self.make_area(v.value().span),

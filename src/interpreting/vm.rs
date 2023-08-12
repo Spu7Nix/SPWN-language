@@ -151,7 +151,7 @@ pub struct Vm {
     pub id_counters: [u16; 4],
 
     pub impls: AHashMap<ValueType, AHashMap<ImmutCloneStr32, VisSource<ValueRef>>>,
-    pub overloads: AHashMap<Operator, Vec<ValueRef>>,
+    pub overloads: AHashMap<Operator, Vec<VisSource<ValueRef>>>,
 
     pub pattern_mismatch_id_count: usize,
 }
@@ -1847,7 +1847,17 @@ impl Vm {
                     },
                     Opcode::AddOperatorOverload { from, op } => {
                         let v = self.get_reg_ref(from).clone();
-                        self.overloads.entry(op).or_insert(vec![]).push(v);
+                        self.overloads
+                            .entry(op)
+                            .or_insert(vec![])
+                            .push(VisSource::Public(v));
+                    },
+                    Opcode::AddPrivateOperatorOverload { from, op } => {
+                        let v = self.get_reg_ref(from).clone();
+                        self.overloads
+                            .entry(op)
+                            .or_insert(vec![])
+                            .push(VisSource::Private(v, Rc::clone(&program.src)));
                     },
                     Opcode::IncMismatchIdCount => {
                         self.pattern_mismatch_id_count += 1;
