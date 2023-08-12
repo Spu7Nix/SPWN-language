@@ -1200,33 +1200,7 @@ impl Vm {
                         return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::Dbg { reg, .. } => {
-                        let r = self.get_reg_ref(reg).clone();
-
-                        let mut top = self.context_stack.last_mut().yeet_current().unwrap();
-                        top.ip += 1;
-
-                        let s = self.runtime_display(
-                            top,
-                            &r,
-                            &self.make_area(opcode_span, &program),
-                            &program,
-                        );
-
-                        self.insert_multi(
-                            s,
-                            |ctx, v| {
-                                println!(
-                                    "{} {} {} {} {}",
-                                    v,
-                                    "::".dimmed(),
-                                    ctx.unique_id.to_string().bright_blue(),
-                                    ctx.group.fmt("g").green(),
-                                    format!("{:?}", r.as_ptr()).dimmed(),
-                                    // ctx.stack.len(),
-                                );
-                            },
-                            &mut out_contexts,
-                        );
+                        self.olga_sex(reg, opcode_span, &program, &mut out_contexts);
 
                         return Ok(LoopFlow::ContinueLoop);
                     },
@@ -1938,6 +1912,43 @@ impl Vm {
             .collect()
     }
 
+    fn olga_sex(
+        &mut self,
+        reg: Register<u8>,
+        opcode_span: CodeSpan,
+        program: &Rc<Program>,
+        out_contexts: &mut Vec<Context>,
+    ) {
+        let r = self.get_reg_ref(reg).clone();
+
+        let mut top = self.context_stack.last_mut().yeet_current().unwrap();
+        top.ip += 1;
+
+        let s = self.runtime_display(top, &r, &self.make_area(opcode_span, program), program);
+
+        let gog = self
+            .context_stack
+            .iter()
+            .map(|c| c.contexts.len())
+            .join(", ");
+
+        self.insert_multi(
+            s,
+            |ctx, v| {
+                println!(
+                    "{} {} {} {} {} {}",
+                    v,
+                    "::".dimmed(),
+                    ctx.unique_id.to_string().bright_blue(),
+                    ctx.group.fmt("g").green(),
+                    format!("{:?}", r.as_ptr()).dimmed(),
+                    gog // ctx.stack.len(),
+                );
+            },
+            out_contexts,
+        );
+    }
+
     fn handle_errored_ctx(
         &mut self,
         mut ctx: Context,
@@ -2223,7 +2234,6 @@ impl Vm {
                             },
                             Box::new(move |vm| {
                                 // println!("babagaga1");
-                                let arg_amount = fill.len();
                                 // println!("babagaga2");
                                 for (i, arg) in fill.into_iter().enumerate() {
                                     match arg {

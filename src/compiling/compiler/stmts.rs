@@ -336,7 +336,7 @@ impl<'a> Compiler<'a> {
                 )?;
                 builder.import(import_reg, s, stmt.span);
 
-                self.extract_import(names, types, scope, import_reg, builder, stmt.span);
+                self.extract_import(&names, &types, scope, import_reg, builder, stmt.span);
             },
             Statement::Impl { name, items } => {
                 let mut new_items = items.clone();

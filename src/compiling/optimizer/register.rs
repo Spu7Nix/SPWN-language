@@ -159,8 +159,12 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
         return false;
     }
 
-    println!("{func}");
-    println!("{:?}", coloring);
+    if coloring.len() == coloring.iter().unique().count() {
+        return false;
+    }
+
+    // println!("{func}");
+    // println!("{:?}", coloring);
 
     {
         let arg_amount = code.functions[*func as usize].args.len();
@@ -185,7 +189,7 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
         }
     }
 
-    println!("{:?}\n==================\n\n", coloring);
+    // println!("{:?}\n==================\n\n", coloring);
 
     let mut changed = false;
 
@@ -197,12 +201,7 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
             Opcode::Call { call, .. } => {
                 let mut call_expr = code.call_exprs[*call as usize].clone();
                 let mut expr_changed = false;
-                for reg in call_expr
-                    .dest
-                    .iter_mut()
-                    .chain(call_expr.positional.iter_mut().map(|(r, _)| r))
-                    .chain(call_expr.named.iter_mut().map(|(_, r, _)| r))
-                {
+                for reg in call_expr.get_regs_mut() {
                     if *reg != Register(coloring[**reg]) {
                         *reg = Register(coloring[**reg]);
                         expr_changed = true;
@@ -221,7 +220,7 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
     }
 
     for opcode in code.functions[*func as usize].opcodes.iter_mut() {
-        for reg in opcode.value.get_used_regs() {
+        for reg in opcode.value.get_used_regs_mut() {
             if *reg != Register(coloring[**reg]) {
                 *reg = Register(coloring[**reg]);
                 changed = true;
@@ -252,6 +251,7 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
     }
     code.functions[*func as usize].regs_used = coloring.iter().copied().max().unwrap_or(0) + 1;
 
+    println!("bulimia {}", changed);
     changed
 }
 

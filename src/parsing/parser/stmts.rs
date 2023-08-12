@@ -18,7 +18,7 @@ impl Parser<'_> {
     pub fn parse_statement(&mut self) -> ParseResult<StmtNode> {
         let start = self.peek_span()?;
 
-        let attrs = self.parse_outer_attributes()?;
+        let mut attrs = self.parse_outer_attributes()?;
 
         let is_arrow = if self.next_is(Token::Arrow)? {
             self.next()?;
@@ -220,20 +220,32 @@ impl Parser<'_> {
                 match check.parse_pattern() {
                     Ok(pat) => {
                         let tok = check.peek()?;
-                        if tok == Token::Assign {
+                        let ex = if tok == Token::Assign {
                             check.next()?;
                             self.lexer = check.lexer;
-                            let e = self.parse_expr(true)?;
+
+                            let mut e = self.parse_expr(true)?;
+                            e.attributes.extend(attrs);
+
                             Statement::Assign(pat, e)
                         } else if let Some(op) = tok.to_assign_op() {
                             check.next()?;
                             self.lexer = check.lexer;
-                            let e = self.parse_expr(true)?;
+
+                            let mut e = self.parse_expr(true)?;
+                            e.attributes.extend(attrs);
+
                             Statement::AssignOp(pat, op, e)
                         } else {
-                            let e = self.parse_expr(true)?;
+                            let mut e = self.parse_expr(true)?;
+                            e.attributes.extend(attrs);
+
                             Statement::Expr(e)
-                        }
+                        };
+
+                        attrs = vec![];
+
+                        ex
                     },
                     Err(pattern_err) => {
                         let e = self.parse_expr(true)?;

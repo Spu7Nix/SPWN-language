@@ -4,7 +4,8 @@ use super::bytecode::{Bytecode, RegNum, Register, UnoptBytecode};
 use super::opcodes::{Opcode, OpcodePos};
 use crate::compiling::opcodes::FuncID;
 
-pub mod register;
+mod register;
+mod unused;
 mod util;
 
 pub fn optimize_code(code: &mut UnoptBytecode) {
@@ -24,6 +25,7 @@ pub fn optimize_code(code: &mut UnoptBytecode) {
             println!("jw {}", func);
             // if func == 1 {
             *changed |= register::optimize(code, func);
+            *changed |= unused::optimize(code, func);
             // }
             // *changed |= redundancy::optimize(&mut (*code).functions[func as usize]);
             // *changed |= dead_code::optimize(&mut (*code).functions[func as usize]);
@@ -31,9 +33,9 @@ pub fn optimize_code(code: &mut UnoptBytecode) {
 
         visit(code, FuncID(0), &mut changed);
 
-        // if !changed {
-        break;
-        // }
+        if !changed {
+            break;
+        }
     }
     // for func in &mut code.functions {
     //     println!("{:#?}", func);

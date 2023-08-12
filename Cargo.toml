@@ -6,6 +6,7 @@ edition = "2021"
 [profile.dev]
 opt-level = 1
 incremental = true
+debug = true
 # rustflags = ["link-args=-zstack-size=4194304"]
 
 [dependencies]

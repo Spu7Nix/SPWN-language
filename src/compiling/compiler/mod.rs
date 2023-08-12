@@ -206,7 +206,7 @@ impl Compiler<'_> {
                 //         SpwnSource::Core,
                 //     )?;
                 //     builder.import(import_reg, s, ZEROSPAN);
-                //     self.extract_import(names, types, base_scope, import_reg, builder, ZEROSPAN);
+                //     self.extract_import(&names, &types, base_scope, import_reg, builder, ZEROSPAN);
 
                 //     if !self.find_no_std_attr(&ast.file_attributes) {
                 //         let (names, s, types) = self.compile_import(
@@ -220,7 +220,7 @@ impl Compiler<'_> {
                 //         )?;
                 //         builder.import(import_reg, s, ZEROSPAN);
                 //         self.extract_import(
-                //             names, types, base_scope, import_reg, builder, ZEROSPAN,
+                //             &names, &types, base_scope, import_reg, builder, ZEROSPAN,
                 //         );
                 //     }
                 // }
@@ -243,8 +243,10 @@ impl Compiler<'_> {
         // for func in &unopt_code.functions {
         //     v.push(func.regs_used)
         // }
+        if !self.build_settings.no_optimize_bytecode {
+            optimize_code(&mut unopt_code);
+        }
 
-        // optimize_code(&mut unopt_code);
         // for (idx, func) in unopt_code.functions.iter().enumerate() {
         //     s += &format!("regs: {} -> {}\n", v[idx], func.regs_used)
         // }

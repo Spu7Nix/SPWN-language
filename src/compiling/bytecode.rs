@@ -77,6 +77,22 @@ pub struct CallExpr<Arg, R, S> {
     pub named: ImmutVec<(S, Arg, Mutability)>,
 }
 
+impl<T: RegNum, U> CallExpr<Register<T>, Register<T>, U> {
+    pub fn get_regs(&self) -> impl Iterator<Item = &Register<T>> {
+        self.dest
+            .iter()
+            .chain(self.positional.iter().map(|(r, _)| r))
+            .chain(self.named.iter().map(|(_, r, _)| r))
+    }
+
+    pub fn get_regs_mut(&mut self) -> impl Iterator<Item = &mut Register<T>> {
+        self.dest
+            .iter_mut()
+            .chain(self.positional.iter_mut().map(|(r, _)| r))
+            .chain(self.named.iter_mut().map(|(_, r, _)| r))
+    }
+}
+
 impl Hash for Constant {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -182,7 +198,7 @@ pub struct Function<T: RegNum> {
 
     pub args: ImmutVec<Spanned<(Option<ImmutStr>, Mutability)>>,
     pub spread_arg: Option<u8>,
-    pub captured_regs: ImmutVec<(Register<T>, Register<T>)>,
+    pub captured_regs: Vec<(Register<T>, Register<T>)>,
 
     pub child_funcs: ImmutVec<FuncID>,
 }

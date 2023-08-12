@@ -259,8 +259,8 @@ impl Compiler<'_> {
 
     pub fn extract_import(
         &mut self,
-        names: ImmutVec<ImmutStr>,
-        types: ImmutVec<(CustomTypeID, Spur)>,
+        names: &[ImmutStr],
+        types: &[(CustomTypeID, Spur)],
         scope: ScopeID,
         import_reg: UnoptRegister,
         builder: &mut CodeBuilder,

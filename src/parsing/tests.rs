@@ -72,6 +72,8 @@ macro_rules! expr_eq {
             match &*stmt.stmt {
                 St::Expr(_e) => {
                     assert_eq!(_exprs[i], *_e.expr);
+                    dbg!(&_e.attributes);
+                    $(assert_eq!($attrs, _e.attributes);)?
                 },
                 _ => unreachable!(),
             }
@@ -84,14 +86,15 @@ macro_rules! expr_eq {
 }
 
 macro_rules! stmt_eq {
-    ($ast:ident,[$($stmts:expr),*]) => {
+    ($ast:ident,[$($stmts:expr),*] $(, attrs:$attrs:expr)?) => {
         let _stmts = &[$($stmts),*];
         for (i, stmt) in $ast.statements.iter().enumerate() {
             assert_eq!(&_stmts[i], &*stmt.stmt);
+            $(assert_eq!($attrs, stmt.attributes);)?
         }
     };
 
-    ($ast:ident, $expr:expr) => {
+    ($ast:ident, $expr:expr $(, attrs:$attrs:expr)?) => {
         stmt_eq!($ast, [$expr])
     };
 }
@@ -161,13 +164,13 @@ const _: () = {
         Ex::Import(..) => (),
         Ex::Instance { .. } => (),
         Ex::Obj(..) => (),
-        Ex::Dbg(..) => todo!(),
-        Ex::Match { .. } => todo!(),
+        Ex::Dbg(..) => (),
+        Ex::Match { .. } => (),
     }
     match St::Break {
         St::Expr(..) => (),
         St::AssignOp(..) => (),
-        St::Assign(..) => todo!(),
+        St::Assign(..) => (),
         St::If { .. } => (),
         St::While { .. } => (),
         St::For { .. } => (),
@@ -220,16 +223,113 @@ fn test_file_attrs() -> ParseResult<()> {
 
 #[test]
 fn test_attrs() -> ParseResult<()> {
-    /*
-       DOC: &str = "doc";
-       pub const DEBUG_BYTECODE: &str = "debug_bytecode";
-       pub const BUILTIN: &str = "builtin";
-       pub const ALIAS: &str = "alias";
-       pub const NO_STD: &str = "no_std";
-    */
+    let t = parse(r#"#[doc(u"")] type @int"#)?;
+    stmt_eq!(
+        t,
+        St::TypeDef(Vis::Public(spur!("int"))),
+        attrs: vec![Attribute {
+            style: AttrStyle::Outer,
+            item: AttrItem {
+                namespace: None,
+                name: span!(spur!("doc")),
+                args: AttrArgs::Eq(string!("", flags: { unindent: true }).node())
+            },
+            span: CodeSpan::internal()
+        }]
+    );
+    let t = parse(r##"#[doc = r#""#] type @int"##)?;
+    stmt_eq!(
+        t,
+        St::TypeDef(Vis::Public(spur!("int"))),
+        attrs: vec![Attribute {
+            style: AttrStyle::Outer,
+            item: AttrItem {
+                namespace: None,
+                name: span!(spur!("doc")),
+                args: AttrArgs::Eq(string!("", flags: { unindent: true }).node())
+            },
+            span: CodeSpan::internal()
+        }]
+    );
 
-    let t = parse("")?;
-    expr_eq!(t, Ex::Int(1));
+    let t = parse("#[debug_bytecode] () {}")?;
+    expr_eq!(
+        t,
+        Ex::Macro { args: vec![], ret_pat: None, code: MacroCode::Normal(vec![]) },
+        attrs: vec![Attribute {
+            style: AttrStyle::Outer,
+            item: AttrItem {
+                namespace: None,
+                name: span!(spur!("debug_bytecode")),
+                args: AttrArgs::Empty
+            },
+            span: CodeSpan::internal()
+        }]
+    );
+
+    let t = parse(
+        r#"impl @int {
+            #[builtin] a: () {}
+        }"#,
+    )?;
+    stmt_eq!(
+        t,
+        St::Impl {
+            name: span!(spur!("A")),
+            items: vec![Vis::Public(DictItem {
+                name: span!(spur!("a")),
+                value: Some(
+                    Ex::Macro {
+                        args: vec![],
+                        ret_pat: None,
+                        code: MacroCode::Normal(vec![])
+                    }
+                    .node()
+                ),
+                attributes: vec![Attribute {
+                    style: AttrStyle::Outer,
+                    item: AttrItem {
+                        namespace: None,
+                        name: span!(spur!("builtin")),
+                        args: AttrArgs::Empty
+                    },
+                    span: CodeSpan::internal()
+                }],
+            }),],
+        }
+    );
+
+    let t = parse(
+        r#"impl @int {
+            #[alias = foo] a: () {}
+        }"#,
+    )?;
+    stmt_eq!(
+        t,
+        St::Impl {
+            name: span!(spur!("A")),
+            items: vec![Vis::Public(DictItem {
+                name: span!(spur!("a")),
+                value: Some(
+                    Ex::Macro {
+                        args: vec![],
+                        ret_pat: None,
+                        code: MacroCode::Normal(vec![])
+                    }
+                    .node()
+                ),
+                attributes: vec![Attribute {
+                    style: AttrStyle::Outer,
+                    item: AttrItem {
+                        namespace: None,
+                        name: span!(spur!("alias")),
+                        args: AttrArgs::Eq(Ex::Var(spur!("foo")).node())
+                    },
+                    span: CodeSpan::internal()
+                }],
+            }),],
+        }
+    );
 
     Ok(())
 }
