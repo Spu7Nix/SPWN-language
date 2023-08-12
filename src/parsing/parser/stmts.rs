@@ -184,18 +184,18 @@ impl Parser<'_> {
                     });
                 };
 
-                let vis = if self.next_is(Token::Private)? {
-                    self.next()?;
-                    Vis::Private
-                } else {
-                    Vis::Public
-                };
-
                 self.expect_tok(Token::LBracket)?;
 
                 let mut macros = vec![];
 
                 list_helper!(self, RBracket {
+                    let vis = if self.next_is(Token::Private)? {
+                        self.next()?;
+                        Vis::Private
+                    } else {
+                        Vis::Public
+                    };
+
                     macros.push(vis(self.parse_expr(true)?));
                 });
 

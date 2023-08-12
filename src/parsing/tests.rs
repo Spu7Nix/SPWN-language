@@ -15,7 +15,7 @@ use crate::parsing::ast::{
     AssignPath, AttrArgs, AttrItem, AttrStyle, Attribute, DictItem, Import, ImportType, MacroArg,
     MacroCode, ObjKeyType, ObjectType, Pattern, PatternNode, StringFlags, Vis,
 };
-use crate::parsing::operators::operators::{AssignOp, BinOp, UnaryOp};
+use crate::parsing::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::parsing::parser::ParseResult;
 use crate::sources::{CodeSpan, Spanned, SpwnSource};
 use crate::util::Interner;
@@ -72,7 +72,6 @@ macro_rules! expr_eq {
             match &*stmt.stmt {
                 St::Expr(_e) => {
                     assert_eq!(_exprs[i], *_e.expr);
-                    dbg!(&_e.attributes);
                     $(assert_eq!($attrs, _e.attributes);)?
                 },
                 _ => unreachable!(),
@@ -1779,7 +1778,127 @@ fn test_impl() -> ParseResult<()> {
 
 #[test]
 fn test_overload() -> ParseResult<()> {
-    // todo!("overloading tests");
+    let t = parse(
+        r#"
+        overload + {
+            (left: @int, right: @string) {},
+            private (left: @foo, right: @foo) {}
+        }
+    "#,
+    )?;
+    stmt_eq!(
+        t,
+        St::Overload {
+            op: Operator::Bin(BinOp::Plus),
+            macros: vec![
+                Vis::Public(
+                    Ex::Macro {
+                        args: vec![
+                            MacroArg::Single {
+                                pattern: Pt::Both(
+                                    Pt::Path {
+                                        var: spur!("left"),
+                                        path: vec![],
+                                        is_ref: false
+                                    }
+                                    .node(),
+                                    Pt::Type(spur!("int")).node()
+                                )
+                                .node(),
+                                default: None
+                            },
+                            MacroArg::Single {
+                                pattern: Pt::Both(
+                                    Pt::Path {
+                                        var: spur!("right"),
+                                        path: vec![],
+                                        is_ref: false
+                                    }
+                                    .node(),
+                                    Pt::Type(spur!("string")).node()
+                                )
+                                .node(),
+                                default: None
+                            },
+                        ],
+                        ret_pat: None,
+                        code: MacroCode::Normal(vec![])
+                    }
+                    .node()
+                ),
+                Vis::Private(
+                    Ex::Macro {
+                        args: vec![
+                            MacroArg::Single {
+                                pattern: Pt::Both(
+                                    Pt::Path {
+                                        var: spur!("left"),
+                                        path: vec![],
+                                        is_ref: false
+                                    }
+                                    .node(),
+                                    Pt::Type(spur!("foo")).node()
+                                )
+                                .node(),
+                                default: None
+                            },
+                            MacroArg::Single {
+                                pattern: Pt::Both(
+                                    Pt::Path {
+                                        var: spur!("right"),
+                                        path: vec![],
+                                        is_ref: false
+                                    }
+                                    .node(),
+                                    Pt::Type(spur!("foo")).node()
+                                )
+                                .node(),
+                                default: None
+                            },
+                        ],
+                        ret_pat: None,
+                        code: MacroCode::Normal(vec![])
+                    }
+                    .node()
+                )
+            ]
+        }
+    );
+
+    let t = parse(
+        r#"
+        overload unary - {
+            (value: @bool) {}
+        }
+    "#,
+    )?;
+    stmt_eq!(
+        t,
+        St::Overload {
+            op: Operator::Unary(UnaryOp::Minus),
+            macros: vec![Vis::Public(
+                Ex::Macro {
+                    args: vec![MacroArg::Single {
+                        pattern: Pt::Both(
+                            Pt::Path {
+                                var: spur!("value"),
+                                path: vec![],
+                                is_ref: false
+                            }
+                            .node(),
+                            Pt::Type(spur!("bool")).node()
+                        )
+                        .node(),
+                        default: None
+                    },],
+                    ret_pat: None,
+                    code: MacroCode::Normal(vec![])
+                }
+                .node()
+            )]
+        }
+    );
+
     Ok(())
 }
 

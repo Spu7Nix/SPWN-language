@@ -4,6 +4,8 @@ use delve::EnumDisplay;
 
 use super::tokens::Token;
 
+pub type LexError<T> = Result<T, LexerError>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumDisplay)]
 pub enum LexerError {
     #[delve(display = "Invalid type indicator")]
@@ -81,13 +83,13 @@ impl<'a> Lexer<'a> {
         &self.src[self.token_start..self.token_end]
     }
 
-    pub fn next_or_eof(&mut self) -> Result<Token, LexerError> {
+    pub fn next_or_eof(&mut self) -> LexError<Token> {
         self.next().unwrap_or(Ok(Token::Eof))
     }
 }
 
 impl<'a> Lexer<'a> {
-    fn next_tok(&mut self) -> Option<Result<Token, LexerError>> {
+    fn next_tok(&mut self) -> Option<LexError<Token>> {
         while let Some(c) = self.read() {
             if is_whitespace(c) {
                 self.bump(1);
@@ -540,7 +542,7 @@ impl<'a> Lexer<'a> {
                     },
                     _ => {
                         match self.read() {
-                            Some(b'"' | b'\\') => {
+                            Some(b'"' | b'\'' | b'\\') => {
                                 if self.read_at(-1) == Some(b'r') {
                                     self.bump(-1);
                                 }
@@ -620,12 +622,12 @@ impl<'a> Lexer<'a> {
                     [Some(0xcf), Some(0x87)] => {
                         self.bump(2);
 
-                        if !is!(0, b'0'..=b'9' | b'a'..=b'b') {
+                        if !is!(0, b'0'..=b'9' | b'a'..=b'b' | b'A'..=b'B') {
                             return Some(Err(LexerError::InvalidDozenalLiteral));
                         }
                         self.bump(1);
 
-                        while is!(0, b'0'..=b'9' | b'a'..=b'b' | b'_') {
+                        while is!(0, b'0'..=b'9' | b'a'..=b'b'| b'A'..=b'B' | b'_') {
                             self.bump(1)
                         }
 
@@ -688,7 +690,7 @@ const fn is_whitespace(b: u8) -> bool {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token, LexerError>;
+    type Item = LexError<Token>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_tok()
