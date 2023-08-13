@@ -22,10 +22,10 @@ impl<'a> From<Message<'a>> for String {
     fn from(m: Message<'a>) -> Self {
         match m {
             Message::RemoveObjectsByGroup(group) => {
-                format!(r#"{{"type": "remove_objects", "value": "{group}", "filter": "group"}}"#)
+                format!(r#"{{"type": "REMOVE_OBJECTS_GROUP", "value": {group}}}"#)
             },
             Message::AddObjects(ls) => {
-                format!(r#"{{"type": "add_objects_string", "value": "{ls}"}}"#)
+                format!(r#"{{"type": "ADD_OBJECTS_STRING", "value": "{ls}"}}"#)
             },
         }
     }
@@ -40,7 +40,7 @@ pub struct LiveEditorResult {
 #[derive(EnumDisplay)]
 pub enum WebSocketError {
     #[delve(display = |kind| format!(
-        "Failed to connect to the Live Editor server ({kind}). Make sure the live editor mod is installed and there is no other active connections. ({})",
+        "Failed to connect to the Live Editor server ({kind}). Ensure that the Live Editor mod is installed, the editor is currently open, and there are no other active connections. ({})",
         hyperlink::<_, &str>("https://github.com/iAndyHD3/WSLiveEditor", None)
     ))]
     FailedToConnect(ErrorKind),
