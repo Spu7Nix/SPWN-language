@@ -22,7 +22,7 @@ impl<'a> From<Message<'a>> for String {
     fn from(m: Message<'a>) -> Self {
         match m {
             Message::RemoveObjectsByGroup(group) => {
-			format!(r#"{{"type": "REMOVE_OBJECTS_GROUP", "value": {group}}}"#)
+            format!(r#"{{"type": "REMOVE_OBJECTS_GROUP", "value": {group}}}"#)
             },
             Message::AddObjects(ls) => {
                 format!(r#"{{"type": "ADD_OBJECTS_STRING", "value": "{ls}"}}"#)
