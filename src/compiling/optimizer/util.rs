@@ -139,6 +139,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             Opcode::CallTriggerFunc { func } => vec![func],
             Opcode::SetContextGroup { reg } => vec![reg],
             Opcode::AddOperatorOverload { from, op } => vec![from],
+            Opcode::AddPrivateOperatorOverload { from, op } => vec![from],
             Opcode::IncMismatchIdCount => vec![],
         }
     }
@@ -253,6 +254,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             Opcode::CallTriggerFunc { func } => vec![],
             Opcode::SetContextGroup { reg } => vec![],
             Opcode::AddOperatorOverload { from, op } => vec![],
+            Opcode::AddPrivateOperatorOverload { from, op } => vec![],
             Opcode::IncMismatchIdCount => vec![],
         }
     }

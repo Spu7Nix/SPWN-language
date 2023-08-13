@@ -2359,7 +2359,7 @@ impl Vm {
 
                         self.call_value(
                             ctx,
-                            base.clone(),
+                            base.value().clone(),
                             &[(left_ref, false), (right_ref, false)],
                             &[],
                             self.make_area(span, program),
@@ -2478,7 +2478,7 @@ impl Vm {
 
                         self.call_value(
                             ctx,
-                            base.clone(),
+                            base.value().clone(),
                             &[(left_ref, left_mut), (right_ref, false)],
                             &[],
                             self.make_area(span, program),
@@ -2606,7 +2606,7 @@ impl Vm {
                             ctx.stack.last().unwrap().registers[*value as usize].clone();
                         self.call_value(
                             ctx,
-                            base.clone(),
+                            base.value().clone(),
                             &[(value_ref.clone(), false)],
                             &[],
                             self.make_area(span, program),
