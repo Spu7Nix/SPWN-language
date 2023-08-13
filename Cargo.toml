@@ -1,6 +1,6 @@
 [package]
 name = "spwn"
-version = "0.9.0"
+version = "0.9.0-beta.1"
 edition = "2021"
 
 [profile.dev]

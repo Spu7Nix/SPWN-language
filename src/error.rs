@@ -14,22 +14,6 @@ pub struct ErrorReport {
     pub note: Option<String>,
 }
 
-impl ErrorReport {
-    pub fn fuck(&self) {
-        println!("TITLE: {}", self.title);
-        println!("MESSAGE: {}", self.message);
-        println!("------------------------------");
-        for (area, label) in &self.labels {
-            let snippet = area.src.read().unwrap()[area.span.start..area.span.end].bright_red();
-            println!("{} -> {}", snippet, label);
-        }
-        println!("------------------------------");
-        if let Some(n) = &self.note {
-            println!("NOTE: {}", n);
-        }
-    }
-}
-
 impl std::error::Error for ErrorReport {}
 impl std::fmt::Display for ErrorReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

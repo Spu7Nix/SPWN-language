@@ -1,33 +1,78 @@
+// extra md syntax:
+// ```spwn -> runnable example
+// ``` -> non-runnable example
+// !```spwn -> runnable example that errors
+// !``` -> non-runnable example that errors
+//
+// [`<type name>`] -> auto link to <type name> docs
+// [`path::to::type`] -> link to type
+//
+// > [!NOTE]
+// > ....
+//
+// > [!WARNING]
+// > ....
+//
+// > [!ERROR]
+// > ....
+//
+// > [!IMPORTANT]
+// > ....
+//
+
+mod error;
+
+use std::path::PathBuf;
+use std::rc::Rc;
+
 use ahash::AHashMap;
 
-use crate::lexing::tokens::Token;
+use self::error::DocResult;
+use crate::cli::DocSettings;
+use crate::parsing::ast::Ast;
+use crate::sources::SpwnSource;
+use crate::util::interner::Interner;
 use crate::util::ImmutStr;
 
-struct Deprecated {
-    version: semver::Version,
-    note: ImmutStr,
+pub struct DocCompiler<'a> {
+    settings: &'a DocSettings,
+    src: Rc<SpwnSource>,
+    interner: Interner,
 }
 
-struct DocData {
-    doc: Option<ImmutStr>,
-    deprecated: Option<Deprecated>,
-}
+impl<'a> DocCompiler<'a> {
+    pub fn new(settings: &'a DocSettings, src: Rc<SpwnSource>, interner: Interner) -> Self {
+        Self {
+            settings,
+            src,
+            interner,
+        }
+    }
 
-struct TypeDoc {
-    name: ImmutStr,
-    doc: DocData,
-}
-struct VarDoc {
-    name: ImmutStr,
-    doc: DocData,
-}
-struct ImplDoc {
-    typ: ImmutStr,
-    map: AHashMap<ImmutStr, DocData>,
-}
+    // pub fn make_area(&self, span: CodeSpan) -> CodeArea {
+    //     CodeArea {
+    //         span,
+    //         src: Rc::clone(&self.src),
+    //     }
+    // }
 
-struct FileDoc {
-    types: Vec<TypeDoc>,
-    vars: Vec<VarDoc>,
-    impls: Vec<ImplDoc>,
+    // fn intern(&self, s: &str) -> Spur {
+    //     self.interner.borrow_mut().get_or_intern(s)
+    // }
+
+    // pub fn resolve(&self, s: &Spur) -> ImmutStr {
+    //     self.Interner.resolve(s).into()
+    // }
+
+    // pub fn resolve_32(&self, s: &Spur) -> ImmutStr32 {
+    //     String32::from_chars(self.Interner.resolve(s).chars().collect_vec()).into()
+    // }
+
+    pub fn compile(&self, ast: Ast) -> DocResult<()> {
+        if let Some(t) = &self.settings.target_dir {
+            std::env::set_current_dir(t).expect("todo thiserror");
+        }
+
+        Ok(())
+    }
 }

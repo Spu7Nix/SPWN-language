@@ -19,12 +19,11 @@ use std::time::Instant;
 use clap::Parser as _;
 use cli::{BuildSettings, DocSettings};
 use colored::Colorize;
+use doc::DocCompiler;
 use gd::gd_object::{GdObject, TriggerObject};
 use interpreting::vm::Vm;
 use lasso::Rodeo;
 use sources::BytecodeMap;
-use spinoff::spinners::SpinnerFrames;
-use spinoff::{Spinner as SSpinner, *};
 
 use crate::cli::{Arguments, Command};
 use crate::compiling::builder::ProtoBytecode;
@@ -39,10 +38,13 @@ use crate::interpreting::context::{CallInfo, Context};
 use crate::interpreting::vm::{FuncCoord, Program};
 #[cfg(target_os = "windows")]
 use crate::liveeditor::win::LiveEditorClient;
+#[cfg(target_os = "windows")]
 use crate::liveeditor::Message;
 use crate::parsing::parser::Parser;
 use crate::sources::{SpwnSource, TypeDefMap};
-use crate::util::{hyperlink, BasicError, HexColorize, RandomState};
+use crate::util::interner::Interner;
+use crate::util::spinner::Spinner;
+use crate::util::{hyperlink, BasicError, HexColorize};
 
 mod cli;
 mod compiling;
@@ -58,56 +60,6 @@ mod sources;
 mod util;
 
 const CORE_PATH: &str = "./libraries/core/";
-
-struct Spinner {
-    frames: SpinnerFrames,
-    disabled: bool,
-    spinner: Option<(SSpinner, String)>,
-}
-impl Spinner {
-    pub fn new(disabled: bool) -> Self {
-        Self {
-            frames: spinner!(["◜ ", "◠ ", "◝ ", "◞ ", "◡ ", "◟ "], 50),
-            spinner: None,
-            disabled,
-        }
-    }
-
-    pub fn start(&mut self, msg: String) {
-        if self.disabled {
-            println!("{msg}");
-        } else {
-            self.spinner = Some((SSpinner::new(self.frames.clone(), msg.clone(), None), msg));
-        }
-    }
-
-    pub fn fail(&mut self, msg: Option<String>) {
-        if let Some((spinner, curr_msg)) = self.spinner.take() {
-            spinner.stop_with_message(&format!("{curr_msg} ❌"));
-        } else {
-            println!("\n{}", "══════════════════════════════════".dimmed().bold());
-        }
-        if let Some(m) = msg {
-            eprintln!("\n{m}");
-        }
-    }
-
-    pub fn complete(&mut self, msg: Option<String>) {
-        if let Some((spinner, curr_msg)) = self.spinner.take() {
-            if let Some(m) = msg {
-                spinner.stop_with_message(&format!("{curr_msg} ✅",));
-                println!("{m}");
-            } else {
-                spinner.clear();
-                println!("{curr_msg} ✅")
-            }
-            return;
-        }
-        if let Some(m) = msg {
-            println!("{m}");
-        }
-    }
-}
 
 const READING_COLOR: u32 = 0x7F94FF;
 const PARSING_COLOR: u32 = 0x59C7FF;
@@ -134,11 +86,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::env::set_var("USE_ASCII", "true");
     }
 
+    let mut spinner = Spinner::new(args.no_spinner);
+
     match args.command {
         Command::Build { file, settings } => {
-            let mut spinner = Spinner::new(args.no_spinner);
+            let is_live_editor = if cfg!(target_os = "windows") {
+                settings.live_editor
+            } else {
+                false
+            };
 
-            let gd_path = if !(settings.no_level || settings.live_editor) {
+            let gd_path = if !(settings.no_level || is_live_editor) {
                 Some(if let Some(ref sf) = settings.save_file {
                     sf.clone()
                 } else if cfg!(target_os = "windows") {
@@ -159,7 +117,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None
             };
 
-            let (level_string, level_name) = if !(settings.no_level || settings.live_editor) {
+            let (level_string, level_name) = if !(settings.no_level || is_live_editor) {
                 if let Some(gd_path) = &gd_path {
                     spinner.start(format!(
                         "{:20}",
@@ -214,13 +172,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 mut objects,
                 mut triggers,
                 id_counters,
-            } = match run_spwn(
-                file,
-                &settings,
-                &DocSettings::default(),
-                &mut spinner,
-                false,
-            ) {
+            } = match run_spwn(file, &settings, &mut spinner) {
                 Ok(o) => o,
                 Err(e) => {
                     spinner.fail(Some(format!("❌  {e}")));
@@ -246,7 +198,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             objects.extend(gd_object::apply_triggers(triggers));
 
             println!(
-                "\n{} objects added",
+                "\n{} total objects",
                 (objects.len()).to_string().bright_white().bold()
             );
 
@@ -271,57 +223,57 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("{}", hyperlink("todo <playground link>", Some(&new_ls)));
             }
 
-            if settings.live_editor {
+            if is_live_editor {
+                #[cfg(target_os = "windows")]
+                {
+                    spinner.start(format!(
+                        "{:20}",
+                        "Connecting to Live Editor..."
+                            .color_hex(CONNECTING_COLOR)
+                            .bold()
+                    ));
+
+                    let mut client = LiveEditorClient::try_create_client()?;
+
+                    spinner.complete(None);
+
+                    spinner.start(format!(
+                        "{:20}",
+                        "Sending level string...".bright_green().bold()
+                    ));
+
+                    client.try_send_message(Message::RemoveObjectsByGroup(1001))?;
+                    client.try_send_message(Message::AddObjects(&new_ls))?;
+
+                    spinner.complete(None);
+                }
+            } else if let Some(gd_path) = gd_path {
                 spinner.start(format!(
-                    "{:20}",
-                    "Connecting to Live Editor..."
-                        .color_hex(CONNECTING_COLOR)
-                        .bold()
+                    r#"{} "{}" {:20}"#,
+                    "Writing back to".bright_cyan().bold(),
+                    level_name.bright_white().bold(),
+                    "..."
                 ));
 
-                let mut client = LiveEditorClient::try_create_client()?;
+                levelstring::encrypt_level_string(
+                    new_ls,
+                    level_string,
+                    gd_path,
+                    &settings.level_name,
+                )?;
 
-                spinner.complete(None);
-
-                spinner.start(format!(
-                    "{:20}",
-                    "Sending level string...".bright_green().bold()
-                ));
-
-                client.try_send_message(Message::RemoveObjectsByGroup(1001))?;
-                client.try_send_message(Message::AddObjects(&new_ls))?;
-
-                spinner.complete(None);
-            } else {
-                match gd_path {
-                    Some(gd_path) => {
-                        spinner.start(format!(
-                            r#"{} "{}" {:20}"#,
-                            "Writing back to".bright_cyan().bold(),
-                            level_name.bright_white().bold(),
-                            "..."
-                        ));
-
-                        levelstring::encrypt_level_string(
-                            new_ls,
-                            level_string,
-                            gd_path,
-                            &settings.level_name,
-                        )?;
-
-                        spinner.complete(Some(format!(
-                            "\n👍  {}  🙂",
-                            "Written to save. You can now open Geometry Dash again!"
-                                .bright_green()
-                                .bold(),
-                        )));
-                    },
-
-                    None => println!("\nOutput: {new_ls}",),
-                };
+                spinner.complete(Some(format!(
+                    "\n👍  {}  🙂",
+                    "Written to save. You can now open Geometry Dash again!"
+                        .bright_green()
+                        .bold(),
+                )));
             }
         },
-        Command::Doc { settings } => todo!(),
+        Command::Doc { settings } => {
+            //
+            generate_doc(&settings, &mut spinner)?;
+        },
     };
 
     Ok(())
@@ -329,17 +281,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn run_spwn(
     file: PathBuf,
-    build_settings: &BuildSettings,
-    doc_settings: &DocSettings,
+    settings: &BuildSettings,
     spinner: &mut Spinner,
-    is_doc_gen: bool,
 ) -> Result<SpwnOutput, Box<dyn Error>> {
     let src = Rc::new(SpwnSource::File(file));
     let code = src.read().ok_or(BasicError("Failed to read SPWN file"))?;
 
-    let interner = Rc::new(RefCell::new(Rodeo::with_hasher(RandomState::new())));
+    let interner = Interner::new();
 
-    let mut parser: Parser<'_> = Parser::new(&code, Rc::clone(&src), Rc::clone(&interner));
+    let mut parser: Parser<'_> = Parser::new(&code, Rc::clone(&src), interner.clone());
 
     spinner.start(format!(
         "{:20}",
@@ -360,9 +310,7 @@ fn run_spwn(
 
     let mut compiler = Compiler::new(
         Rc::clone(&src),
-        &build_settings,
-        &doc_settings,
-        is_doc_gen,
+        settings,
         &mut bytecode_map,
         &mut type_def_map,
         interner,
@@ -374,13 +322,13 @@ fn run_spwn(
 
     spinner.complete(None);
 
-    if build_settings.debug_bytecode {
+    if settings.debug_bytecode {
         for (src, code) in &*bytecode_map {
             code.debug_str(&Rc::new(src.clone()), None)
         }
     }
 
-    let mut vm = Vm::new(type_def_map, bytecode_map);
+    let mut vm = Vm::new(type_def_map, bytecode_map, settings.trailing.clone());
 
     let program = Program {
         bytecode: vm.bytecode_map.get(&src).unwrap().clone(),
@@ -394,78 +342,68 @@ fn run_spwn(
     println!("{:20}", "Building...".color_hex(RUNNING_COLOR).bold());
     println!("\n{}", "════ Output ══════════════════════".dimmed().bold());
 
-    // let t = Instant::now();
+    let out = vm.run_function(
+        Context::new(),
+        CallInfo {
+            func: start,
+            call_area: None,
+            is_builtin: None,
+        },
+        Box::new(|_| {}),
+    );
 
-    // #[cfg(debug_assertions)]
-    // {
-    //     return stacker::maybe_grow(32 * 1024, 1024 * 1024, || {
-    //         let out = vm.run_function(
-    //             Context::new(),
-    //             CallInfo {
-    //                 func: start,
-    //                 call_area: None,
-    //                 is_builtin: None,
-    //             },
-    //             Box::new(|_| {}),
-    //         );
-
-    //         for (_, v) in out {
-    //             if let Err(e) = v {
-    //                 // let s = format!("{:#?}", e);
-    //                 // println!("{}", &s[..500]);
-    //                 let report = e.to_report(&vm);
-    //                 report.fuck();
-    //                 Err(report)?
-    //             }
-    //         }
-
-    //         Ok(SpwnOutput {
-    //             objects: vm.objects,
-    //             triggers: vm.triggers,
-    //             id_counters: vm.id_counters,
-    //         })
-    //     });
-    // }
-
-    //.    #[cfg(not(debug_assertions))]
-    {
-        let out = vm.run_function(
-            Context::new(),
-            CallInfo {
-                func: start,
-                call_area: None,
-                is_builtin: None,
-            },
-            Box::new(|_| {}),
-        );
-
-        for (_, v) in out {
-            if let Err(e) = v {
-                // let s = format!("{:#?}", e);
-                // println!("{}", &s[..500]);
-                let report = e.to_report(&vm);
-                report.fuck();
-                Err(report)?
-            }
+    for (_, v) in out {
+        if let Err(e) = v {
+            Err(e.to_report(&vm))?;
         }
-
-        return Ok(SpwnOutput {
-            objects: vm.objects,
-            triggers: vm.triggers,
-            id_counters: vm.id_counters,
-        });
     }
 
-    // vm.objects
+    println!("\n{}", "══════════════════════════════════".dimmed().bold());
 
-    // .map_err(|e| e.to_report(&vm))?;
-
-    // println!("\n{}", "══════════════════════════════════".dimmed().bold());
-    // println!("{}", t.elapsed().as_secs_f64());
+    Ok(SpwnOutput {
+        objects: vm.objects,
+        triggers: vm.triggers,
+        id_counters: vm.id_counters,
+    })
 }
-// fn g(v: [u32; 5]) {
-//     // match a {
-//     //     1..=5 => todo!(),
-//     // }
-//     Box::new(x)
-// }
+
+fn generate_doc(settings: &DocSettings, spinner: &mut Spinner) -> Result<(), Box<dyn Error>> {
+    let file: PathBuf = if let Some(file) = &settings.file {
+        file.into()
+    } else if let Some(lib) = &settings.lib {
+        let p: PathBuf = lib.into();
+
+        if p.is_file() {
+            Err(BasicError(
+                "`--lib`/`-l` argument expected a library, found file",
+            ))?;
+        }
+
+        p.join("lib.spwn")
+    } else {
+        unreachable!("BUG: no file/lib specified")
+    };
+
+    let src = Rc::new(SpwnSource::File(file));
+    let code = src.read().ok_or(BasicError("Failed to read SPWN file"))?;
+
+    let interner = Interner::new();
+
+    let mut parser: Parser<'_> = Parser::new(&code, Rc::clone(&src), interner.clone());
+
+    spinner.start(format!(
+        "{:20}",
+        "Generating Documentation..."
+            .color_hex(PARSING_COLOR)
+            .bold()
+    ));
+
+    let ast = parser.parse().map_err(|e| e.to_report())?;
+
+    let compiler = DocCompiler::new(settings, src, interner);
+    //compiler.compile(ast)?;
+
+    spinner.complete(None);
+
+    Ok(())
+}

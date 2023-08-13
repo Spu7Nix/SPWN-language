@@ -18,8 +18,7 @@ use crate::parsing::ast::{
 use crate::parsing::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::parsing::parser::ParseResult;
 use crate::sources::{CodeSpan, Spanned, SpwnSource};
-use crate::util::Interner;
-use crate::RandomState;
+use crate::util::interner::Interner;
 
 type Pt = Pattern<Spur, PatternNode, ExprNode, Spur>;
 
@@ -63,7 +62,7 @@ impl IntoNode<PatternNode> for Pt {
     }
 }
 
-static mut INTERNER: Option<Rc<RefCell<Interner>>> = None;
+static mut INTERNER: Option<Interner> = None;
 
 macro_rules! expr_eq {
     ($ast:ident,[$($exprs:expr),*] $(, attrs:$attrs:expr)?) => {
@@ -109,9 +108,8 @@ macro_rules! span {
 
 macro_rules! spur {
     ($str:literal) => {{
-        let v = unsafe { INTERNER.as_ref().unwrap() };
-        let mut i = v.borrow_mut();
-        i.get_or_intern($str)
+        let mut v = unsafe { INTERNER.as_ref().unwrap() };
+        v.get_or_intern($str)
     }};
 }
 
@@ -187,14 +185,10 @@ const _: () = {
 };
 
 fn parse(code: &'static str) -> ParseResult<Ast> {
-    unsafe {
-        INTERNER = Some(Rc::new(RefCell::new(
-            Rodeo::with_hasher(RandomState::new()),
-        )))
-    };
+    unsafe { INTERNER = Some(Interner::new()) };
 
     let mut parser = Parser::new(code, Rc::new(SpwnSource::File("<test>".into())), unsafe {
-        Rc::clone(INTERNER.as_ref().unwrap())
+        INTERNER.as_ref().unwrap().clone()
     });
 
     parser.parse()

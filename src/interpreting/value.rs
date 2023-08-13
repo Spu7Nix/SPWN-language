@@ -173,7 +173,7 @@ macro_rules! value {
 
         pub mod value_structs {
             use super::*;
-            
+
             #[derive(Debug, PartialEq, Clone)]
             pub struct FieldGetter<'a, T, const MUT: bool> {
                 value_ref: &'a ValueRef,
@@ -197,7 +197,7 @@ macro_rules! value {
                 pub fn borrow_mut(&'a self) -> std::cell::RefMut<'a, T> {
                     (self.getter_mut)(self.value_ref)
                 }
-            } 
+            }
 
 
             paste::paste! {
@@ -221,7 +221,7 @@ macro_rules! value {
                             pub fn area(&'a self) -> CodeArea {
                                 stringify!($tuple_typ);
                                 self.0.parent_area()
-                                
+
                                 // const VALUE_REF_SIZE: usize = std::mem::size_of::<ValueRef>();
                                 // const STRUCT_SIZE: usize = std::mem::size_of::<$name>();
 
@@ -263,9 +263,9 @@ macro_rules! value {
                     impl<'a, const MUT: bool> [<$name Getter>]<'a, MUT> {
                         pub const fn make_from(vref: &'a ValueRef) -> Self {
                             value! { @make
-                                Self 
-                                $( 
-                                    ( 
+                                Self
+                                $(
+                                    (
                                         FieldGetter::<'a, $tuple_typ, MUT> {
                                             value_ref: vref,
                                             getter: |vr: &ValueRef| {
@@ -285,10 +285,10 @@ macro_rules! value {
                                                 })
                                             }
                                         }
-                                    ) 
+                                    )
                                 )?
-                                $( 
-                                    { 
+                                $(
+                                    {
                                         $(
                                             $n: FieldGetter::<'a, $t1, MUT> {
                                                 value_ref: vref,
@@ -310,16 +310,16 @@ macro_rules! value {
                                                 }
                                             },
                                         )*
-                                    } 
+                                    }
                                 )?
                             }
-                            
+
                         }
                     }
                 )*
             }
         }
-        
+
         pub mod type_aliases {
             use super::*;
 
@@ -541,7 +541,7 @@ impl Value {
                 arr.iter()
                     .map(|c| {
                         let value = Value::from_const(vm, c, area.clone());
-                        ValueRef::new(value.into_stored(area.clone()))
+                        value.into_value_ref(area.clone())
                     })
                     .collect(),
             ),
@@ -552,14 +552,14 @@ impl Value {
                         // let g = s.into_utfstring();
                         (
                             s.clone().into_utfstring().into(),
-                            VisSource::Public(ValueRef::new(value.into_stored(area.clone()))),
+                            VisSource::Public(value.into_value_ref(area.clone())),
                         )
                     })
                     .collect(),
             ),
             Constant::Maybe(o) => Value::Maybe(o.clone().map(|c| {
                 let value = Value::from_const(vm, &c, area.clone());
-                ValueRef::new(value.into_stored(area.clone()))
+                value.into_value_ref(area.clone())
             })),
             Constant::Builtins => Value::Builtins,
             Constant::Empty => Value::Empty,
@@ -571,7 +571,7 @@ impl Value {
                         let value = Value::from_const(vm, c, area.clone());
                         (
                             s.clone().into_utfstring().into(),
-                            VisSource::Public(ValueRef::new(value.into_stored(area.clone()))),
+                            VisSource::Public(value.into_value_ref(area.clone())),
                         )
                     })
                     .collect(),
@@ -581,5 +581,9 @@ impl Value {
 
     pub fn into_stored(self, area: CodeArea) -> StoredValue {
         StoredValue { value: self, area }
+    }
+
+    pub fn into_value_ref(self, area: CodeArea) -> ValueRef {
+        ValueRef::new(self.into_stored(area))
     }
 }

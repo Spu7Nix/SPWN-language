@@ -11,7 +11,7 @@ pub struct Alias {
 impl Compiler<'_> {
     fn find_attr_by_str_name(&self, attrs: &[Attribute], name: &str) -> bool {
         for attr in attrs {
-            if self.interner.borrow().resolve(&*attr.item.name) != name {
+            if &*self.interner.resolve(&attr.item.name) != name {
                 continue;
             }
 
@@ -34,7 +34,7 @@ impl Compiler<'_> {
 
     pub fn find_alias_attr(&self, attrs: &[Attribute]) -> CompileResult<Option<Spanned<Alias>>> {
         for attr in attrs {
-            if self.interner.borrow().resolve(&*attr.item.name) != attr_names::ALIAS {
+            if &*self.interner.resolve(&*attr.item.name) != attr_names::ALIAS {
                 continue;
             }
 
@@ -43,7 +43,7 @@ impl Compiler<'_> {
                     Expression::Var(s) => {
                         return Ok(Some(
                             Alias {
-                                name: self.interner.borrow().resolve(s).into(),
+                                name: self.interner.resolve(s).into(),
                             }
                             .spanned(attr.span),
                         ))

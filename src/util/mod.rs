@@ -1,3 +1,6 @@
+pub mod interner;
+pub(crate) mod spinner;
+
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::hash_map::Drain;
@@ -10,10 +13,12 @@ use std::path::PathBuf;
 use std::process::Output;
 use std::rc::Rc;
 
-use ahash::AHashMap;
+use ahash::{AHashMap, RandomState};
 use bincode::de;
 use colored::{ColoredString, Colorize};
+use derive_more::{Deref, DerefMut};
 use itertools::Itertools;
+use lasso::{Rodeo, Spur};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::ser::SerializeSeq;
@@ -25,9 +30,6 @@ use crate::interpreting::error::RuntimeError;
 use crate::interpreting::value::ValueType;
 use crate::interpreting::vm::{RuntimeResult, Vm};
 use crate::sources::CodeArea;
-
-pub type RandomState = ahash::RandomState;
-pub type Interner = lasso::Rodeo<lasso::Spur, RandomState>;
 
 pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
     let mtext = match &text {
@@ -146,9 +148,14 @@ impl<T: Colorize> HexColorize for T {
     }
 }
 
-#[derive(Debug)]
 pub struct BasicError<T: fmt::Display>(pub(crate) T);
 impl<T: fmt::Display + fmt::Debug> std::error::Error for BasicError<T> {}
+
+impl<T: fmt::Display> fmt::Debug for BasicError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl<T: fmt::Display> fmt::Display for BasicError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

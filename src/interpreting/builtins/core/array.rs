@@ -16,31 +16,31 @@ impl_type! {
         fn push(&mut Array(slf) as "self", elem) {
             slf.borrow_mut().push(vm.deep_clone_ref(elem));
 
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// fgdfgdfg
         fn is_empty(&Array(slf) as "self") {
             let is_empty = slf.borrow().is_empty();
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Bool(is_empty).into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Bool(is_empty).into_value_ref(area)))
         }
 
         /// lolool
         fn reverse(&mut Array(slf) as "self") {
             slf.borrow_mut().reverse();
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// lolool
         fn clear(&mut Array(slf) as "self") {
             slf.borrow_mut().clear();
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// lolool
         fn pop(&mut Array(slf) as "self") {
             let elem = slf.borrow_mut().pop().map(|a| Value::Maybe(Some(a))).unwrap_or(Value::Maybe(None));
-            Multi::new_single(ctx, Ok(ValueRef::new(elem.into_stored(area))))
+            Multi::new_single(ctx, Ok(elem.into_value_ref(area)))
         }
 
         /// lols
@@ -61,15 +61,15 @@ impl_type! {
             let len = slf.borrow().len();
             let elem = slf.borrow_mut().remove(match index_wrap(0, len, ValueType::Array, &area, vm) {
                 Ok(idx) => idx,
-                Err(e) => return Multi::new_single(ctx, Ok(ValueRef::new(Value::Maybe(None).into_stored(area))))
+                Err(e) => return Multi::new_single(ctx, Ok(Value::Maybe(None).into_value_ref(area)))
             });
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Maybe(Some(elem)).into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Maybe(Some(elem)).into_value_ref(area)))
         }
 
         /// sds
         fn unshift(&mut Array(slf) as "self", elem) {
             slf.borrow_mut().insert(0, vm.deep_clone_ref(elem));
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// sdhefuh
@@ -82,7 +82,7 @@ impl_type! {
             };
 
             slf.borrow_mut().insert(idx, vm.deep_clone_ref(elem));
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// dwhud
@@ -111,7 +111,7 @@ impl_type! {
                 });
             }
 
-            ret.try_map(|ctx, v| (ctx, Ok(ValueRef::new(Value::Array(v).into_stored(area.clone())))))
+            ret.try_map(|ctx, v| (ctx, Ok(Value::Array(v).into_value_ref(area.clone()))))
         }
 
 
@@ -158,7 +158,7 @@ impl_type! {
                 });
             }
 
-            ret.try_map(|ctx, v| (ctx, Ok(ValueRef::new(Value::Bool(v).into_stored(area.clone())))))
+            ret.try_map(|ctx, v| (ctx, Ok(Value::Bool(v).into_value_ref(area.clone()))))
         }
 
         /// swuhd
@@ -204,7 +204,7 @@ impl_type! {
                 });
             }
 
-            ret.try_map(|ctx, v| (ctx, Ok(ValueRef::new(Value::Bool(v).into_stored(area.clone())))))
+            ret.try_map(|ctx, v| (ctx, Ok(Value::Bool(v).into_value_ref(area.clone()))))
         }
 
         /// dds
@@ -252,7 +252,7 @@ impl_type! {
                 });
             }
 
-            ret.try_map(|ctx, v| (ctx, Ok(ValueRef::new(Value::Array(v).into_stored(area.clone())))))
+            ret.try_map(|ctx, v| (ctx, Ok(Value::Array(v).into_value_ref(area.clone()))))
         }
 
     }

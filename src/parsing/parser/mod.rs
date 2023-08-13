@@ -15,19 +15,19 @@ use super::error::SyntaxError;
 use crate::lexing::lexer::{Lexer, LexerError};
 use crate::lexing::tokens::Token;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
-use crate::util::Interner;
+use crate::util::interner::Interner;
 
 #[derive(Clone)]
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     pub src: Rc<SpwnSource>,
-    interner: Rc<RefCell<Interner>>,
+    interner: Interner,
 }
 
 pub type ParseResult<T> = Result<T, SyntaxError>;
 
 impl<'a> Parser<'a> {
-    pub fn new(code: &'a str, src: Rc<SpwnSource>, interner: Rc<RefCell<Interner>>) -> Self {
+    pub fn new(code: &'a str, src: Rc<SpwnSource>, interner: Interner) -> Self {
         let lexer = Lexer::new(code);
         Parser {
             lexer,
@@ -108,7 +108,7 @@ impl Parser<'_> {
     }
 
     pub fn slice_interned(&self) -> Spur {
-        self.interner.borrow_mut().get_or_intern(self.lexer.slice())
+        self.interner.get_or_intern(self.lexer.slice())
     }
 
     pub fn peek(&self) -> ParseResult<Token> {
@@ -179,11 +179,11 @@ impl Parser<'_> {
     }
 
     fn intern_string<T: AsRef<str>>(&self, string: T) -> Spur {
-        self.interner.borrow_mut().get_or_intern(string)
+        self.interner.get_or_intern(string)
     }
 
     pub fn resolve(&self, s: &Spur) -> Box<str> {
-        self.interner.borrow_mut().resolve(s).into()
+        self.interner.resolve(s).into()
     }
 
     pub fn parse(&mut self) -> ParseResult<Ast> {

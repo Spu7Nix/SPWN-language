@@ -25,9 +25,8 @@ use crate::compiling::builder::ProtoBytecode;
 use crate::new_id_wrapper;
 use crate::parsing::ast::{Ast, Import, ImportType, PatternNode, Statements, Vis};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap, ZEROSPAN};
-use crate::util::{
-    ImmutStr, ImmutStr32, ImmutVec, Interner, SlabMap, Str32, String32, BUILTIN_DIR,
-};
+use crate::util::interner::Interner;
+use crate::util::{ImmutStr, ImmutStr32, ImmutVec, SlabMap, Str32, String32, BUILTIN_DIR};
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
@@ -81,13 +80,11 @@ pub struct DeferredTriggerFunc {
 
 pub struct Compiler<'a> {
     src: Rc<SpwnSource>,
-    interner: Rc<RefCell<Interner>>,
+    interner: Interner,
     scopes: SlabMap<ScopeID, Scope>,
     pub global_return: Option<Spanned<ImmutVec<Spanned<Spur>>>>,
 
-    build_settings: &'a BuildSettings,
-    doc_settings: &'a DocSettings,
-    is_doc_gen: bool,
+    settings: &'a BuildSettings,
 
     bytecode_map: &'a mut BytecodeMap,
     pub type_def_map: &'a mut TypeDefMap,
@@ -101,12 +98,10 @@ pub struct Compiler<'a> {
 impl<'a> Compiler<'a> {
     pub fn new(
         src: Rc<SpwnSource>,
-        build_settings: &'a BuildSettings,
-        doc_settings: &'a DocSettings,
-        is_doc_gen: bool,
+        settings: &'a BuildSettings,
         bytecode_map: &'a mut BytecodeMap,
         type_def_map: &'a mut TypeDefMap,
-        interner: Rc<RefCell<Interner>>,
+        interner: Interner,
     ) -> Self {
         Self {
             src,
@@ -115,9 +110,7 @@ impl<'a> Compiler<'a> {
             global_return: None,
             local_type_defs: SlabMap::new(),
             available_custom_types: AHashMap::new(),
-            build_settings,
-            doc_settings,
-            is_doc_gen,
+            settings,
             bytecode_map,
             type_def_map,
             deferred_trigger_func_stack: vec![],
@@ -134,15 +127,15 @@ impl Compiler<'_> {
     }
 
     fn intern(&self, s: &str) -> Spur {
-        self.interner.borrow_mut().get_or_intern(s)
+        self.interner.get_or_intern(s)
     }
 
     pub fn resolve(&self, s: &Spur) -> ImmutStr {
-        self.interner.borrow().resolve(s).into()
+        self.interner.resolve(s).into()
     }
 
     pub fn resolve_32(&self, s: &Spur) -> ImmutStr32 {
-        String32::from_chars(self.interner.borrow().resolve(s).chars().collect_vec()).into()
+        String32::from_chars(self.interner.resolve(s).chars().collect_vec()).into()
     }
 
     pub fn src_hash(&self) -> u32 {
@@ -243,7 +236,7 @@ impl Compiler<'_> {
         // for func in &unopt_code.functions {
         //     v.push(func.regs_used)
         // }
-        if !self.build_settings.no_optimize_bytecode {
+        if !self.settings.no_optimize_bytecode {
             optimize_code(&mut unopt_code);
         }
 
@@ -314,7 +307,7 @@ impl Compiler<'_> {
                 .collect_vec(),
         };
 
-        if !self.build_settings.debug_bytecode && !opt_code.debug_funcs.is_empty() {
+        if !self.settings.debug_bytecode && !opt_code.debug_funcs.is_empty() {
             opt_code.debug_str(&self.src, Some(&opt_code.debug_funcs))
         }
 

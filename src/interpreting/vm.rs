@@ -32,7 +32,7 @@ use crate::interpreting::value::{BuiltinClosure, MacroData};
 use crate::parsing::ast::{ObjectType, Vis, VisSource, VisTrait};
 use crate::parsing::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap};
-use crate::util::{ImmutCloneStr32, ImmutStr, Str32, String32};
+use crate::util::{ImmutCloneStr32, ImmutStr, ImmutVec, Str32, String32};
 
 const RECURSION_LIMIT: usize = 256;
 
@@ -154,10 +154,12 @@ pub struct Vm {
     pub overloads: AHashMap<Operator, Vec<VisSource<ValueRef>>>,
 
     pub pattern_mismatch_id_count: usize,
+
+    pub trailing_args: Vec<String>,
 }
 
 impl Vm {
-    pub fn new(type_def_map: TypeDefMap, bytecode_map: BytecodeMap) -> Self {
+    pub fn new(type_def_map: TypeDefMap, bytecode_map: BytecodeMap, trailing: Vec<String>) -> Self {
         Self {
             context_stack: ContextStack(vec![]),
             objects: vec![],
@@ -169,6 +171,7 @@ impl Vm {
             impls: AHashMap::new(),
             overloads: AHashMap::new(),
             pattern_mismatch_id_count: 0,
+            trailing_args: trailing,
         }
     }
 
@@ -867,10 +870,7 @@ impl Vm {
                         self.change_reg_multi(
                             dest,
                             s.try_map(|ctx, v| {
-                                (
-                                    ctx,
-                                    Ok(ValueRef::new(Value::Iterator(v).into_stored(area.clone()))),
-                                )
+                                (ctx, Ok(Value::Iterator(v).into_value_ref(area.clone())))
                             }),
                             &mut out_contexts,
                         );
@@ -1252,10 +1252,8 @@ impl Vm {
                             s.try_map(|ctx, v| {
                                 (
                                     ctx,
-                                    Ok(ValueRef::new(
-                                        Value::String(String32::from(v).into())
-                                            .into_stored(area.clone()),
-                                    )),
+                                    Ok(Value::String(String32::from(v).into())
+                                        .into_value_ref(area.clone())),
                                 )
                             }),
                             &mut out_contexts,
@@ -1909,10 +1907,10 @@ impl Vm {
             .map(|mut ctx| {
                 let ret = mem::replace(&mut ctx.returned, Ok(None)).map(|mut v| match v.take() {
                     Some(v) => v,
-                    None => ValueRef::new(Value::Empty.into_stored(CodeArea {
+                    None => Value::Empty.into_value_ref(CodeArea {
                         src: Rc::clone(&program.src),
                         span: CodeSpan::internal(),
-                    })),
+                    }),
                 });
 
                 ctx.ip = original_ip;
@@ -2398,7 +2396,7 @@ impl Vm {
                         self,
                         program,
                     )
-                    .map(|v| ValueRef::new(v.into_stored(self.make_area(span, program)))),
+                    .map(|v| v.into_value_ref(self.make_area(span, program))),
                 };
                 (ctx, v)
             }),
@@ -2408,10 +2406,7 @@ impl Vm {
                     Some(Err(err)) => Err(err),
                     None => {
                         return func(left, right, ctx, span, self, program).try_map(|ctx, v| {
-                            (
-                                ctx,
-                                Ok(ValueRef::new(v.into_stored(self.make_area(span, program)))),
-                            )
+                            (ctx, Ok(v.into_value_ref(self.make_area(span, program))))
                         })
                     },
                 };
@@ -2641,7 +2636,7 @@ impl Vm {
                     self,
                     program,
                 )
-                .map(|v| ValueRef::new(v.into_stored(self.make_area(span, program)))),
+                .map(|v| v.into_value_ref(self.make_area(span, program))),
             };
             (ctx, v)
         });
@@ -2701,10 +2696,9 @@ impl Vm {
                 Value::Array(
                     a.into_iter()
                         .map(|(k, v)| {
-                            let s =
-                                ValueRef::new(Value::String(k.clone()).into_stored(area.clone()));
+                            let s = Value::String(k.clone()).into_value_ref(area.clone());
                             let v = self.deep_clone_ref(v.value());
-                            ValueRef::new(Value::Array(vec![s, v]).into_stored(area.clone()))
+                            Value::Array(vec![s, v]).into_value_ref(area.clone())
                         })
                         .collect(),
                 )
@@ -2741,10 +2735,8 @@ impl Vm {
             (Value::String(s), ValueType::Array) => Value::Array(
                 s.chars()
                     .map(|c| {
-                        ValueRef::new(
-                            Value::String(Str32::from_char_slice(&[c]).into())
-                                .into_stored(v.borrow().area.clone()),
-                        )
+                        Value::String(Str32::from_char_slice(&[c]).into())
+                            .into_value_ref(v.borrow().area.clone())
                     })
                     .collect(),
             ),
@@ -3164,7 +3156,7 @@ impl Vm {
                         };
                         extra.n += 1;
 
-                        Multi::new_single(ctx, Ok(ValueRef::new(ret.into_stored(area))))
+                        Multi::new_single(ctx, Ok(ret.into_value_ref(area)))
                     } ctx vm program area extra
                 }
                 MacroData {
@@ -3197,13 +3189,13 @@ impl Vm {
                             Value::Maybe(None)
                         } else {
                             let (k, v) = extra.arr[extra.n].clone();
-                            let k = ValueRef::new(Value::String(k).into_stored(area.clone()));
+                            let k = Value::String(k).into_value_ref(area.clone());
                             let v = v.take_value();
-                            Value::Maybe(Some(ValueRef::new(Value::Array(vec![k, v]).into_stored(area.clone()))))
+                            Value::Maybe(Some(Value::Array(vec![k, v]).into_value_ref(area.clone())))
                         };
                         extra.n += 1;
 
-                        Multi::new_single(ctx, Ok(ValueRef::new(ret.into_stored(area))))
+                        Multi::new_single(ctx, Ok(ret.into_value_ref(area)))
                     } ctx vm program area extra
                 }
                 MacroData {
@@ -3229,11 +3221,11 @@ impl Vm {
                         let ret = if extra.n == extra.end {
                             Value::Maybe(None)
                         } else {
-                            Value::Maybe(Some(ValueRef::new(Value::Int(extra.n).into_stored(area.clone()))))
+                            Value::Maybe(Some(Value::Int(extra.n).into_value_ref(area.clone())))
                         };
                         extra.n += extra.step;
 
-                        Multi::new_single(ctx, Ok(ValueRef::new(ret.into_stored(area))))
+                        Multi::new_single(ctx, Ok(ret.into_value_ref(area)))
                     } ctx vm program area extra
                 }
                 MacroData {

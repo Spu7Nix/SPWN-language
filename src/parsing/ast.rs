@@ -17,7 +17,7 @@ use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
 use crate::interpreting::value::Value;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
-use crate::util::{ImmutStr, Interner};
+use crate::util::interner::Interner;
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
@@ -49,12 +49,12 @@ impl StringContent {
         }
     }
 
-    pub fn get_compile_time(&self, interner: &Rc<RefCell<Interner>>) -> Option<String> {
+    pub fn get_compile_time(&self, interner: &Interner) -> Option<String> {
         if self.flags.bytes {
             return None;
         }
         let mut s = match self.s {
-            StringType::Normal(k) => interner.borrow().resolve(&k).to_string(),
+            StringType::Normal(k) => interner.resolve(&k).to_string(),
             _ => return None,
         };
         if self.flags.unindent {
@@ -392,7 +392,7 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
 }
 
 impl<T, E> Pattern<T, PatternNode, E, Spur> {
-    pub fn is_self(&self, interner: &Rc<RefCell<Interner>>) -> bool {
+    pub fn is_self(&self, interner: &Interner) -> bool {
         match self {
             Pattern::Either(a, b) => a.pat.is_self(interner) || b.pat.is_self(interner),
             Pattern::Both(a, b) => a.pat.is_self(interner) || b.pat.is_self(interner),
@@ -403,8 +403,8 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
                 map.iter().any(|(_, p)| p.pat.is_self(interner))
             },
             Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.is_self(interner)),
-            Pattern::Path { var, .. } => interner.borrow().resolve(var) == "self",
-            Pattern::Mut { name, .. } => interner.borrow().resolve(name) == "self",
+            Pattern::Path { var, .. } => &*interner.resolve(var) == "self",
+            Pattern::Mut { name, .. } => &*interner.resolve(name) == "self",
             Pattern::IfGuard { pat, .. } => pat.pat.is_self(interner),
             _ => false,
         }
@@ -687,13 +687,13 @@ impl Attribute {
         matches!(self.item.args, AttrArgs::Empty)
     }
 
-    pub fn value_str(&self, interner: &Rc<RefCell<Interner>>) -> Option<String> {
+    pub fn value_str(&self, interner: &Interner) -> Option<String> {
         self.item.value_str(interner)
     }
 }
 
 impl AttrItem {
-    fn value_str(&self, interner: &Rc<RefCell<Interner>>) -> Option<String> {
+    fn value_str(&self, interner: &Interner) -> Option<String> {
         match &self.args {
             AttrArgs::Eq(args) => match &*args.expr {
                 Expression::String(s) => s.get_compile_time(interner),

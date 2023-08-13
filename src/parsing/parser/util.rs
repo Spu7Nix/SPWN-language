@@ -178,7 +178,7 @@ impl Parser<'_> {
                     let code = " ".repeat(start + expr_start + 1) + &s;
 
                     let mut parser: Parser<'_> =
-                        Parser::new(&code, Rc::clone(&self.src), Rc::clone(&self.interner));
+                        Parser::new(&code, Rc::clone(&self.src), self.interner.clone());
 
                     let expr = parser.parse_expr(true)?;
 

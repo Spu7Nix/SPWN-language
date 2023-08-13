@@ -180,8 +180,7 @@ impl Compiler<'_> {
             },
         };
 
-        let mut parser: Parser<'_> =
-            Parser::new(&code, Rc::clone(&new_src), Rc::clone(&self.interner));
+        let mut parser: Parser<'_> = Parser::new(&code, Rc::clone(&new_src), self.interner.clone());
 
         let ast = parser
             .parse()
@@ -193,12 +192,10 @@ impl Compiler<'_> {
 
         let mut compiler = Compiler::new(
             Rc::clone(&new_src),
-            self.build_settings,
-            self.doc_settings,
-            self.is_doc_gen,
+            self.settings,
             self.bytecode_map,
             self.type_def_map,
-            Rc::clone(&self.interner),
+            self.interner.clone(),
         );
 
         compiler.compile(&ast, (0..code.len()).into())?;
@@ -214,7 +211,7 @@ impl Compiler<'_> {
         let bytes = bincode::serialize(&*self.bytecode_map[&new_src]).unwrap();
 
         // dont write bytecode if caching is disabled
-        if !self.build_settings.no_bytecode_cache || !self.is_doc_gen {
+        if !self.settings.no_bytecode_cache {
             let _ = std::fs::create_dir(import_base.join(".spwnc"));
             std::fs::write(spwnc_path, bytes).unwrap();
         }

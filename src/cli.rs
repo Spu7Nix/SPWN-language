@@ -64,14 +64,28 @@ pub struct BuildSettings {
     #[cfg(target_os = "windows")]
     #[arg(short = 'e', long)]
     pub live_editor: bool,
+
+    // collects any arguments after `--`
+    #[arg(trailing_var_arg = true)]
+    pub trailing: Vec<String>,
 }
 
 #[derive(Args, Debug, Default)]
 pub struct DocSettings {
-    #[arg(short = 'm', long)]
-    pub module: Option<String>,
+    #[arg(
+        short = 'f',
+        long,
+        required_unless_present("lib"),
+        conflicts_with("lib")
+    )]
+    pub file: Option<String>,
 
-    #[arg(short = 'l', long)]
+    #[arg(
+        short = 'l',
+        long,
+        required_unless_present("file"),
+        conflicts_with("file")
+    )]
     pub lib: Option<String>,
 
     #[arg(short = 't', long)]

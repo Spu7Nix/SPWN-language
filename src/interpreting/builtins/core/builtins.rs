@@ -10,6 +10,7 @@ use crate::interpreting::value::Value;
 use crate::interpreting::value_ops;
 use crate::interpreting::vm::ValueRef;
 use crate::parsing::ast::ObjectType;
+use crate::util::{Str32, String32};
 
 impl_type! {
     impl Builtins {
@@ -45,7 +46,7 @@ impl_type! {
 
                 print!("{}{}", v.iter().join(&sep), end);
 
-                Ok(ValueRef::new(Value::Empty.into_stored(area.clone())))
+                Ok(Value::Empty.into_value_ref(area.clone()))
             }))
         }
 
@@ -84,18 +85,18 @@ impl_type! {
                 ),
             }
 
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// dfdf
         fn epsilon(&Builtins{} as "self") -> "@epsilon" {
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Epsilon.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Epsilon.into_value_ref(area)))
         }
 
         /// dfdf
         fn trigger_fn_context(&Builtins{} as "self") -> "@group" {
             let context_g = Value::Group(ctx.group);
-            Multi::new_single(ctx, Ok(ValueRef::new(context_g.into_stored(area))))
+            Multi::new_single(ctx, Ok(context_g.into_value_ref(area)))
         }
 
         /// dfdf
@@ -103,7 +104,7 @@ impl_type! {
             if !*value.borrow() {
                 return Multi::new_single(ctx, Err(RuntimeError::AssertionFailed { area, call_stack: vm.get_call_stack() }))
             }
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// gg
@@ -111,7 +112,7 @@ impl_type! {
             if !value_ops::equality(&left.borrow().value, &right.borrow().value) {
                 return Multi::new_single(ctx, Err(RuntimeError::EqAssertionFailed { area, call_stack: vm.get_call_stack() }));
             }
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// gfg
@@ -120,7 +121,48 @@ impl_type! {
             vm.hash_value(value, &mut state);
             let hash = state.finish();
 
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Int(hash as i64).into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Int(hash as i64).into_value_ref(area)))
+        }
+
+        /// gfg
+        fn version(&Builtins{} as "self") -> "[@int, @int, @int, @int?]" {
+            let semver = semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("BUG: invalid semver format");
+
+            let v =
+                vec![
+                    Value::Int(semver.major as i64).into_value_ref(area.clone()),
+                    Value::Int(semver.minor as i64).into_value_ref(area.clone()),
+                    Value::Int(semver.patch as i64).into_value_ref(area.clone()),
+                    {
+                        if semver.pre == semver::Prerelease::EMPTY {
+                            Value::Maybe(None).into_value_ref(area.clone())
+                        } else {
+                            let beta = semver.pre.split(".").nth(1).expect("BUG: missing beta version");
+                            Value::Maybe(
+                                Some(
+                                    Value::Int(
+                                        i64::from_str_radix(beta, 10).expect("BUG: invalid beta number")
+                                    ).into_value_ref(area.clone())
+                                )
+                            ).into_value_ref(area.clone())
+                        }
+                    }
+                ];
+
+            Multi::new_single(ctx, Ok(Value::Array(v).into_value_ref(area)))
+        }
+
+        /// gfg
+        fn args(&Builtins{} as "self") -> "@string[]" {
+            let args: Vec<ValueRef> = vm.trailing_args.iter().map(
+                |s| {
+                    Value::String(
+                        String32::from_str(s.as_str()).into()
+                    ).into_value_ref(area.clone())
+                }
+            ).collect();
+
+            Multi::new_single(ctx, Ok(Value::Array(args).into_value_ref(area)))
         }
     }
 }

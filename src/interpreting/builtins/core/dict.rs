@@ -26,7 +26,7 @@ impl_type! {
         fn insert(&mut Dict(slf) as "self", String(key) as "key", &value) {
             slf.borrow_mut().insert(Rc::clone(&*key.borrow()), VisSource::Public(value.clone()));
 
-            Multi::new_single(ctx, Ok(ValueRef::new(Value::Empty.into_stored(area))))
+            Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
     }
