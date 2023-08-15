@@ -14,6 +14,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 
 use super::compiler::{CustomTypeID, LocalTypeID};
+use super::deprecated::DeprecatedFeatures;
 use super::opcodes::{FuncID, Opcode, OptOpcode};
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
@@ -222,6 +223,8 @@ pub struct Bytecode<T: RegNum> {
     pub debug_funcs: Vec<FuncID>,
 
     pub call_exprs: Vec<CallExpr<Register<T>, Register<T>, ImmutStr>>,
+
+    pub deprecated_features: DeprecatedFeatures,
 }
 pub type OptBytecode = Bytecode<u8>;
 pub type UnoptBytecode = Bytecode<usize>;

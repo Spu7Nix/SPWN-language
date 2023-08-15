@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use super::builder::BlockID;
 use super::bytecode::{CallExpr, OptBytecode, OptFunction, UnoptRegister};
+use super::deprecated::DeprecatedFeatures;
 use super::error::CompileError;
 use super::optimizer::optimize_code;
 use crate::cli::{BuildSettings, DocSettings};
@@ -93,6 +94,8 @@ pub struct Compiler<'a> {
     pub available_custom_types: AHashMap<Spur, Vis<CustomTypeID>>,
 
     deferred_trigger_func_stack: Vec<Vec<DeferredTriggerFunc>>,
+
+    pub deprecated_features: DeprecatedFeatures,
 }
 
 impl<'a> Compiler<'a> {
@@ -114,6 +117,7 @@ impl<'a> Compiler<'a> {
             bytecode_map,
             type_def_map,
             deferred_trigger_func_stack: vec![],
+            deprecated_features: DeprecatedFeatures::default(),
         }
     }
 }
@@ -131,11 +135,11 @@ impl Compiler<'_> {
     }
 
     pub fn resolve(&self, s: &Spur) -> ImmutStr {
-        self.interner.resolve(s).into()
+        self.interner.resolve(s)
     }
 
     pub fn resolve_32(&self, s: &Spur) -> ImmutStr32 {
-        String32::from_chars(self.interner.resolve(s).chars().collect_vec()).into()
+        self.interner.resolve_32(s)
     }
 
     pub fn src_hash(&self) -> u32 {
@@ -275,8 +279,7 @@ impl Compiler<'_> {
                             .captured_regs
                             .iter()
                             .map(|&(a, b)| (a.try_into().unwrap(), b.try_into().unwrap()))
-                            .collect_vec()
-                            .into(),
+                            .collect_vec(),
                         child_funcs: f.child_funcs.clone(),
                     };
                     opt_func
@@ -305,6 +308,7 @@ impl Compiler<'_> {
                         .into(),
                 })
                 .collect_vec(),
+            deprecated_features: self.deprecated_features.clone(),
         };
 
         if !self.settings.debug_bytecode && !opt_code.debug_funcs.is_empty() {

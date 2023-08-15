@@ -3,10 +3,11 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use lasso::Spur;
+use semver::Version;
 
 use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType, VarData};
 use crate::compiling::builder::{BlockID, CodeBuilder, JumpType};
-use crate::compiling::bytecode::{OptRegister, UnoptRegister};
+use crate::compiling::bytecode::{OptBytecode, OptRegister, UnoptRegister};
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::Opcode;
 use crate::gd::ids::IDClass;
@@ -16,7 +17,7 @@ use crate::parsing::ast::{
 };
 use crate::parsing::parser::Parser;
 use crate::sources::{CodeSpan, Spannable, SpwnSource};
-use crate::util::{ImmutStr, ImmutVec};
+use crate::util::{Digest, ImmutStr, ImmutVec, VERSION};
 
 impl Compiler<'_> {
     pub fn is_inside_macro(&self, scope: ScopeID) -> Option<Option<Rc<PatternNode>>> {
@@ -180,6 +181,45 @@ impl Compiler<'_> {
             },
         };
 
+        let hash: Digest = md5::compute(&code).into();
+
+        'from_cache: {
+            if spwnc_path.is_file() {
+                let source_bytes = std::fs::read(&spwnc_path).unwrap();
+                let bytecode: OptBytecode = match bincode::deserialize(&source_bytes) {
+                    Ok(b) => b,
+                    Err(_) => {
+                        break 'from_cache;
+                    },
+                };
+
+                // if bytecode.source_hash == hash.into() && bytecode.version == *VERSION {
+                //     for import in &bytecode.import_paths {
+                //         self.compile_import(
+                //             &import.value,
+                //             import.span,
+                //             importer_src.clone(),
+                //             import.get_variant(),
+                //         )?;
+                //     }
+
+                //     for (k, (name, private)) in &bytecode.custom_types {
+                //         self.custom_type_defs.insert(
+                //             TypeDef {
+                //                 def_src: import_src.clone(),
+                //                 name: self.intern(&name.value),
+                //                 private: *private,
+                //             },
+                //             k.spanned(name.span),
+                //         );
+                //     }
+
+                //     self.map.map.insert(import_src, bytecode);
+                //     return Ok(());
+                // }
+            }
+        }
+
         let mut parser: Parser<'_> = Parser::new(&code, Rc::clone(&new_src), self.interner.clone());
 
         let ast = parser
@@ -217,41 +257,6 @@ impl Compiler<'_> {
         }
 
         Ok((export_names.into(), (*new_src).clone(), custom_types))
-
-        // todo: caching
-        // 'from_cache: {
-        //     if spwnc_path.is_file() {
-        //         let source_bytes = std::fs::read(&spwnc_path).unwrap();
-
-        //         let bytecode: Bytecode<Register> = match bincode::deserialize(&source_bytes) {
-        //             Ok(b) => b,
-        //             Err(_) => {
-        //                 break 'from_cache;
-        //             },
-        //         };
-
-        //         if bytecode.source_hash == hash.into()
-        //             && bytecode.spwn_ver == env!("CARGO_PKG_VERSION")
-        //         {
-        //             for import in &bytecode.import_paths {
-        //                 self.compile_import(&import.value, import.span, import_src.clone())?;
-        //             }
-        //             for (k, (name, private)) in &bytecode.custom_types {
-        //                 self.custom_type_defs.insert(
-        //                     TypeDef {
-        //                         def_src: import_src.clone(),
-        //                         name: self.intern(&name.value),
-        //                         private: *private,
-        //                     },
-        //                     k.spanned(name.span),
-        //                 );
-        //             }
-
-        //             self.map.map.insert(import_src, bytecode);
-        //             return Ok(());
-        //         }
-        //     }
-        // }
     }
 
     pub fn extract_import(

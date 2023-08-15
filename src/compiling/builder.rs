@@ -20,7 +20,7 @@ use crate::new_id_wrapper;
 use crate::parsing::ast::VisTrait;
 use crate::parsing::operators::operators::Operator;
 use crate::sources::{CodeSpan, Spannable, Spanned, SpwnSource};
-use crate::util::{ImmutStr, ImmutStr32, ImmutVec, SlabMap, UniqueRegister};
+use crate::util::{ImmutStr, ImmutStr32, ImmutVec, SlabMap, UniqueRegister, VERSION};
 
 new_id_wrapper! {
     BlockID: u16;
@@ -246,7 +246,7 @@ impl ProtoBytecode {
 
         Ok(Bytecode {
             source_hash: md5::compute(src.read().unwrap()).into(),
-            version: Version::parse(env!("CARGO_PKG_VERSION")).unwrap(),
+            version: (*VERSION).clone(),
             constants: constants.into(),
             functions: funcs.into(),
             custom_types: compiler
@@ -270,6 +270,7 @@ impl ProtoBytecode {
             import_paths: import_paths.into(),
             debug_funcs: self.debug_funcs.into(),
             call_exprs: call_exprs.into(),
+            deprecated_features: compiler.deprecated_features.clone(),
         })
 
         // Ok(Bytecode {

@@ -1,42 +1,46 @@
-extract import "libraries/core/lib.spwn"
-extract import "libraries/std/lib.spwn"
 
 
-arr = [18,16,12,4,10,5,6,2,13,0,11,7,17,8,14,1,15,3,9,19]
-mut counters = []
-for i in 0..arr.length {
-    group = ?g
+import bilbo
+
+// extract import "libraries/core/lib.spwn"
+// extract import "libraries/std/lib.spwn"
+
+
+// arr = [18,16,12,4,10,5,6,2,13,0,11,7,17,8,14,1,15,3,9,19]
+// mut counters = []
+// for i in 0..arr.length {
+//     group = ?g
     
-    $.add(obj {
-        OBJ_ID: 1753,
-        X: 45 + 30 * i,
-        Y: 45,
-        ROTATION: 90,
-        SCALING: 30,
-        GROUPS: [group],
-    }, true)
+//     $.add(obj {
+//         OBJ_ID: 1753,
+//         X: 45 + 30 * i,
+//         Y: 45,
+//         ROTATION: 90,
+//         SCALING: 30,
+//         GROUPS: [group],
+//     }, true)
 
     
-    counters.push(counter(reset = false))
+//     counters.push(counter(reset = false))
 
-    counters[i].add_bind((x) {
-        -> group.move(0, x, 0.2, easing = @easing::EASE_IN_OUT)
-    })
-    counters[i].display(45 + 30 * i, 45);
-    counters[i].add_const(arr[i])
-}
-wait(1)
+//     counters[i].add_bind((x) {
+//         -> group.move(0, x, 0.2, easing = @easing::EASE_IN_OUT)
+//     })
+//     counters[i].display(45 + 30 * i, 45);
+//     counters[i].add_const(arr[i])
+// }
+// wait(1)
 
 
-while_loop(() => true, () {
-    for j in 0..(counters.length - 1) {
-        -> if counters[j] > counters[j+1] {
-            swap_tmp = counter(?i, reset = true);
-            counters[j].add_to(swap_tmp)
-            counters[j+1].add_to(counters[j])
-            swap_tmp.add_to(counters[j+1])
-        }
-        dbg j;
-        wait(0.1)
-    }
-})
+// while_loop(() => true, () {
+//     for j in 0..(counters.length - 1) {
+//         -> if counters[j] > counters[j+1] {
+//             swap_tmp = counter(?i, reset = true);
+//             counters[j].add_to(swap_tmp)
+//             counters[j+1].add_to(counters[j])
+//             swap_tmp.add_to(counters[j+1])
+//         }
+//         dbg j;
+//         wait(0.1)
+//     }
+// })

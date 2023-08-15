@@ -21,6 +21,7 @@ use itertools::Itertools;
 use lasso::{Rodeo, Spur};
 use lazy_static::lazy_static;
 use regex::Regex;
+use semver::Version;
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use slab::Slab;
@@ -215,6 +216,11 @@ lazy_static! {
         ".spwn/versions/{}/libraries/",
         env!("CARGO_PKG_VERSION")
     ));
+}
+
+lazy_static! {
+    pub static ref VERSION: Version =
+        Version::parse(env!("CARGO_PKG_VERSION")).expect("BUG: invalid cargo ver");
 }
 
 // this is equivalent to if you were to do
