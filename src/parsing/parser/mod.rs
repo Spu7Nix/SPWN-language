@@ -12,6 +12,7 @@ use lasso::Spur;
 use super::ast::Ast;
 use super::attributes::AttributeTarget;
 use super::error::SyntaxError;
+use crate::compiling::deprecated::DeprecatedFeatures;
 use crate::lexing::lexer::{Lexer, LexerError};
 use crate::lexing::tokens::Token;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
@@ -22,6 +23,8 @@ pub struct Parser<'a> {
     lexer: Lexer<'a>,
     pub src: Rc<SpwnSource>,
     interner: Interner,
+
+    pub deprecated_features: DeprecatedFeatures,
 }
 
 pub type ParseResult<T> = Result<T, SyntaxError>;
@@ -33,6 +36,7 @@ impl<'a> Parser<'a> {
             lexer,
             src,
             interner,
+            deprecated_features: DeprecatedFeatures::default(),
         }
     }
 }
@@ -183,7 +187,7 @@ impl Parser<'_> {
     }
 
     pub fn resolve(&self, s: &Spur) -> Box<str> {
-        self.interner.resolve(s).into()
+        self.interner.resolve(s)
     }
 
     pub fn parse(&mut self) -> ParseResult<Ast> {

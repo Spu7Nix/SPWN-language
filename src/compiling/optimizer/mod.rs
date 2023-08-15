@@ -22,7 +22,7 @@ pub fn optimize_code(code: &mut UnoptBytecode) {
                 visit(code, child, changed)
             }
 
-            println!("jw {}", func);
+            // println!("jw {}", func);
             // if func == 1 {
             *changed |= register::optimize(code, func);
             *changed |= unused::optimize(code, func);

@@ -8,6 +8,7 @@ use semver::Version;
 use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType, VarData};
 use crate::compiling::builder::{BlockID, CodeBuilder, JumpType};
 use crate::compiling::bytecode::{OptBytecode, OptRegister, UnoptRegister};
+use crate::compiling::deprecated::DeprecatedFeatures;
 use crate::compiling::error::CompileError;
 use crate::compiling::opcodes::Opcode;
 use crate::gd::ids::IDClass;
@@ -236,6 +237,7 @@ impl Compiler<'_> {
             self.bytecode_map,
             self.type_def_map,
             self.interner.clone(),
+            DeprecatedFeatures::default(),
         );
 
         compiler.compile(&ast, (0..code.len()).into())?;
@@ -247,6 +249,10 @@ impl Compiler<'_> {
             .filter(|(_, v)| v.is_pub())
             .map(|(id, s)| (*id, compiler.intern(&s.value().value)))
             .collect();
+
+        // self.deprecated
+        //     .empty_type_def
+        //     .extend(compiler.deprecated.empty_type_def);
 
         let bytes = bincode::serialize(&*self.bytecode_map[&new_src]).unwrap();
 

@@ -314,6 +314,7 @@ fn run_spwn(
         &mut bytecode_map,
         &mut type_def_map,
         interner,
+        parser.deprecated_features,
     );
 
     compiler

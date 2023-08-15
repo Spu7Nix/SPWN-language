@@ -251,7 +251,7 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
     }
     code.functions[*func as usize].regs_used = coloring.iter().copied().max().unwrap_or(0) + 1;
 
-    println!("bulimia {}", changed);
+    // println!("bulimia {}", changed);
     changed
 }
 

@@ -1,16 +1,12 @@
-
-
-import bilbo
-
 // extract import "libraries/core/lib.spwn"
-// extract import "libraries/std/lib.spwn"
+// extract import "libraries/std/counter.spwn"
 
 
 // arr = [18,16,12,4,10,5,6,2,13,0,11,7,17,8,14,1,15,3,9,19]
 // mut counters = []
 // for i in 0..arr.length {
 //     group = ?g
-    
+
 //     $.add(obj {
 //         OBJ_ID: 1753,
 //         X: 45 + 30 * i,
@@ -20,7 +16,7 @@ import bilbo
 //         GROUPS: [group],
 //     }, true)
 
-    
+
 //     counters.push(counter(reset = false))
 
 //     counters[i].add_bind((x) {
@@ -44,3 +40,13 @@ import bilbo
 //         wait(0.1)
 //     }
 // })
+
+// type @qoi
+// impl @qoi {
+//     decode: (og_bytes: [@int], debug: @bool = false, spam_debug: @bool = false) -> @qoi {
+//         // ...
+//     },
+//     // ...
+// }
+// file = () -> [@int] => [113,111,105,102,0,0,0,32,0,0,0,32,4,0,254,/*etc*/]
+// output = @qoi::decode(file(), true, false)

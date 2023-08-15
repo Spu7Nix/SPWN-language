@@ -21,7 +21,10 @@ pub enum Token {
     ArbitraryBlockID,
     ArbitraryItemID,
     TypeIndicator,
+
     Mut,
+    Let,
+
     True,
     False,
     Obj,
@@ -107,6 +110,8 @@ impl Token {
     pub fn to_str(self) -> &'static str {
         match self {
             Self::Mut => "mut",
+            Self::Let => "let",
+
             Self::Match => "match",
             Self::Int => "int",
             Self::HexInt => "hex int",

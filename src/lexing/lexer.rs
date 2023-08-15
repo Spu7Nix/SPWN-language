@@ -315,7 +315,7 @@ impl<'a> Lexer<'a> {
 
                         while let Some(c) = self.read() {
                             if c == b'\n' {
-                                self.bump(1);
+                                //self.bump(1);
                                 return self.next();
                             }
                             self.bump(1)
@@ -459,7 +459,10 @@ impl<'a> Lexer<'a> {
                     "else" => Token::Else,
                     "while" => Token::While,
                     "for" => Token::For,
+
                     "mut" => Token::Mut,
+                    "let" => Token::Let,
+
                     "in" => Token::In,
                     "try" => Token::Try,
                     "catch" => Token::Catch,

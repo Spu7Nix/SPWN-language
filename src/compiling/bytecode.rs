@@ -203,6 +203,7 @@ pub struct Function<T: RegNum> {
 
     pub child_funcs: ImmutVec<FuncID>,
 }
+
 pub type OptFunction = Function<u8>;
 pub type UnoptFunction = Function<usize>;
 
@@ -226,6 +227,7 @@ pub struct Bytecode<T: RegNum> {
 
     pub deprecated_features: DeprecatedFeatures,
 }
+
 pub type OptBytecode = Bytecode<u8>;
 pub type UnoptBytecode = Bytecode<usize>;
 

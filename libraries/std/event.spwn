@@ -1,7 +1,4 @@
-
 extract import "obj_ids.spwn"
-
-
 
 #[doc(u"
     `@event` is an API for runtime events, such as player input and collisions.

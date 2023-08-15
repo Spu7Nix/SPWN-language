@@ -7,7 +7,6 @@ edition = "2021"
 opt-level = 1
 incremental = true
 debug = true
-# rustflags = ["link-args=-zstack-size=4194304"]
 
 [dependencies]
 ariadne = { git = "https://github.com/zesterer/ariadne.git", features = [

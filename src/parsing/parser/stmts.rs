@@ -131,7 +131,14 @@ impl Parser<'_> {
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
 
-                Statement::TypeDef(Vis::Public(self.intern_string(name)))
+                if self.skip_tok(Token::RBracket)? {
+                    todo!("type @a {{....}}")
+                } else {
+                    let span = self.span();
+                    self.deprecated_features.empty_type_def.insert(span);
+
+                    Statement::TypeDef(Vis::Public(self.intern_string(name)))
+                }
             },
             Token::Private => {
                 self.next()?;
@@ -139,7 +146,14 @@ impl Parser<'_> {
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
 
-                Statement::TypeDef(Vis::Private(self.intern_string(name)))
+                if self.skip_tok(Token::RBracket)? {
+                    todo!("type @a {{....}}")
+                } else {
+                    let span = self.span();
+                    self.deprecated_features.empty_type_def.insert(span);
+
+                    Statement::TypeDef(Vis::Public(self.intern_string(name)))
+                }
             },
             Token::Impl => {
                 self.next()?;
@@ -243,6 +257,7 @@ impl Parser<'_> {
                             Statement::Expr(e)
                         };
 
+                        self.deprecated_features.extend(check.deprecated_features);
                         attrs = vec![];
 
                         ex

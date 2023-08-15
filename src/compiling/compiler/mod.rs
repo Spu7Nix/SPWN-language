@@ -105,6 +105,7 @@ impl<'a> Compiler<'a> {
         bytecode_map: &'a mut BytecodeMap,
         type_def_map: &'a mut TypeDefMap,
         interner: Interner,
+        deprecated_features: DeprecatedFeatures,
     ) -> Self {
         Self {
             src,
@@ -117,7 +118,7 @@ impl<'a> Compiler<'a> {
             bytecode_map,
             type_def_map,
             deferred_trigger_func_stack: vec![],
-            deprecated_features: DeprecatedFeatures::default(),
+            deprecated_features,
         }
     }
 }
@@ -308,7 +309,7 @@ impl Compiler<'_> {
                         .into(),
                 })
                 .collect_vec(),
-            deprecated_features: self.deprecated_features.clone(),
+            deprecated_features: unopt_code.deprecated_features,
         };
 
         if !self.settings.debug_bytecode && !opt_code.debug_funcs.is_empty() {

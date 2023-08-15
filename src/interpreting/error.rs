@@ -468,7 +468,7 @@ error_maker! {
             Message: "Thrown error", Note: None;
             Main Area: area;
             Labels: [
-                area => "{}": "69";
+                area => "{}": "todo";
             ]
         ]
         ThrownError {

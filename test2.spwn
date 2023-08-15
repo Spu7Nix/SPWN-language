@@ -1,0 +1,221 @@
+extract import "libraries/core/lib.spwn"
+extract import "libraries/std/lib.spwn"
+
+type @qoi
+
+BLACK_COLOR = { r: 0, g: 0, b: 0, a: 255 }
+BLACK_COLOR_TRANSPARENT = { r: 0, g: 0, b: 0, a: 0 }
+
+impl @qoi {
+    decode: #[debug_bytecode] (og_bytes/*: [@int]*/, debug: @bool = false, spam_debug: @bool = false) -> @qoi {
+        // start_time = $.time()
+
+        mut bytes = og_bytes
+
+        byte_count = bytes.length
+
+        // start_process_time = $.time()
+        if debug {
+            dbg f"Bytes: {byte_count}b"
+            // $.print("Read file: {}s".fmt(start_process_time - start_time))
+        }
+
+        next_bytes = (n: @int&>=1){
+            mut these_bytes = []
+            for i in 0..n {
+                these_bytes.push(bytes.shift())
+            }
+            return these_bytes
+        }
+        size = (n: @int&>=1, be: @bool = true) {
+            dbg "sus"
+            mut current_value = 0
+            mut these_bytes = next_bytes(n)
+            for i in 0..n {
+                current_value += these_bytes[i] * 2^((n-i-1)*8 if be else i*8)
+            }
+            return current_value
+        }
+
+
+        if next_bytes(4) != [113?,111?,105?,102?] {
+            throw "Magic bytes not found"
+        }
+
+        dbg "test"
+        width = size(4)
+        height = size(4)
+
+
+        mut image = [ [ BLACK_COLOR_TRANSPARENT ] * height ] * width // setting to transparent black is what makes the most sense
+
+        channels = next_bytes(1)[0]
+        if ![3,4].contains(channels) {
+            throw "Invalid channels byte"
+        }
+
+        colorspace = next_bytes(1)[0]
+        if ![0,1].contains(colorspace) {
+            throw "Invalid colorspace byte"
+        }
+
+        mut previous_color = BLACK_COLOR
+
+        mut previous_colors = [ () ] * 64
+        previous_colors[@qoi::hash_color(0,0,0,255)] = BLACK_COLOR
+        previous_colors[@qoi::hash_color(0,0,0,0)] = BLACK_COLOR_TRANSPARENT
+
+        mut x = 0
+        mut y = 0
+
+        increment_position = () {
+            x += 1
+            if x >= width { y += 1; x = 0 }
+        }
+        decrement_position = () {
+            x -= 1
+            if x < 0 { y -= 1; x = width - 1 }
+        }
+
+        while x < width && y < height {
+            if bytes.length <= 0 {
+                if debug { $.print("Decoding ended prematurely") }
+                break
+            }
+            head_byte = next_bytes(1)[0]
+
+            match head_byte {
+                ==254 | ==255 => () { // [QOI_OP_RGB+QOI_OP_RGBA] set color (rgb+rgba)
+                    if spam_debug { $.print("QOI_OP_RGB" if head_byte == 254 else "QOI_OP_RGBA") }
+
+                    [ r, g, b ] = next_bytes(3)
+
+                    a = next_bytes(1)[0] if head_byte == 255 else previous_color.a
+
+                    image[x][y] = { r, g, b, a }
+                    previous_colors[@qoi::hash_color(r,g,b,a)] = { r, g, b, a }
+                } (),
+                >=192&<=253 => () { // [QOI_OP_RUN] run length
+                    if spam_debug { $.print("QOI_OP_RUN") }
+
+                    mut length = head_byte - 191 // +1 bias
+
+                    mut ended = false
+
+                    if spam_debug { $.print(" ",length) }
+
+                    for i in 0..length {
+                        image[x][y] = previous_color
+                        increment_position()
+                        if y >= height {
+                            decrement_position()
+                            ended = true
+                            break
+                        }
+                    }
+                    if !ended {
+                        decrement_position() // it gets incremented too much
+                    }
+                } (),
+                >=128&<=191 => () { // [QOI_OP_LUMA] luma difference
+                    if spam_debug { $.print("QOI_OP_LUMA") }
+
+                    mut diff_green = head_byte - 160 // -32 bias
+
+                    drdgdbdg = next_bytes(1)[0]
+                    // -8 bias
+                    dr_dg = $.floor(drdgdbdg / 2^4 - 8)
+                    db_dg = drdgdbdg % 2^4 - 8
+
+                    r = (previous_color.r + diff_green + dr_dg) % 256
+                    g = (previous_color.g + diff_green) % 256
+                    b = (previous_color.b + diff_green + db_dg) % 256
+
+                    if spam_debug { $.print(" ",diff_green," ",dr_dg," ",db_dg) }
+
+                    image[x][y] = {
+                        r,
+                        g,
+                        b,
+                        a: previous_color.a,
+                    }
+
+                    previous_colors[@qoi::hash_color(r,g,b,previous_color.a)] = { r, g, b, a: previous_color.a }
+                } (),
+                >=64&<=127 => () { // [QOI_OP_DIFF] color difference
+                    if spam_debug { $.print("QOI_OP_DIFF") }
+
+                    mut current_byte = head_byte - 2^6
+                    // -2 bias
+                    mut dr = -2
+                    mut dg = -2
+                    mut db = -2
+                    helper = (exp: @int, &var: @int) {
+                        if current_byte >= 2^exp {
+                            current_byte -= 2^exp
+                            var += 2^(exp % 2)
+                        }
+                    }
+                    helper(5, dr)
+                    helper(4, dr)
+                    helper(3, dg)
+                    helper(2, dg)
+                    helper(1, db)
+                    helper(0, db)
+
+                    if spam_debug { $.print(" ",dr," ",dg," ",db) }
+
+                    image[x][y] = {
+                        r: (previous_color.r + dr) % 256,
+                        g: (previous_color.g + dg) % 256,
+                        b: (previous_color.b + db) % 256,
+                        a: previous_color.a,
+                    }
+
+                    previous_colors[ @qoi::hash_color(dr, dg, db,previous_color.a) ] = { dr, dg, db, a: previous_color.a }
+                } (),
+                >=0&<=63 => () { // [QOI_OP_INDEX]
+                    if spam_debug {
+                        $.print("QOI_OP_INDEX")
+                        $.print(" {}".fmt(head_byte))
+                    }
+
+                    image[x][y] = previous_colors[head_byte]
+                } (),
+            }
+
+            // if image[x][y] != () {
+
+                previous_color = image[x][y]
+            // } else {
+            //     $.print("got color () at index [{}/{}] {}".fmt([x,y,head_byte]))
+            //     if head_byte >= 64 { throw "{}".fmt(head_byte)}
+            //     throw "()"
+            // }
+
+            if spam_debug { $.print(" ", image[x][y]) }
+
+            increment_position()
+        }
+
+        if debug {
+            // processing_time = $.time() - start_process_time
+            // $.print("Finished processing: {}s".fmt(processing_time))
+            $.print("Width: {}".fmt(width))
+            $.print("Height: {}".fmt(height))
+            // $.print("Bytes/second: {}b/s".fmt(byte_count/processing_time))
+        }
+
+        return @qoi::{
+            image,
+            width,
+            height,
+        }
+    },
+    encode: (self) -> [@number] {
+        throw "bro seriously thought encoder was ready"
+    },
+    hash_color: (r: @int, g: @int, b: @int, a: @int = 255) {
+        return (r * 3 + g * 5 + b * 7 + a * 11) % 64
+    },
+}

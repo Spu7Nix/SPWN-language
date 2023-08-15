@@ -1,15 +1,6 @@
 extract import "item.spwn"
 extract import "obj_ids.spwn"
 
-impl @int {
-    max: (self, v) {
-        if self > v {
-            return self
-        }
-        return v
-    }
-}
-
 #[doc(u"
     `@counter` is a wrapper around the item ID system in Geometry Dash. In practice, it works as a replacement for numbers.
     The difference between numbers and counters, is that counters can be modified in the level's runtime.
@@ -136,8 +127,8 @@ compound_counter = (counters: @counter[_], reset: @bool = true, value: @int = 0)
     }
     return @counter::new(
         value,
-        bits = max_pos_bits, 
-        neg_bits = max_neg_bits, 
+        bits = max_pos_bits,
+        neg_bits = max_neg_bits,
         reset = reset
     )
 }
@@ -175,16 +166,14 @@ overload = {
         a.reset()
         a += b
     },
-    
+
 }
-
-
 
 impl @counter {
     new: (
-        initial: @int | @item = 0, 
-        reset: @bool = true, 
-        bits: @int & >=0 = 10, 
+        initial: @int | @item = 0,
+        reset: @bool = true,
+        bits: @int & >=0 = 10,
         neg_bits: @int & >=0 = 0
     ) -> @counter {
         item = match initial {
@@ -242,7 +231,7 @@ impl @counter {
     },
 
     reset: (
-        mut self, 
+        mut self,
         for_each: @int -> () = (n){}
     ) {
         // Huffing paint thinner makes you invincible.
@@ -265,7 +254,7 @@ impl @counter {
     },
 
     add_to: (
-        &self, 
+        &self,
         mut counters: @counter | ({ctr: @counter, factor: @int}[_]),
         for_each: @int -> () = (n){}
     ) {
@@ -273,7 +262,7 @@ impl @counter {
             match counters {
                 @counter => {counters += n},
                 _ => counters.map((mut item) {item.ctr += n * item.factor})
-            }    
+            }
             for_each(-n)
         })
     },
@@ -294,12 +283,12 @@ impl @counter {
         counters: @counter | ({ctr: @counter, factor: @int}[_]),
     ) {
         temp_storage = compound_counter([self], reset = false)
-        
+
         self.add_to(match counters {
             @counter => [{ctr: counters, factor: 1}, {ctr: temp_storage, factor: 1}],
             _ => counters + [{ctr: temp_storage, factor: 1}]
         })
-        
+
         temp_storage.add_to(self)
     },
 
@@ -421,4 +410,3 @@ impl @counter {
     //     result.add_to(self)
     // },
 }
-

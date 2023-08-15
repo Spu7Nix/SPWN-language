@@ -137,11 +137,11 @@ impl_type! {
                         if semver.pre == semver::Prerelease::EMPTY {
                             Value::Maybe(None).into_value_ref(area.clone())
                         } else {
-                            let beta = semver.pre.split(".").nth(1).expect("BUG: missing beta version");
+                            let beta = semver.pre.split('.').nth(1).expect("BUG: missing beta version");
                             Value::Maybe(
                                 Some(
                                     Value::Int(
-                                        i64::from_str_radix(beta, 10).expect("BUG: invalid beta number")
+                                        beta.parse::<i64>().expect("BUG: invalid beta number")
                                     ).into_value_ref(area.clone())
                                 )
                             ).into_value_ref(area.clone())

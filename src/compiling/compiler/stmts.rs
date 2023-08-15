@@ -277,6 +277,11 @@ impl<'a> Compiler<'a> {
                 },
             },
             Statement::TypeDef(name) => {
+                // todo: actually parse other syntax
+                // self.deprecated
+                //     .empty_type_def
+                //     .push(self.make_area(stmt.span));
+
                 if !matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
                     return Err(CompileError::TypeDefNotGlobal {
                         area: self.make_area(stmt.span),

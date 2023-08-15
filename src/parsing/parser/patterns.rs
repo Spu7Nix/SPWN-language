@@ -64,7 +64,12 @@ impl<'a> Parser<'a> {
 
         let pat = 'out_pat: {
             match self.next()? {
-                Token::Mut => {
+                l @ (Token::Mut | Token::Let) => {
+                    if matches!(l, Token::Let) {
+                        let span = self.span();
+                        self.deprecated_features.let_not_mut.insert(span);
+                    }
+
                     self.expect_tok(Token::Ident)?;
                     Pattern::Mut {
                         name: self.slice_interned(),
@@ -76,13 +81,25 @@ impl<'a> Parser<'a> {
                     let (is_ref, name) = if t == Token::Ident {
                         (false, self.slice_interned())
                     } else {
-                        if self.skip_tok(Token::Mut)? {
+                        'inner: {
+                            if self.next_is(Token::Let)? {
+                                let span = self.span();
+                                self.deprecated_features.let_not_mut.insert(span);
+
+                                self.next()?;
+                            } else if self.next_is(Token::Mut)? {
+                                self.next()?;
+                            } else {
+                                break 'inner;
+                            }
+
                             self.expect_tok(Token::Ident)?;
                             break 'out_pat Pattern::Mut {
                                 name: self.slice_interned(),
                                 is_ref: true,
                             };
                         }
+
                         self.expect_tok(Token::Ident)?;
                         (true, self.slice_interned())
                     };
