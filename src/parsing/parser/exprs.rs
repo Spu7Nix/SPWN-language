@@ -187,7 +187,6 @@ impl Parser<'_> {
                         }
                     };
 
-                    // todo: better way? doubles every time due to the .clone()
                     self.deprecated_features.extend(check.deprecated_features);
 
                     // println!("spingkla {:?}", after_close);

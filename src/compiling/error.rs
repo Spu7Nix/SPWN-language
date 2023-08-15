@@ -272,6 +272,18 @@ error_maker! {
 
         // ==================================================================
         #[
+            Message: "Invalid string type used for attribute", Note: Some("f-strings and byte strings are not allowed as keys".into());
+            Main Area: area;
+            Labels: [
+                area => "Invalid string here";
+            ]
+        ]
+        InvalidAttributeString {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
             Message: "Unexpected item in overload", Note: Some("Only explicit macro definitions are allowed".into());
             Main Area: area;
             Labels: [

@@ -18,13 +18,23 @@ use crate::lexing::tokens::Token;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
 use crate::util::interner::Interner;
 
-#[derive(Clone)]
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     pub src: Rc<SpwnSource>,
     interner: Interner,
 
     pub deprecated_features: DeprecatedFeatures,
+}
+
+impl<'a> Clone for Parser<'a> {
+    fn clone(&self) -> Self {
+        Self {
+            lexer: self.lexer.clone(),
+            src: Rc::clone(&self.src),
+            interner: self.interner.clone(),
+            deprecated_features: DeprecatedFeatures::default(),
+        }
+    }
 }
 
 pub type ParseResult<T> = Result<T, SyntaxError>;

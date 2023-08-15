@@ -17,7 +17,7 @@ use crate::parsing::ast::{
     DictItem, ExprNode, Expression, Import, ImportType, PatternNode, Vis, VisTrait,
 };
 use crate::parsing::parser::Parser;
-use crate::sources::{CodeSpan, Spannable, SpwnSource};
+use crate::sources::{CodeSpan, Spannable, SpwnSource, ZEROSPAN};
 use crate::util::{Digest, ImmutStr, ImmutVec, VERSION};
 
 impl Compiler<'_> {
@@ -167,7 +167,7 @@ impl Compiler<'_> {
 
         let new_src = Rc::new(src_variant(path.clone()));
 
-        let import_name = path.file_name().unwrap().to_str().unwrap();
+        let import_name = path.file_stem().unwrap().to_str().unwrap();
         let import_base = path.parent().unwrap();
         let spwnc_path = import_base.join(format!(".spwnc/{import_name}.spwnc"));
 
@@ -184,83 +184,98 @@ impl Compiler<'_> {
 
         let hash: Digest = md5::compute(&code).into();
 
-        'from_cache: {
-            if spwnc_path.is_file() {
+        let imported_cache = 'from_cache: {
+            if !self.settings.no_bytecode_cache && spwnc_path.is_file() {
                 let source_bytes = std::fs::read(&spwnc_path).unwrap();
                 let bytecode: OptBytecode = match bincode::deserialize(&source_bytes) {
                     Ok(b) => b,
                     Err(_) => {
-                        break 'from_cache;
+                        break 'from_cache false;
                     },
                 };
 
-                // if bytecode.source_hash == hash.into() && bytecode.version == *VERSION {
-                //     for import in &bytecode.import_paths {
-                //         self.compile_import(
-                //             &import.value,
-                //             import.span,
-                //             importer_src.clone(),
-                //             import.get_variant(),
-                //         )?;
-                //     }
+                if bytecode.source_hash == hash && bytecode.version == *VERSION {
+                    for import in &bytecode.import_paths {
+                        self.compile_import(
+                            &Import {
+                                path: import.path().clone(),
+                                typ: ImportType::File,
+                            },
+                            ZEROSPAN,
+                            importer_src.clone(),
+                            import.get_variant(),
+                        )?;
+                    }
 
-                //     for (k, (name, private)) in &bytecode.custom_types {
-                //         self.custom_type_defs.insert(
-                //             TypeDef {
-                //                 def_src: import_src.clone(),
-                //                 name: self.intern(&name.value),
-                //                 private: *private,
-                //             },
-                //             k.spanned(name.span),
-                //         );
-                //     }
+                    for (k, s) in &bytecode.custom_types {
+                        let name = self.intern(&s.value().value);
+                        self.available_custom_types
+                            .insert(name, s.clone().map(|_| *k));
+                        // self.custom_type_defs.insert(
+                        //     TypeDef {
+                        //         def_src: import_src.clone(),
+                        //         name: self.intern(&name.value),
+                        //         private: *private,
+                        //     },
+                        //     k.spanned(name.span),
+                        // );
+                    }
 
-                //     self.map.map.insert(import_src, bytecode);
-                //     return Ok(());
-                // }
+                    self.bytecode_map.insert(bytecode, &new_src);
+
+                    // self.bytecode_map
+                    //     .insert((*new_src).clone(), Rc::new(bytecode));
+                    println!("bolivia");
+                    break 'from_cache true;
+                    // return Ok(());
+                }
+            }
+            false
+        };
+
+        if !imported_cache {
+            let mut parser: Parser<'_> =
+                Parser::new(&code, Rc::clone(&new_src), self.interner.clone());
+
+            let ast = parser
+                .parse()
+                .map_err(|e| CompileError::ImportSyntaxError {
+                    is_file,
+                    err: e,
+                    area: self.make_area(span),
+                })?;
+
+            let mut compiler = Compiler::new(
+                Rc::clone(&new_src),
+                self.settings,
+                self.bytecode_map,
+                self.type_def_map,
+                self.interner.clone(),
+                parser.deprecated_features,
+            );
+
+            println!("tuvalu");
+            compiler.compile(&ast, (0..code.len()).into())?;
+            let bytes = bincode::serialize(&*self.bytecode_map[&new_src]).unwrap();
+
+            // dont write bytecode if caching is disabled
+            if !self.settings.no_bytecode_cache {
+                let _ = std::fs::create_dir(import_base.join(".spwnc"));
+                std::fs::write(spwnc_path, bytes).unwrap();
             }
         }
 
-        let mut parser: Parser<'_> = Parser::new(&code, Rc::clone(&new_src), self.interner.clone());
-
-        let ast = parser
-            .parse()
-            .map_err(|e| CompileError::ImportSyntaxError {
-                is_file,
-                err: e,
-                area: self.make_area(span),
-            })?;
-
-        let mut compiler = Compiler::new(
-            Rc::clone(&new_src),
-            self.settings,
-            self.bytecode_map,
-            self.type_def_map,
-            self.interner.clone(),
-            DeprecatedFeatures::default(),
-        );
-
-        compiler.compile(&ast, (0..code.len()).into())?;
-
-        let export_names = compiler.bytecode_map[&new_src].export_names.clone();
-        let custom_types = compiler.bytecode_map[&new_src]
+        let export_names = self.bytecode_map[&new_src].export_names.clone();
+        let custom_types = self.bytecode_map[&new_src]
             .custom_types
             .iter()
             .filter(|(_, v)| v.is_pub())
-            .map(|(id, s)| (*id, compiler.intern(&s.value().value)))
+            .map(|(id, s)| (*id, self.intern(&s.value().value)))
             .collect();
 
         // self.deprecated
         //     .empty_type_def
         //     .extend(compiler.deprecated.empty_type_def);
-
-        let bytes = bincode::serialize(&*self.bytecode_map[&new_src]).unwrap();
-
-        // dont write bytecode if caching is disabled
-        if !self.settings.no_bytecode_cache {
-            let _ = std::fs::create_dir(import_base.join(".spwnc"));
-            std::fs::write(spwnc_path, bytes).unwrap();
-        }
 
         Ok((export_names.into(), (*new_src).clone(), custom_types))
     }

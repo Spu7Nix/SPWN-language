@@ -1,8 +1,5 @@
 
-
-type @test
-
-
-
-
-return {}
+a = 20
+match a {
+    ==@int | ==@int => {}
+}

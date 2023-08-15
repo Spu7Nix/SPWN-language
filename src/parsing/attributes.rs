@@ -137,6 +137,7 @@ pub(crate) mod attr_names {
     pub const BUILTIN: &str = "builtin";
     pub const ALIAS: &str = "alias";
     pub const NO_STD: &str = "no_std";
+    pub const DEPRECATED: &str = "deprecated";
 }
 
 pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
@@ -167,16 +168,22 @@ pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
             style: &[AttrStyle::Outer],
             targets: &[AttributeTarget::Macro],
         },
-        // Attribute {
-        //     namespace: None,
-        //     name: "deprecated",
-        //     template: AttributeTemplate {
-        //         word: true,
-        //         list: Some(&[ListArg::Required("reason"), ListArg::Optional("since")]),
-        //         name_value: false,
-        //     },
-        //     duplicates: AttributeDuplicates::ErrorFollowing,
-        // },
+        Attribute {
+            namespace: None,
+            name: attr_names::DEPRECATED,
+            template: AttributeTemplate {
+                word: true,
+                list: Some(&[ListArg::Required("reason"), ListArg::Optional("since")]),
+                name_value: false,
+            },
+            duplicates: AttributeDuplicates::ErrorFollowing,
+            style: &[AttrStyle::Outer],
+            targets: &[
+                AttributeTarget::Assign,
+                AttributeTarget::TypeDef,
+                AttributeTarget::DictItem,
+            ],
+        },
         Attribute {
             namespace: None,
             name: attr_names::DOC,

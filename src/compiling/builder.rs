@@ -87,7 +87,7 @@ pub struct ProtoBytecode {
 
     import_paths: UniqueRegister<SpwnSource>,
 
-    call_exprs: UniqueRegister<CallExpr<UnoptRegister, UnoptRegister, ImmutStr>>,
+    call_exprs: Vec<CallExpr<UnoptRegister, UnoptRegister, ImmutStr>>,
     debug_funcs: Vec<FuncID>,
 
     pub overloads: AHashMap<Operator, Vec<FuncID>>,
@@ -101,7 +101,7 @@ impl ProtoBytecode {
             blocks: SlabMap::new(),
             import_paths: UniqueRegister::new(),
             debug_funcs: vec![],
-            call_exprs: UniqueRegister::new(),
+            call_exprs: vec![],
             overloads: AHashMap::new(),
         }
     }
@@ -143,7 +143,6 @@ impl ProtoBytecode {
         type BlockPos = (u16, u16);
 
         let constants = self.consts.make_vec();
-        let call_exprs = self.call_exprs.make_vec();
 
         let mut funcs: Vec<UnoptFunction> = vec![];
 
@@ -269,7 +268,7 @@ impl ProtoBytecode {
             },
             import_paths: import_paths.into(),
             debug_funcs: self.debug_funcs.into(),
-            call_exprs: call_exprs.into(),
+            call_exprs: self.call_exprs.into(),
             deprecated_features: compiler.deprecated_features.clone(),
         })
 
@@ -852,7 +851,8 @@ impl<'a> CodeBuilder<'a> {
         v: CallExpr<UnoptRegister, UnoptRegister, ImmutStr>,
         span: CodeSpan,
     ) {
-        let id = self.proto_bytecode.call_exprs.insert(v).into();
+        self.proto_bytecode.call_exprs.push(v);
+        let id = (self.proto_bytecode.call_exprs.len() - 1).into();
         self.push_opcode(ProtoOpcode::Raw(Opcode::Call { base, call: id }), span)
     }
 

@@ -193,27 +193,26 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
 
     let mut changed = false;
 
-    let mut call_expr_changes: AHashMap<CallExprID, CallExprID> = AHashMap::new();
+    // let mut call_expr_changes: AHashMap<CallExprID, CallExprID> = AHashMap::new();
 
     for opcode in code.functions[*func as usize].opcodes.iter() {
         #[allow(clippy::single_match)]
         match opcode.value {
             Opcode::Call { call, .. } => {
-                let mut call_expr = code.call_exprs[*call as usize].clone();
-                let mut expr_changed = false;
+                let mut call_expr = &mut code.call_exprs[*call as usize];
+
+                // let mut expr_changed = false;
                 for reg in call_expr.get_regs_mut() {
                     if *reg != Register(coloring[**reg]) {
                         *reg = Register(coloring[**reg]);
-                        expr_changed = true;
+                        changed = true;
                     }
                 }
 
-                changed |= expr_changed;
-
-                if expr_changed {
-                    code.call_exprs.push(call_expr);
-                    call_expr_changes.insert(call, (code.call_exprs.len() - 1).into());
-                }
+                // if expr_changed {
+                //     code.call_exprs.push(call_expr);
+                //     call_expr_changes.insert(call, (code.call_exprs.len() - 1).into());
+                // }
             },
             _ => {},
         }
@@ -226,11 +225,11 @@ pub fn optimize(code: &mut UnoptBytecode, func: FuncID) -> bool {
                 changed = true;
             }
         }
-        #[allow(clippy::single_match)]
-        match &mut opcode.value {
-            Opcode::Call { call, .. } => *call = *call_expr_changes.get(call).unwrap_or(call),
-            _ => {},
-        }
+        // #[allow(clippy::single_match)]
+        // match &mut opcode.value {
+        //     Opcode::Call { call, .. } => *call = *call_expr_changes.get(call).unwrap_or(call),
+        //     _ => {},
+        // }
     }
 
     // vec![1,2].remove(index)

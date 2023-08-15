@@ -1,6 +1,6 @@
 use std::io::{BufWriter, Write};
 
-use ariadne::{sources, CharSet, Config, Label, Report, ReportKind};
+use ariadne::{sources, CharSet, Color, Config, Label, Report, ReportKind};
 use colored::Colorize;
 
 use crate::sources::CodeArea;
@@ -12,6 +12,23 @@ pub struct ErrorReport {
     pub message: String,
     pub labels: Vec<(CodeArea, String)>,
     pub note: Option<String>,
+    pub report_kind: ReportKind<'static>, // we never use custom message
+}
+
+impl ErrorReport {
+    pub fn fuck(&self) {
+        println!("TITLE: {}", self.title);
+        println!("MESSAGE: {}", self.message);
+        println!("------------------------------");
+        for (area, label) in &self.labels {
+            let snippet = area.src.read().unwrap()[area.span.start..area.span.end].bright_red();
+            println!("{} -> {}", snippet, label);
+        }
+        println!("------------------------------");
+        if let Some(n) = &self.note {
+            println!("NOTE: {}", n);
+        }
+    }
 }
 
 impl std::error::Error for ErrorReport {}
@@ -24,7 +41,14 @@ impl std::fmt::Display for ErrorReport {
             None => CharSet::Unicode,
         };
 
-        let mut report = Report::build(ReportKind::Error, "", 0)
+        let color = match self.report_kind {
+            ReportKind::Advice => Color::Blue,
+            ReportKind::Warning => Color::Yellow,
+            ReportKind::Error => Color::Red,
+            ReportKind::Custom(_, c) => c,
+        };
+
+        let mut report = Report::build(ReportKind::Custom(&self.title, color), "", 0)
             .with_config(Config::default().with_char_set(charset))
             .with_message(&self.message);
 
@@ -38,7 +62,7 @@ impl std::fmt::Display for ErrorReport {
             report = report.with_label(
                 Label::new((area.src.hyperlink(), area.span.into()))
                     .with_message(msg)
-                    .with_color(ariadne::Color::RGB(col.0, col.1, col.2)),
+                    .with_color(Color::RGB(col.0, col.1, col.2)),
             );
         }
 
@@ -152,6 +176,7 @@ macro_rules! error_maker {
                                 )?
                                 v
                             },
+                            report_kind: ariadne::ReportKind::Error,
                             note: $note.map(|s: String| s.to_string()),
                         },
                     )*

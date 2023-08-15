@@ -355,6 +355,8 @@ fn run_spwn(
 
     for (_, v) in out {
         if let Err(e) = v {
+            let g = e.to_report(&vm);
+            g.fuck();
             Err(e.to_report(&vm))?;
         }
     }

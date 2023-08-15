@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use super::builder::BlockID;
 use super::bytecode::{CallExpr, OptBytecode, OptFunction, UnoptRegister};
-use super::deprecated::DeprecatedFeatures;
+use super::deprecated::{DeprecatedFeatures, DeprecatedWarning};
 use super::error::CompileError;
 use super::optimizer::optimize_code;
 use crate::cli::{BuildSettings, DocSettings};
@@ -316,8 +316,7 @@ impl Compiler<'_> {
             opt_code.debug_str(&self.src, Some(&opt_code.debug_funcs))
         }
 
-        self.bytecode_map
-            .insert((*self.src).clone(), Rc::new(opt_code));
+        self.bytecode_map.insert(opt_code, &self.src);
 
         Ok(())
     }

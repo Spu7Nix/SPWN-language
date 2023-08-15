@@ -11,6 +11,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::compiling::bytecode::{Bytecode, OptBytecode};
 use crate::compiling::compiler::{CustomTypeID, TypeDef};
+use crate::compiling::deprecated::{DeprecatedFeatures, DeprecatedWarning};
 use crate::new_id_wrapper;
 use crate::util::{hyperlink, ImmutStr, ImmutStr32, ImmutVec, SlabMap};
 
@@ -207,6 +208,43 @@ impl Debug for CodeArea {
 
 #[derive(Default, Deref, DerefMut)]
 pub struct BytecodeMap(AHashMap<SpwnSource, Rc<OptBytecode>>);
+
+impl BytecodeMap {
+    pub fn insert(&mut self, bytecode: OptBytecode, src: &Rc<SpwnSource>) {
+        // todo: add link to docs
+        for &span in &bytecode.deprecated_features.let_not_mut {
+            eprintln!(
+                "{}",
+                DeprecatedWarning {
+                    message: "Use of `let` instead of `mut`".into(),
+                    area: CodeArea {
+                        span,
+                        src: src.clone(),
+                    },
+                    area_message: "Found `let` here".into(),
+                    note: Some("This feature has been deprecated since 0.9.0. Replace the `let` keyword with `mut`".into()),
+                }
+                .to_report()
+            )
+        }
+        for &span in &bytecode.deprecated_features.empty_type_def {
+            eprintln!(
+                "{}",
+                DeprecatedWarning {
+                    message: "Emtpy type definition".into(),
+                    area: CodeArea {
+                        span,
+                        src: src.clone(),
+                    },
+                    area_message: "Found type definition with no members".into(),
+                    note: Some("This feature has been deprecated since 0.9.0. The new syntax for type definitions is `type @<type> { <members> }`".into()),
+                }
+                .to_report()
+            )
+        }
+        self.0.insert((**src).clone(), Rc::new(bytecode));
+    }
+}
 
 #[derive(Default, Deref, DerefMut, Index, IndexMut)]
 pub struct TypeDefMap(AHashMap<CustomTypeID, TypeDef<ImmutStr32>>);
