@@ -1,3 +1,4 @@
+pub mod error;
 pub mod interner;
 pub(crate) mod spinner;
 
@@ -146,21 +147,6 @@ impl<T: Colorize> HexColorize for T {
     fn on_color_hex(self, c: u32) -> ColoredString {
         let (r, g, b, _) = hex_to_rgb(c as u64).unwrap();
         self.on_truecolor(r, g, b)
-    }
-}
-
-pub struct BasicError<T: fmt::Display>(pub(crate) T);
-impl<T: fmt::Display + fmt::Debug> std::error::Error for BasicError<T> {}
-
-impl<T: fmt::Display> fmt::Debug for BasicError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl<T: fmt::Display> fmt::Display for BasicError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
 

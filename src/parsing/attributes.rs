@@ -173,7 +173,11 @@ pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
             name: attr_names::DEPRECATED,
             template: AttributeTemplate {
                 word: true,
-                list: Some(&[ListArg::Required("reason"), ListArg::Optional("since")]),
+                list: Some(&[
+                    ListArg::Required("reason"),
+                    ListArg::Optional("since"),
+                    ListArg::Optional("note"),
+                ]),
                 name_value: false,
             },
             duplicates: AttributeDuplicates::ErrorFollowing,

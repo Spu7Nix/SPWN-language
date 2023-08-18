@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 use std::fs;
 use std::ops::Range;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use ahash::AHashMap;
@@ -52,7 +52,7 @@ impl SpwnSource {
             .map(|s| s.replace("\r\n", "\n").trim_end().to_string())
     }
 
-    pub fn path_str(&self) -> String {
+    pub fn path_string(&self) -> String {
         fs::canonicalize(self.path())
             .unwrap()
             .to_str()
@@ -61,10 +61,10 @@ impl SpwnSource {
     }
 
     pub fn hyperlink(&self) -> String {
-        hyperlink(self.path_str(), Some(self.name()))
+        hyperlink(self.path_string(), Some(self.name()))
     }
 
-    pub fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &Path {
         match self {
             Self::File(f) | Self::Core(f) | Self::Std(f) => f,
         }
@@ -242,6 +242,7 @@ impl BytecodeMap {
                 .to_report()
             )
         }
+
         self.0.insert((**src).clone(), Rc::new(bytecode));
     }
 }

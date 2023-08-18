@@ -9,7 +9,7 @@ use libflate::{gzip, zlib};
 use quick_xml::events::{BytesText, Event};
 use quick_xml::{Reader, Writer};
 
-use crate::util::BasicError;
+use super::error::LevelError;
 
 fn xor(data: Vec<u8>, key: u8) -> Vec<u8> {
     data.into_iter().map(|b| b ^ key).collect()
@@ -26,7 +26,7 @@ fn base_64_decrypt(encoded: Vec<u8>) -> Vec<u8> {
         .unwrap()
 }
 
-fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
+fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, LevelError> {
     if cfg!(target_os = "macos") {
         use aes::Aes256;
         use block_modes::block_padding::Pkcs7;
@@ -41,7 +41,7 @@ fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
         ];
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_from_slices(IOS_KEY, &[])?;
+        let cipher = AesEcb::new_from_slices(IOS_KEY, &[]).unwrap();
 
         Ok(cipher.decrypt(&mut sf)?.to_vec())
     } else {
@@ -61,7 +61,7 @@ fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
 pub fn get_level_string(
     ls: Vec<u8>,
     level_name: Option<&String>,
-) -> Result<(String, String), Box<dyn Error>> {
+) -> Result<(String, String), LevelError> {
     // decrypting the savefile
     let content = decrypt_savefile(ls)?;
     let string_content = String::from_utf8_lossy(&content);
@@ -81,14 +81,18 @@ pub fn get_level_string(
         match reader.read_event() {
             // unescape and decode the text event using the reader encoding
             Ok(Event::Text(e)) => {
-                let text = e.unescape()?.to_string();
+                let text = e
+                    .unescape()
+                    .map_err(|e| LevelError::XMLErrorAtPosition {
+                        position: reader.buffer_position(),
+                        error: e,
+                    })?
+                    .to_string();
 
                 if text == "k2" {
                     k2_detected = true;
                     if level_detected {
-                        return Err(BasicError(
-                            "Level is not initialized! Please open the level, place some objects, then save and quit to initialize the level.").into()
-                        );
+                        return Err(LevelError::UninitializedLevel);
                     }
                 } else if k2_detected {
                     if let Some(level_name) = level_name {
@@ -113,27 +117,21 @@ pub fn get_level_string(
 
             Ok(Event::Eof) => break, // exits the loop when reaching end of file
             Err(e) => {
-                return Err(BasicError(format!(
-                    "Error at position {}: {:?}",
-                    reader.buffer_position(),
-                    e
-                ))
-                .into());
+                return Err(LevelError::XMLErrorAtPosition {
+                    position: reader.buffer_position(),
+                    error: e,
+                });
             },
             _ => (), // There are several other `Event`s we do not consider here
         }
     }
     if level_detected && !k4_detected {
-        return Err(BasicError(
-            "Level is not initialized! Please open the level, place some objects, then save and quit to initialize the level"
-        ).into());
+        return Err(LevelError::UninitializedLevel);
     } else if !k4_detected {
         if let Some(level_name) = level_name {
-            return Err(BasicError(format!("Level named \"{level_name}\" was not found")).into());
+            return Err(LevelError::UnknownLevel(level_name.to_string()));
         } else {
-            return Err(
-                BasicError("No level found! Please create a level for SPWN to operate on").into(),
-            );
+            return Err(LevelError::NoLevels);
         }
     }
 
@@ -152,7 +150,7 @@ pub fn encrypt_level_string(
     old_ls: String,
     path: PathBuf,
     level_name: &Option<String>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), LevelError> {
     let mut file = fs::File::open(path.clone())?;
 
     let mut file_content = Vec::new();
@@ -178,7 +176,13 @@ pub fn encrypt_level_string(
         match reader.read_event() {
             // unescape and decode the text event using the reader encoding
             Ok(Event::Text(e)) => {
-                let text = e.unescape()?.to_string();
+                let text = e
+                    .unescape()
+                    .map_err(|e| LevelError::XMLErrorAtPosition {
+                        position: reader.buffer_position(),
+                        error: e,
+                    })?
+                    .to_string();
 
                 if k4_detected && level_detected {
                     let encrypted_ls: String = {
@@ -226,12 +230,10 @@ pub fn encrypt_level_string(
             },
             Ok(Event::Eof) => break, // exits the loop when reaching end of file
             Err(e) => {
-                return Err(BasicError(format!(
-                    "Error at position {}: {:?}",
-                    reader.buffer_position(),
-                    e
-                ))
-                .into());
+                return Err(LevelError::XMLErrorAtPosition {
+                    position: reader.buffer_position(),
+                    error: e,
+                });
             },
             Ok(e) => assert!(writer.write_event(e).is_ok()),
         }
@@ -253,7 +255,7 @@ pub fn encrypt_level_string(
         type AesEcb = Ecb<Aes256, Pkcs7>;
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_from_slices(IOS_KEY, &[])?;
+        let cipher = AesEcb::new_from_slices(IOS_KEY, &[]).unwrap();
 
         let fin = cipher.encrypt_vec(&bytes);
         assert!(fs::write(path, fin).is_ok());

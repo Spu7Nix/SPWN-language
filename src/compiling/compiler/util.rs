@@ -198,7 +198,7 @@ impl Compiler<'_> {
                     for import in &bytecode.import_paths {
                         self.compile_import(
                             &Import {
-                                path: import.path().clone(),
+                                path: import.path().to_path_buf(),
                                 typ: ImportType::File,
                             },
                             ZEROSPAN,
@@ -225,7 +225,7 @@ impl Compiler<'_> {
 
                     // self.bytecode_map
                     //     .insert((*new_src).clone(), Rc::new(bytecode));
-                    println!("bolivia");
+                    // println!("bolivia");
                     break 'from_cache true;
                     // return Ok(());
                 }

@@ -1,9 +1,3 @@
+impl @a {}
 
-
-
-extract import "test2.spwn"
-
-
-1 + "gfgf"
-
-// dbg [sex, man];
+type @a

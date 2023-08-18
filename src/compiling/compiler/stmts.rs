@@ -22,10 +22,6 @@ impl<'a> Compiler<'a> {
         scope: ScopeID,
         builder: &mut CodeBuilder,
     ) -> CompileResult<()> {
-        if let Some(d) = self.find_deprecated_attr(&stmt.attributes)? {
-            self.deprecated_features.user_deprecated.insert(d);
-        }
-
         self.deferred_trigger_func_stack.push(vec![]);
 
         match &*stmt.stmt {

@@ -3,9 +3,8 @@ use ariadne::ReportKind;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
-use super::compiler::attributes::Deprecated;
-use crate::error::ErrorReport;
-use crate::sources::{CodeArea, CodeSpan, Spanned};
+use crate::sources::{CodeArea, CodeSpan};
+use crate::util::error::ErrorReport;
 
 // any features deprecated from <0.9 / any deprecated attributes
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -14,8 +13,6 @@ pub struct DeprecatedFeatures {
     pub empty_type_def: AHashSet<CodeSpan>,
     // use of `let` instead of `mut`
     pub let_not_mut: AHashSet<CodeSpan>,
-
-    pub user_deprecated: AHashSet<Spanned<Deprecated>>,
 }
 
 impl DeprecatedFeatures {

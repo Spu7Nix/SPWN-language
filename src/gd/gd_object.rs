@@ -3,6 +3,7 @@ use std::hash::Hash;
 
 use ahash::{AHashMap, AHashSet};
 
+use super::error::LevelError;
 use super::ids::*;
 use crate::interpreting::vm::Vm;
 use crate::parsing::ast::ObjectType;
@@ -242,7 +243,7 @@ pub fn remove_spwn_objects(file_content: &mut String) {
 pub fn append_objects(
     mut objects: Vec<GdObject>,
     old_ls: &str,
-) -> Result<(String, [usize; 4]), String> {
+) -> Result<(String, [usize; 4]), LevelError> {
     let mut closed_ids = get_used_ids(old_ls);
 
     //collect all specific ids mentioned into closed_[id] lists
@@ -341,9 +342,8 @@ pub fn append_objects(
                                     id_maps[class_index].insert(*i, id);
                                     id
                                 } else {
-                                    return Err(format!(
-                                        "This level exceeds the {} limit!",
-                                        ["group", "color", "block ID", "item ID"][class_index]
+                                    return Err(LevelError::ExceedsIDLimit(
+                                        ["group", "color", "block ID", "item ID"][class_index],
                                     ));
                                 }
                             },
@@ -357,12 +357,11 @@ pub fn append_objects(
     for (i, list) in closed_ids.iter_mut().enumerate() {
         list.remove(&0);
         if list.len() > ID_MAX as usize {
-            return Err(format!(
-                "This level exceeds the {} limit! ({}/{})",
-                ["group", "color", "block ID", "item ID"][i],
-                list.len(),
-                ID_MAX
-            ));
+            return Err(LevelError::ExceedsIDLimitByAmount {
+                id: ["group", "color", "block ID", "item ID"][i],
+                max: ID_MAX,
+                amount: list.len(),
+            });
         }
     }
 

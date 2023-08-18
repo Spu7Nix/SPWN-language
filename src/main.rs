@@ -20,6 +20,7 @@ use clap::Parser as _;
 use cli::{BuildSettings, DocSettings};
 use colored::Colorize;
 use doc::DocCompiler;
+use error::SpwnError;
 use gd::gd_object::{GdObject, TriggerObject};
 use interpreting::vm::Vm;
 use lasso::Rodeo;
@@ -44,7 +45,7 @@ use crate::parsing::parser::Parser;
 use crate::sources::{SpwnSource, TypeDefMap};
 use crate::util::interner::Interner;
 use crate::util::spinner::Spinner;
-use crate::util::{hyperlink, BasicError, HexColorize};
+use crate::util::{hyperlink, HexColorize};
 
 mod cli;
 mod compiling;
@@ -74,7 +75,7 @@ struct SpwnOutput {
     pub id_counters: [u16; 4],
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), SpwnError> {
     assert_eq!(4, std::mem::size_of::<OptOpcode>());
 
     let args = Arguments::parse();
@@ -111,7 +112,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 } else if cfg!(target_os = "android") {
                     PathBuf::from("/data/data/com.robtopx.geometryjump/CCLocalLevels.dat")
                 } else {
-                    return Err(BasicError("Unsupported operating system").into());
+                    return Err(SpwnError::UsuppportedOS);
                 })
             } else {
                 None
@@ -283,9 +284,9 @@ fn run_spwn(
     file: PathBuf,
     settings: &BuildSettings,
     spinner: &mut Spinner,
-) -> Result<SpwnOutput, Box<dyn Error>> {
+) -> Result<SpwnOutput, SpwnError> {
     let src = Rc::new(SpwnSource::File(file));
-    let code = src.read().ok_or(BasicError("Failed to read SPWN file"))?;
+    let code = src.read().ok_or(SpwnError::FailedToReadSpwnFile)?;
 
     let interner = Interner::new();
 
@@ -370,29 +371,20 @@ fn run_spwn(
     })
 }
 
-fn generate_doc(settings: &DocSettings, spinner: &mut Spinner) -> Result<(), Box<dyn Error>> {
-    let file: PathBuf = if let Some(file) = &settings.file {
+fn generate_doc(settings: &DocSettings, spinner: &mut Spinner) -> Result<(), SpwnError> {
+    let root: PathBuf = if let Some(file) = &settings.file {
         file.into()
     } else if let Some(lib) = &settings.lib {
         let p: PathBuf = lib.into();
 
         if p.is_file() {
-            Err(BasicError(
-                "`--lib`/`-l` argument expected a library, found file",
-            ))?;
+            Err(SpwnError::DocExpectedLibrary)?;
         }
 
         p.join("lib.spwn")
     } else {
         unreachable!("BUG: no file/lib specified")
     };
-
-    let src = Rc::new(SpwnSource::File(file));
-    let code = src.read().ok_or(BasicError("Failed to read SPWN file"))?;
-
-    let interner = Interner::new();
-
-    let mut parser: Parser<'_> = Parser::new(&code, Rc::clone(&src), interner.clone());
 
     spinner.start(format!(
         "{:20}",
@@ -401,10 +393,8 @@ fn generate_doc(settings: &DocSettings, spinner: &mut Spinner) -> Result<(), Box
             .bold()
     ));
 
-    let ast = parser.parse().map_err(|e| e.to_report())?;
-
-    let compiler = DocCompiler::new(settings, src, interner);
-    //compiler.compile(ast)?;
+    let mut compiler = DocCompiler::new(settings, root);
+    compiler.compile()?;
 
     spinner.complete(None);
 

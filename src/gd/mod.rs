@@ -1,3 +1,4 @@
+pub mod error;
 pub mod gd_object;
 pub mod ids;
 pub mod levelstring;
