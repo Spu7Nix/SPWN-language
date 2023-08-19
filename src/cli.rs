@@ -61,6 +61,7 @@ pub struct BuildSettings {
     #[arg(short = 'f', long)]
     pub save_file: Option<PathBuf>,
 
+    #[cfg(target_os = "windows")]
     #[arg(short = 'e', long)]
     pub live_editor: bool,
 
