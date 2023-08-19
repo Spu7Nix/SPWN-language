@@ -96,6 +96,8 @@ pub struct Compiler<'a> {
     deferred_trigger_func_stack: Vec<Vec<DeferredTriggerFunc>>,
 
     pub deprecated_features: DeprecatedFeatures,
+
+    pub import_stack: &'a mut Vec<(Rc<SpwnSource>, CodeArea)>,
 }
 
 impl<'a> Compiler<'a> {
@@ -106,6 +108,7 @@ impl<'a> Compiler<'a> {
         type_def_map: &'a mut TypeDefMap,
         interner: Interner,
         deprecated_features: DeprecatedFeatures,
+        import_stack: &'a mut Vec<(Rc<SpwnSource>, CodeArea)>,
     ) -> Self {
         Self {
             src,
@@ -119,6 +122,7 @@ impl<'a> Compiler<'a> {
             type_def_map,
             deferred_trigger_func_stack: vec![],
             deprecated_features,
+            import_stack,
         }
     }
 }
@@ -224,6 +228,10 @@ impl Compiler<'_> {
                 // }
 
                 self.compile_stmts(&ast.statements, base_scope, builder)?;
+
+                let default_out = builder.next_reg();
+                builder.alloc_dict(default_out, 0, ZEROSPAN);
+                builder.ret(default_out, true, ZEROSPAN);
 
                 Ok(())
             },

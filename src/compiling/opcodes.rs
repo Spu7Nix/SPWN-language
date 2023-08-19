@@ -142,9 +142,9 @@ opcodes! {
     #[delve(display = |from, to| format!("write {from} deep ~> {to}"))]
     WriteDeep { [from], [to] },
 
-    #[delve(display = |from, to, m| format!("assign {from} ref -> {to}"))]
+    #[delve(display = |from, to, _m| format!("assign {from} ref -> {to}"))]
     AssignRef { [from], [to], left_mut: bool },
-    #[delve(display = |from, to, m| format!("assign {from} deep ~> {to}"))]
+    #[delve(display = |from, to, _m| format!("assign {from} deep ~> {to}"))]
     AssignDeep { [from], [to], left_mut: bool },
 
     #[delve(display = |a, b, to| format!("{a} + {b} -> {to}"))]

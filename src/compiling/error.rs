@@ -293,5 +293,20 @@ error_maker! {
         UnexpectedItemInOverload {
             area: CodeArea,
         },
+
+        // ==================================================================
+        #[
+            Message: "Circular import", Note: None;
+            Main Area: area_b;
+            Labels: [
+                area_a => "{} was previously imported here": name;
+                area_b => "Importing it again causes a circular import";
+            ]
+        ]
+        CircularImport {
+            area_a: CodeArea,
+            area_b: CodeArea,
+            name: String,
+        },
     }
 }

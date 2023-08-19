@@ -308,6 +308,8 @@ fn run_spwn(
         "Compiling...".color_hex(COMPILING_COLOR).bold()
     ));
 
+    let mut import_stack = vec![];
+
     let mut compiler = Compiler::new(
         Rc::clone(&src),
         settings,
@@ -315,6 +317,7 @@ fn run_spwn(
         &mut type_def_map,
         interner,
         parser.deprecated_features,
+        &mut import_stack,
     );
 
     compiler

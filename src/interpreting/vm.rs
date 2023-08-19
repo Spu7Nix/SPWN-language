@@ -31,7 +31,7 @@ use crate::interpreting::error::RuntimeError;
 use crate::interpreting::value::{BuiltinClosure, MacroData};
 use crate::parsing::ast::{ObjectType, Vis, VisSource, VisTrait};
 use crate::parsing::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
-use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap};
+use crate::sources::{BytecodeMap, CodeArea, CodeSpan, Spanned, SpwnSource, TypeDefMap, ZEROSPAN};
 use crate::util::{ImmutCloneStr32, ImmutStr, ImmutVec, Str32, String32};
 
 const RECURSION_LIMIT: usize = 256;
@@ -171,6 +171,8 @@ pub struct Vm {
     pub pattern_mismatch_id_count: usize,
 
     pub trailing_args: Vec<String>,
+
+    pub import_cache: AHashMap<Rc<SpwnSource>, ValueRef>,
 }
 
 impl Vm {
@@ -187,6 +189,7 @@ impl Vm {
             overloads: AHashMap::new(),
             pattern_mismatch_id_count: 0,
             trailing_args: trailing,
+            import_cache: AHashMap::new(),
         }
     }
 
@@ -1232,6 +1235,11 @@ impl Vm {
                                 },
                                 _ => unreachable!(),
                             }
+
+                            mem::drop(r);
+
+                            self.import_cache
+                                .insert(program.src.clone(), ret_val.clone());
                         }
 
                         self.context_stack.last_mut().have_returned = true;
@@ -1259,28 +1267,46 @@ impl Vm {
                     Opcode::Import { id, dest } => {
                         let import = &program.bytecode.import_paths[*id as usize];
 
-                        let coord = FuncCoord {
-                            func: 0,
-                            program: Rc::new(Program {
-                                src: Rc::new(import.clone()),
-                                bytecode: self.bytecode_map[import].clone(),
-                            }),
-                        };
+                        // for (src, _) in &self.import_cache {
+                        //     println!("fetus {:?}", src);
+                        // }
 
-                        let mut top = self.context_stack.last_mut().yeet_current().unwrap();
-                        top.ip += 1;
-                        // also i need to do mergig
-                        let ret = self.run_function(
-                            top,
-                            CallInfo {
-                                func: coord,
-                                call_area: None,
-                                is_builtin: None,
-                            },
-                            Box::new(|_| {}),
-                        );
-                        self.change_reg_multi(dest, ret, &mut out_contexts);
-                        return Ok(LoopFlow::ContinueLoop);
+                        if let Some(v) = self.import_cache.get(import) {
+                            // println!("gorgonzola {:?}", import);
+                            self.change_reg(dest, v.clone());
+                        } else {
+                            // println!("{:?}", import);
+                            self.import_cache.insert(
+                                Rc::new(import.clone()),
+                                ValueRef::new(
+                                    Value::Dict(AHashMap::new())
+                                        .into_stored(self.make_area(ZEROSPAN, &program)),
+                                ),
+                            );
+
+                            let coord = FuncCoord {
+                                func: 0,
+                                program: Rc::new(Program {
+                                    src: Rc::new(import.clone()),
+                                    bytecode: self.bytecode_map[import].clone(),
+                                }),
+                            };
+
+                            let mut top = self.context_stack.last_mut().yeet_current().unwrap();
+                            top.ip += 1;
+                            // also i need to do mergig
+                            let ret = self.run_function(
+                                top,
+                                CallInfo {
+                                    func: coord,
+                                    call_area: None,
+                                    is_builtin: None,
+                                },
+                                Box::new(|_| {}),
+                            );
+                            self.change_reg_multi(dest, ret, &mut out_contexts);
+                            return Ok(LoopFlow::ContinueLoop);
+                        }
                     },
                     Opcode::ToString { from, dest } => {
                         let r = self.get_reg_ref(from).clone();

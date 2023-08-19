@@ -5,7 +5,7 @@ use std::str::FromStr;
 use lasso::Spur;
 use semver::Version;
 
-use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType, VarData};
+use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType, TypeDef, VarData};
 use crate::compiling::builder::{BlockID, CodeBuilder, JumpType};
 use crate::compiling::bytecode::{OptBytecode, OptRegister, UnoptRegister};
 use crate::compiling::deprecated::DeprecatedFeatures;
@@ -18,7 +18,7 @@ use crate::parsing::ast::{
 };
 use crate::parsing::parser::Parser;
 use crate::sources::{CodeSpan, Spannable, SpwnSource, ZEROSPAN};
-use crate::util::{Digest, ImmutStr, ImmutVec, VERSION};
+use crate::util::{Digest, ImmutStr, ImmutVec, String32, VERSION};
 
 impl Compiler<'_> {
     pub fn is_inside_macro(&self, scope: ScopeID) -> Option<Option<Rc<PatternNode>>> {
@@ -167,6 +167,17 @@ impl Compiler<'_> {
 
         let new_src = Rc::new(src_variant(path.clone()));
 
+        if let Some((_, prev_import)) = self.import_stack.iter().find(|(s, _)| s == &new_src) {
+            return Err(CompileError::CircularImport {
+                area_a: prev_import.clone(),
+                area_b: self.make_area(span),
+                name: new_src.name(),
+            });
+        }
+
+        self.import_stack
+            .push((new_src.clone(), self.make_area(span)));
+
         let import_name = path.file_stem().unwrap().to_str().unwrap();
         let import_base = path.parent().unwrap();
         let spwnc_path = import_base.join(format!(".spwnc/{import_name}.spwnc"));
@@ -211,6 +222,15 @@ impl Compiler<'_> {
                         let name = self.intern(&s.value().value);
                         self.available_custom_types
                             .insert(name, s.clone().map(|_| *k));
+
+                        self.type_def_map.insert(
+                            *k,
+                            TypeDef {
+                                src: Rc::clone(&self.src),
+                                def_span: s.value().span,
+                                name: String32::from(&***s.value()).into(),
+                            },
+                        );
                         // self.custom_type_defs.insert(
                         //     TypeDef {
                         //         def_src: import_src.clone(),
@@ -252,9 +272,10 @@ impl Compiler<'_> {
                 self.type_def_map,
                 self.interner.clone(),
                 parser.deprecated_features,
+                self.import_stack,
             );
 
-            println!("tuvalu");
+            // println!("tuvalu");
             compiler.compile(&ast, (0..code.len()).into())?;
             let bytes = bincode::serialize(&*self.bytecode_map[&new_src]).unwrap();
 
@@ -276,7 +297,7 @@ impl Compiler<'_> {
         // self.deprecated
         //     .empty_type_def
         //     .extend(compiler.deprecated.empty_type_def);
-
+        self.import_stack.pop();
         Ok((export_names.into(), (*new_src).clone(), custom_types))
     }
 

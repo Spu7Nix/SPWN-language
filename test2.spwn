@@ -1,5 +1,2 @@
-dbg "fgg";
-let cock = 5
-return {
-    cock
-}
+
+import "test3.spwn"

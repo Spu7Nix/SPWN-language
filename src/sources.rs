@@ -231,7 +231,7 @@ impl BytecodeMap {
             eprintln!(
                 "{}",
                 DeprecatedWarning {
-                    message: "Emtpy type definition".into(),
+                    message: "Empty type definition".into(),
                     area: CodeArea {
                         span,
                         src: src.clone(),

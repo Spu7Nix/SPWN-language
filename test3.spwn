@@ -1,5 +1,2 @@
 
-a = 20
-match a {
-    ==@int | ==@int => {}
-}
+import "test.spwn"
