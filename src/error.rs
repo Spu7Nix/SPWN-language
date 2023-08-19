@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use crate::doc::error::DocError;
 use crate::gd::error::LevelError;
+#[cfg(target_os = "windows")]
 use crate::liveeditor::WebSocketError;
 use crate::util::error::ErrorReport;
 
@@ -23,6 +24,7 @@ pub enum SpwnError {
     #[error("{0}")]
     DocError(#[from] DocError),
 
+    #[cfg(target_os = "windows")]
     #[error("{0}")]
     WebSocketError(#[from] WebSocketError),
 

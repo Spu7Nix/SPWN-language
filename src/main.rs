@@ -91,11 +91,10 @@ fn main() -> Result<(), SpwnError> {
 
     match args.command {
         Command::Build { file, settings } => {
-            let is_live_editor = if cfg!(target_os = "windows") {
-                settings.live_editor
-            } else {
-                false
-            };
+            #[cfg(target_os = "windows")]
+            let is_live_editor = settings.live_editor;
+            #[cfg(not(target_os = "windows"))]
+            let is_live_editor = false;
 
             let gd_path = if !(settings.no_level || is_live_editor) {
                 Some(if let Some(ref sf) = settings.save_file {
@@ -400,3 +399,4 @@ fn generate_doc(settings: &DocSettings, spinner: &mut Spinner) -> Result<(), Spw
 
     Ok(())
 }
+
