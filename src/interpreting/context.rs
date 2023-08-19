@@ -211,22 +211,22 @@ impl Vm {
 
         for stack_item in &mut new.stack {
             for reg in stack_item.registers.iter_mut() {
-                *reg = reg.deep_clone_checked(self, &mut Some(&mut clone_map));
+                *reg = reg.deep_clone_checked(self, &mut Some(&mut clone_map), true);
             }
         }
 
         if let Ok(Some(v)) = &mut new.returned {
-            *v = v.deep_clone_checked(self, &mut Some(&mut clone_map))
+            *v = v.deep_clone_checked(self, &mut Some(&mut clone_map), true)
         }
 
         for (_, v) in &mut new.storage {
             match v {
                 ContextStorage::Single(v) => {
-                    *v = v.deep_clone_checked(self, &mut Some(&mut clone_map))
+                    *v = v.deep_clone_checked(self, &mut Some(&mut clone_map), true)
                 },
                 ContextStorage::Vec(v) => {
                     for v in v {
-                        *v = v.deep_clone_checked(self, &mut Some(&mut clone_map))
+                        *v = v.deep_clone_checked(self, &mut Some(&mut clone_map), true)
                     }
                 },
             }

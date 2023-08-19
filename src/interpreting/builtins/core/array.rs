@@ -14,7 +14,7 @@ impl_type! {
 
         /// fghfddggfd
         fn push(&mut Array(slf) as "self", elem) {
-            slf.borrow_mut().push(vm.deep_clone_ref(elem));
+            slf.borrow_mut().push(vm.deep_clone_ref(elem, false));
 
             Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
@@ -68,7 +68,7 @@ impl_type! {
 
         /// sds
         fn unshift(&mut Array(slf) as "self", elem) {
-            slf.borrow_mut().insert(0, vm.deep_clone_ref(elem));
+            slf.borrow_mut().insert(0, vm.deep_clone_ref(elem, false));
             Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
@@ -81,7 +81,7 @@ impl_type! {
                 Err(e) => return Multi::new_single(ctx, Err(e))
             };
 
-            slf.borrow_mut().insert(idx, vm.deep_clone_ref(elem));
+            slf.borrow_mut().insert(idx, vm.deep_clone_ref(elem, false));
             Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 

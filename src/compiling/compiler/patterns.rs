@@ -483,7 +483,7 @@ impl Compiler<'_> {
                         Some(mutable) => {
                             builder.assign_deep(expr_reg, path_info.reg, mutable, pattern.span)
                         },
-                        None => builder.write(expr_reg, path_info.reg, pattern.span),
+                        None => builder.write_deep(expr_reg, path_info.reg, pattern.span),
                     }
                 }
                 builder.load_const(true, out_reg, pattern.span);
@@ -501,7 +501,7 @@ impl Compiler<'_> {
                 if *is_ref {
                     builder.copy_ref(expr_reg, var_reg, pattern.span);
                 } else {
-                    builder.write(expr_reg, var_reg, pattern.span);
+                    builder.write_deep(expr_reg, var_reg, pattern.span);
                 }
                 builder.load_const(true, out_reg, pattern.span);
             },

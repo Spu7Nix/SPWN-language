@@ -17,7 +17,7 @@ impl_type! {
             let mut slf = slf.borrow_mut();
             let v = slf.entry(Rc::clone(&*key.borrow())).or_insert(VisSource::Public(value.clone()));
 
-            let v = vm.deep_clone_ref((*v).value());
+            let v = vm.deep_clone_ref((*v).value(), false);
 
             Multi::new_single(ctx, Ok(v))
         }
