@@ -39,16 +39,26 @@ const RECURSION_LIMIT: usize = 256;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 pub trait DeepClone<I> {
-    fn deep_clone_map(&self, input: I, map: &mut Option<&mut CloneMap>) -> StoredValue;
-    fn deep_clone(&self, input: I) -> StoredValue {
-        self.deep_clone_map(input, &mut None)
+    fn deep_clone_map(
+        &self,
+        input: I,
+        map: &mut Option<&mut CloneMap>,
+        context_split: bool,
+    ) -> StoredValue;
+    fn deep_clone(&self, input: I, context_split: bool) -> StoredValue {
+        self.deep_clone_map(input, &mut None, context_split)
     }
-    fn deep_clone_ref(&self, input: I) -> ValueRef {
-        let v: StoredValue = self.deep_clone(input);
+    fn deep_clone_ref(&self, input: I, context_split: bool) -> ValueRef {
+        let v: StoredValue = self.deep_clone(input, context_split);
         ValueRef::new(v)
     }
-    fn deep_clone_ref_map(&self, input: I, map: &mut Option<&mut CloneMap>) -> ValueRef {
-        let v: StoredValue = self.deep_clone_map(input, map);
+    fn deep_clone_ref_map(
+        &self,
+        input: I,
+        map: &mut Option<&mut CloneMap>,
+        context_split: bool,
+    ) -> ValueRef {
+        let v: StoredValue = self.deep_clone_map(input, map, context_split);
         ValueRef::new(v)
     }
 }
@@ -74,19 +84,24 @@ impl ValueRef {
         Self(Rc::new(RefCell::new(v)))
     }
 
-    pub fn deep_clone_checked(&self, vm: &Vm, map: &mut Option<&mut CloneMap>) -> Self {
+    pub fn deep_clone_checked(
+        &self,
+        vm: &Vm,
+        map: &mut Option<&mut CloneMap>,
+        context_split: bool,
+    ) -> Self {
         if let Some(m) = map {
             if let Some(v) = m.get(self) {
                 return v.clone();
             }
-            let new = vm.deep_clone_ref_map(self, map);
+            let new = vm.deep_clone_ref_map(self, map, context_split);
             // goofy thing to avoid borrow checker
             if let Some(m) = map {
                 m.insert(self, new.clone());
             }
             return new;
         }
-        vm.deep_clone_ref_map(self, map)
+        vm.deep_clone_ref_map(self, map, context_split)
     }
 }
 
@@ -301,7 +316,12 @@ impl Vm {
 }
 
 impl DeepClone<&StoredValue> for Vm {
-    fn deep_clone_map(&self, input: &StoredValue, map: &mut Option<&mut CloneMap>) -> StoredValue {
+    fn deep_clone_map(
+        &self,
+        input: &StoredValue,
+        map: &mut Option<&mut CloneMap>,
+        context_split: bool,
+    ) -> StoredValue {
         let area = input.area.clone();
 
         let mut deep_clone_dict_items = |v: &AHashMap<ImmutCloneStr32, VisSource<ValueRef>>| {
@@ -309,7 +329,8 @@ impl DeepClone<&StoredValue> for Vm {
                 .map(|(k, v)| {
                     (
                         k.clone(),
-                        v.clone().map(|v| v.deep_clone_checked(self, map)),
+                        v.clone()
+                            .map(|v| v.deep_clone_checked(self, map, context_split)),
                     )
                 })
                 .collect()
@@ -318,11 +339,14 @@ impl DeepClone<&StoredValue> for Vm {
         let value = match &input.value {
             Value::Array(arr) => Value::Array(
                 arr.iter()
-                    .map(|v| v.deep_clone_checked(self, map))
+                    .map(|v| v.deep_clone_checked(self, map, context_split))
                     .collect(),
             ),
             Value::Dict(map) => Value::Dict(deep_clone_dict_items(map)),
-            Value::Maybe(v) => Value::Maybe(v.as_ref().map(|v| v.deep_clone_checked(self, map))),
+            Value::Maybe(v) => Value::Maybe(
+                v.as_ref()
+                    .map(|v| v.deep_clone_checked(self, map, context_split)),
+            ),
             Value::Instance { typ, items } => Value::Instance {
                 typ: *typ,
                 items: deep_clone_dict_items(items),
@@ -330,30 +354,37 @@ impl DeepClone<&StoredValue> for Vm {
             Value::Module { exports, types } => Value::Module {
                 exports: exports
                     .iter()
-                    .map(|(k, v)| (Rc::clone(k), v.deep_clone_checked(self, map)))
+                    .map(|(k, v)| (Rc::clone(k), v.deep_clone_checked(self, map, context_split)))
                     .collect(),
                 types: types.clone(),
             },
             v @ (Value::Macro(data) | Value::Iterator(data)) => {
                 let mut new_data = data.clone();
-                for r in new_data.defaults.iter_mut().flatten() {
-                    *r = r.deep_clone_checked(self, map)
-                    // }
+                if context_split {
+                    for r in new_data.defaults.iter_mut().flatten() {
+                        *r = r.deep_clone_checked(self, map, context_split)
+                        // }
+                    }
                 }
                 if let Some(r) = &mut new_data.self_arg {
-                    *r = r.deep_clone_checked(self, map)
+                    *r = r.deep_clone_checked(self, map, context_split)
                 }
 
                 match &mut new_data.target {
                     MacroTarget::Spwn { captured, .. } => {
-                        for r in captured.iter_mut() {
-                            *r = r.deep_clone_checked(self, map)
+                        if context_split {
+                            for r in captured.iter_mut() {
+                                *r = r.deep_clone_checked(self, map, context_split)
+                            }
                         }
                     },
                     MacroTarget::FullyRust { fn_ptr, .. } => {
-                        let new = fn_ptr.borrow().shallow_clone();
-                        new.borrow_mut().deep_clone_inner_refs(self, map);
-                        *fn_ptr = new;
+                        if context_split {
+                            let new = fn_ptr.borrow().shallow_clone();
+                            new.borrow_mut()
+                                .deep_clone_inner_refs(self, map, context_split);
+                            *fn_ptr = new;
+                        }
                     },
                 }
                 if matches!(v, Value::Macro(_)) {
@@ -370,17 +401,27 @@ impl DeepClone<&StoredValue> for Vm {
 }
 
 impl DeepClone<&ValueRef> for Vm {
-    fn deep_clone_map(&self, input: &ValueRef, map: &mut Option<&mut CloneMap>) -> StoredValue {
+    fn deep_clone_map(
+        &self,
+        input: &ValueRef,
+        map: &mut Option<&mut CloneMap>,
+        context_split: bool,
+    ) -> StoredValue {
         let v = input.borrow();
 
-        self.deep_clone_map(&*v, map)
+        self.deep_clone_map(&*v, map, context_split)
     }
 }
 
 impl DeepClone<OptRegister> for Vm {
-    fn deep_clone_map(&self, input: OptRegister, map: &mut Option<&mut CloneMap>) -> StoredValue {
+    fn deep_clone_map(
+        &self,
+        input: OptRegister,
+        map: &mut Option<&mut CloneMap>,
+        context_split: bool,
+    ) -> StoredValue {
         let v = &self.context_stack.current().stack.last().unwrap().registers[*input as usize];
-        self.deep_clone_map(v, map)
+        self.deep_clone_map(v, map, context_split)
     }
 }
 
@@ -621,7 +662,9 @@ impl Vm {
                             value.into_stored(self.make_area(opcode_span, &program)),
                         );
                     },
-                    Opcode::CopyDeep { from, to } => self.change_reg(to, self.deep_clone(from)),
+                    Opcode::CopyDeep { from, to } => {
+                        self.change_reg(to, self.deep_clone(from, false))
+                    },
                     Opcode::CopyShallow { from, to } => {
                         let new = self.get_reg_ref(from).borrow().clone();
                         self.change_reg(to, new)
@@ -634,7 +677,9 @@ impl Vm {
                         let v = self.get_reg_ref(from).borrow().clone();
                         self.write_pointee(to, v)
                     },
-                    Opcode::WriteDeep { from, to } => self.write_pointee(to, self.deep_clone(from)),
+                    Opcode::WriteDeep { from, to } => {
+                        self.write_pointee(to, self.deep_clone(from, false))
+                    },
                     Opcode::AssignRef { from, to, left_mut } => {
                         assign_op!(= false, to, from, left_mut);
                     },
@@ -904,7 +949,7 @@ impl Vm {
                         },
                     ),
                     Opcode::PushArrayElem { elem, dest } => {
-                        let push = self.deep_clone_ref(elem);
+                        let push = self.deep_clone_ref(elem, false);
                         match &mut self.get_reg_ref(dest).borrow_mut().value {
                             Value::Array(v) => v.push(push),
                             _ => unreachable!(),
@@ -918,7 +963,7 @@ impl Vm {
                         },
                     ),
                     Opcode::InsertDictElem { elem, dest, key } => {
-                        let push = self.deep_clone_ref(elem);
+                        let push = self.deep_clone_ref(elem, false);
 
                         let key = self.borrow_reg(key, |key| match &key.value {
                             Value::String(s) => Ok(s.clone()),
@@ -931,7 +976,7 @@ impl Vm {
                         };
                     },
                     Opcode::InsertPrivDictElem { elem, dest, key } => {
-                        let push = self.deep_clone_ref(elem);
+                        let push = self.deep_clone_ref(elem, false);
 
                         let key = self.borrow_reg(key, |key| match &key.value {
                             Value::String(s) => Ok(s.clone()),
@@ -1005,7 +1050,7 @@ impl Vm {
                         dest,
                     } => {
                         // Objec
-                        let push = self.deep_clone(elem);
+                        let push = self.deep_clone(elem, false);
 
                         let param = {
                             let types = obj_key.types();
@@ -1153,7 +1198,7 @@ impl Vm {
                         self.change_reg(reg, val.into_stored(area))
                     },
                     Opcode::WrapMaybe { from, to } => {
-                        let v = self.deep_clone_ref(from);
+                        let v = self.deep_clone_ref(from, false);
                         self.change_reg(
                             to,
                             Value::Maybe(Some(v))
@@ -1399,7 +1444,7 @@ impl Vm {
                                     error!(base_type)
                                 };
 
-                                let mut v = self.deep_clone(r.value());
+                                let mut v = self.deep_clone(r.value(), false);
 
                                 if let Value::Macro(MacroData {
                                     self_arg,
@@ -2449,7 +2494,8 @@ impl Vm {
     ) {
         if let Either::Right(true) = op {
             let v = ctx.stack.last().unwrap().registers[*right as usize].clone();
-            ctx.stack.last_mut().unwrap().registers[*right as usize] = self.deep_clone_ref(&v)
+            ctx.stack.last_mut().unwrap().registers[*right as usize] =
+                self.deep_clone_ref(&v, false)
         }
 
         let mut out: Multi<Option<Result<(), RuntimeError>>> = Multi::new_single(ctx, None);
@@ -2697,7 +2743,7 @@ impl Vm {
                     a.into_iter()
                         .map(|(k, v)| {
                             let s = Value::String(k.clone()).into_value_ref(area.clone());
-                            let v = self.deep_clone_ref(v.value());
+                            let v = self.deep_clone_ref(v.value(), false);
                             Value::Array(vec![s, v]).into_value_ref(area.clone())
                         })
                         .collect(),

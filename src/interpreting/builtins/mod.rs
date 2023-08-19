@@ -612,7 +612,7 @@ macro_rules! impl_type {
     };
     (@ArgsCheckCloneA[$idx:expr]($args:ident, $vm:ident) $ident:ident $($t:tt)*) => {
         {
-            let new = $crate::interpreting::vm::DeepClone::deep_clone_ref($vm, &$args[$idx]);
+            let new = $crate::interpreting::vm::DeepClone::deep_clone_ref($vm, &$args[$idx], false);
             $args[$idx] = new;
         }
         $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneB[$ __ $idx, false]($args, $vm) $ident $($t)* }

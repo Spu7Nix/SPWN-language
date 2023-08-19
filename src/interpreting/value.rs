@@ -40,9 +40,14 @@ pub trait BuiltinClosure:
 {
     fn shallow_clone(&self) -> Rc<RefCell<dyn BuiltinClosure>>;
     fn get_mut_refs<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut ValueRef> + 'a>;
-    fn deep_clone_inner_refs(&mut self, vm: &Vm, map: &mut Option<&mut CloneMap>) {
+    fn deep_clone_inner_refs(
+        &mut self,
+        vm: &Vm,
+        map: &mut Option<&mut CloneMap>,
+        context_split: bool,
+    ) {
         for v in self.get_mut_refs() {
-            *v = v.deep_clone_checked(vm, map);
+            *v = v.deep_clone_checked(vm, map, context_split);
         }
     }
     // fn deep_clone_checked(&self, vm: &Vm, map: &mut Option<&mut CloneMap>) -> Self {
