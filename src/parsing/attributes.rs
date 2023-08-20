@@ -83,7 +83,7 @@ impl Statement {
             Statement::Return(..) => AT::Return,
             Statement::Break => AT::Break,
             Statement::Continue => AT::Continue,
-            Statement::TypeDef(..) => AT::TypeDef,
+            Statement::TypeDef { .. } => AT::TypeDef,
             Statement::ExtractImport(..) => AT::ExtractImport,
             Statement::Impl { .. } => AT::Impl,
             Statement::Overload { .. } => AT::Overload,

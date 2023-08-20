@@ -402,4 +402,3 @@ fn generate_doc(settings: &DocSettings, spinner: &mut Spinner) -> Result<(), Spw
 
     Ok(())
 }
-

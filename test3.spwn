@@ -1,2 +1,5 @@
 
-import "test.spwn"
+extract import "test.spwn"
+
+dbg @thing::lol
+dbg @lol

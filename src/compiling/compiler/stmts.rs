@@ -273,11 +273,8 @@ impl<'a> Compiler<'a> {
                     })
                 },
             },
-            Statement::TypeDef(name) => {
-                // todo: actually parse other syntax
-                // self.deprecated
-                //     .empty_type_def
-                //     .push(self.make_area(stmt.span));
+            Statement::TypeDef { name, members } => {
+                // todo: members
 
                 if !matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
                     return Err(CompileError::TypeDefNotGlobal {
@@ -325,6 +322,7 @@ impl<'a> Compiler<'a> {
                         name: name_str,
                     },
                 );
+
                 self.available_custom_types
                     .insert(*name.value(), name.map(|_| custom_id));
             },

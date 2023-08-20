@@ -247,5 +247,5 @@ impl BytecodeMap {
     }
 }
 
-#[derive(Default, Deref, DerefMut, Index, IndexMut)]
+#[derive(Default, Debug, Deref, DerefMut, Index, IndexMut)]
 pub struct TypeDefMap(AHashMap<CustomTypeID, TypeDef<ImmutStr32>>);

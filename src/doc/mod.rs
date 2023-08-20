@@ -81,10 +81,10 @@ impl<'a> DocCompiler<'a> {
 
     fn compile_stmt(&mut self, stmt: &StmtNode, src: &Rc<SpwnSource>) -> DocResult<()> {
         match &*stmt.stmt {
-            Statement::TypeDef(td) if td.is_pub() => {
+            Statement::TypeDef { name, .. } if name.is_pub() => {
                 let typ = self.new_type(true, &stmt.attributes, src)?;
 
-                self.types.insert((Rc::clone(src), *td.value()), typ);
+                self.types.insert((Rc::clone(src), *name.value()), typ);
 
                 // todo: check if we have members for static types maybe
             },
@@ -96,8 +96,6 @@ impl<'a> DocCompiler<'a> {
                 let t = self.new_type(false, &stmt.attributes, src)?;
                 // leave the type as-is if it was already defined, otherwise insert it as undefined
                 self.types.entry((Rc::clone(src), spur)).or_insert(t);
-
-                // todo: impls will only have fns?
 
                 // self.impls.entry(spur).and_modify(f)
             },

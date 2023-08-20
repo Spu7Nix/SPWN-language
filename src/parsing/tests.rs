@@ -219,7 +219,7 @@ fn test_attrs() -> ParseResult<()> {
     let t = parse(r#"#[doc(u"")] type @int"#)?;
     stmt_eq!(
         t,
-        St::TypeDef(Vis::Public(spur!("int"))),
+        St::TypeDef { name: Vis::Public(spur!("int")), members: None },
         attrs: vec![Attribute {
             style: AttrStyle::Outer,
             item: AttrItem {
@@ -230,10 +230,10 @@ fn test_attrs() -> ParseResult<()> {
             span: CodeSpan::internal()
         }]
     );
-    let t = parse(r##"#[doc = r#""#] type @int"##)?;
+    let t = parse(r##"#[doc = r#""#] type @int {}"##)?;
     stmt_eq!(
         t,
-        St::TypeDef(Vis::Public(spur!("int"))),
+        St::TypeDef { name: Vis::Public(spur!("int")), members: Some(vec![]) },
         attrs: vec![Attribute {
             style: AttrStyle::Outer,
             item: AttrItem {
@@ -1638,10 +1638,26 @@ fn test_control_flow() -> ParseResult<()> {
 #[test]
 fn test_typedef() -> ParseResult<()> {
     let t = parse("type @A")?;
-    stmt_eq!(t, St::TypeDef(Vis::Public(spur!("A"))));
+    stmt_eq!(
+        t,
+        St::TypeDef {
+            name: Vis::Public(spur!("A")),
+            members: None
+        }
+    );
 
-    let t = parse("private type @A")?;
-    stmt_eq!(t, St::TypeDef(Vis::Private(spur!("A"))));
+    let t = parse("private type @A { a: @int }")?;
+    stmt_eq!(
+        t,
+        St::TypeDef {
+            name: Vis::Private(spur!("A")),
+            members: Some(vec![Vis::Public(DictItem {
+                name: span!(spur!("a")),
+                attributes: vec![],
+                value: Some(Ex::Type(spur!("@int")).node()),
+            })])
+        }
+    );
 
     Ok(())
 }

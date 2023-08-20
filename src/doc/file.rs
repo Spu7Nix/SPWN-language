@@ -27,7 +27,7 @@ impl<'a> DocCompiler<'a> {
 
         for stmt in &ast.statements {
             match &*stmt.stmt {
-                Statement::TypeDef(td) if td.is_pub() => return true,
+                Statement::TypeDef { name, .. } if name.is_pub() => return true,
                 _ => (),
             }
         }

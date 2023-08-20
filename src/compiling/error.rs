@@ -213,7 +213,7 @@ error_maker! {
             Message: "Nonexistent type", Note: None;
             Main Area: area;
             Labels: [
-                area => "Type {} does not exist or has not been imported and extracted": format!("@{type_name}");
+                area => "Type {} does not exist, is private, or has not been imported and extracted": format!("@{type_name}");
             ]
         ]
         NonexistentType {

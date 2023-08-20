@@ -126,33 +126,33 @@ impl Parser<'_> {
 
                 Statement::Break
             },
-            Token::Type => {
+            t @ (Token::Private | Token::Type) => {
+                let vis = if matches!(t, Token::Private) {
+                    self.next()?;
+                    Vis::Private
+                } else {
+                    Vis::Public
+                };
+
                 self.next()?;
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
 
                 if self.skip_tok(Token::RBracket)? {
-                    todo!("type @a {{....}}")
+                    let members = self.parse_dictlike(true)?;
+
+                    Statement::TypeDef {
+                        name: vis(self.intern_string(name)),
+                        members: Some(members),
+                    }
                 } else {
                     let span = self.span();
                     self.deprecated_features.empty_type_def.insert(span);
 
-                    Statement::TypeDef(Vis::Public(self.intern_string(name)))
-                }
-            },
-            Token::Private => {
-                self.next()?;
-                self.expect_tok(Token::Type)?;
-                self.expect_tok(Token::TypeIndicator)?;
-                let name = self.slice()[1..].to_string();
-
-                if self.skip_tok(Token::RBracket)? {
-                    todo!("type @a {{....}}")
-                } else {
-                    let span = self.span();
-                    self.deprecated_features.empty_type_def.insert(span);
-
-                    Statement::TypeDef(Vis::Public(self.intern_string(name)))
+                    Statement::TypeDef {
+                        members: None,
+                        name: vis(self.intern_string(name)),
+                    }
                 }
             },
             Token::Impl => {

@@ -320,7 +320,11 @@ pub enum Statement {
     Break,
     Continue,
 
-    TypeDef(Vis<Spur>),
+    TypeDef {
+        name: Vis<Spur>,
+        // wont be optional after 1.0.0
+        members: Option<Vec<Vis<DictItem>>>,
+    },
 
     ExtractImport(Import),
 
