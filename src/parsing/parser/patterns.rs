@@ -49,7 +49,6 @@ impl<'a> Parser<'a> {
                             pat: Box::new(Pattern::Path {
                                 var: key,
                                 path: vec![],
-                                is_ref: false,
                             }),
                             span: key_span,
                         }
@@ -73,36 +72,11 @@ impl<'a> Parser<'a> {
                     self.expect_tok(Token::Ident)?;
                     Pattern::Mut {
                         name: self.slice_interned(),
-                        is_ref: false,
+                        // is_ref: false,
                     }
                 },
-                t @ (Token::Ident | Token::BinAnd) => {
-                    // println!("amba {t:?}");
-                    let (is_ref, name) = if t == Token::Ident {
-                        (false, self.slice_interned())
-                    } else {
-                        'inner: {
-                            if self.next_is(Token::Let)? {
-                                let span = self.span();
-                                self.deprecated_features.let_not_mut.insert(span);
-
-                                self.next()?;
-                            } else if self.next_is(Token::Mut)? {
-                                self.next()?;
-                            } else {
-                                break 'inner;
-                            }
-
-                            self.expect_tok(Token::Ident)?;
-                            break 'out_pat Pattern::Mut {
-                                name: self.slice_interned(),
-                                is_ref: true,
-                            };
-                        }
-
-                        self.expect_tok(Token::Ident)?;
-                        (true, self.slice_interned())
-                    };
+                Token::Ident => {
+                    let name = self.slice_interned();
 
                     let mut path = vec![];
 
@@ -133,12 +107,15 @@ impl<'a> Parser<'a> {
                         }
                     }
 
-                    Pattern::Path {
-                        var: name,
-                        path,
-                        is_ref,
+                    Pattern::Path { var: name, path }
+                },
+                Token::BinAnd => {
+                    self.expect_tok(Token::Ident)?;
+                    Pattern::Ref {
+                        name: self.slice_interned(),
                     }
                 },
+
                 Token::LSqBracket => {
                     let mut v = vec![];
                     list_helper!(self, RSqBracket {

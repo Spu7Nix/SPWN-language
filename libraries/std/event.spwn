@@ -17,7 +17,7 @@ impl @event {
         return @event::{ on }
     },
 
-    on: (&self, func: @trigger_function) {
+    on: (self, func: @trigger_function) {
         self.on(func)
     }
 }

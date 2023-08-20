@@ -142,7 +142,6 @@ impl Parser<'_> {
                                     pat: Box::new(Pattern::Path {
                                         var: var_name,
                                         path: vec![],
-                                        is_ref: false,
                                     }),
                                     span: var_span,
                                 },

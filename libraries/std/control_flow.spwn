@@ -47,7 +47,7 @@ for_loop = (
     range: @range,
     code: @counter -> (),
 ) {
-    mut i = @counter::new()
+    i = @counter::new()
     i += range.start
 
     func = !{

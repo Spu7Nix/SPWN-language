@@ -4,7 +4,7 @@ extract import "control_flow.spwn"
 
 impl @group {
     move: (
-        &self,
+        self,
         x: @int,
         y: @int,
         duration: @float | @int = 0,
@@ -24,7 +24,7 @@ impl @group {
         wait(duration)
     },
 
-    stop: (&self) {
+    stop: (self) {
         $.add(trigger {
             OBJ_ID: @obj_id::triggers.STOP,
             TARGET: self,
@@ -32,7 +32,7 @@ impl @group {
     },
 
     alpha: (
-        &self,
+        self,
         opacity: @float & >= 0.0 & <= 1.0 = 1.0,
         duration: @int | @float = 0
     ) {
@@ -45,7 +45,7 @@ impl @group {
         wait(duration)
     },
 
-    toggle_off: (&self) {
+    toggle_off: (self) {
         $.add(trigger {
             OBJ_ID: @obj_id::triggers.TOGGLE,
             TARGET: self,
@@ -53,7 +53,7 @@ impl @group {
         })
     },
 
-    toggle_on: (&self) {
+    toggle_on: (self) {
         $.add(trigger {
             OBJ_ID: @obj_id::triggers.TOGGLE,
             TARGET: self,
@@ -74,7 +74,7 @@ impl @group {
         ```
     ")]
     rotate: (
-        &self,
+        self,
         center: @group,
         degrees: @int,
         duration: @float | @int = 0,
@@ -104,7 +104,7 @@ impl @group {
         ```
     ")]
     follow: (
-        &self,
+        self,
         other: @group,
         x_mod: @float | @int = 1,
         y_mod: @float | @int = 1,
@@ -131,7 +131,7 @@ impl @group {
     ")]
     follow_player_y:
     (
-        &self,
+        self,
         speed: @float | @int = 1,
         delay: @float | @int = 0,
         offset: @float | @int = 0,
@@ -159,7 +159,7 @@ impl @group {
         ```
     ")]
     move_to: (
-        &self,
+        self,
         target: @group,
         duration: @float | @int = 0,
         x_only: @bool = false,
@@ -198,7 +198,7 @@ impl @group {
     //     ```
     // ")]
     // move_to_coords: (
-    //     &self,
+    //     self,
     //     coords:
     //         { x: @int | @float, y: @int | @float }
     //         | { x: @int | @float }
@@ -252,7 +252,7 @@ impl @group {
         ```
     ")]
     pulse: (
-        &self,
+        self,
         c: @chroma,
         fade_in: @float | @int = 0,
         hold: @float | @int = 0,

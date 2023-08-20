@@ -6,11 +6,11 @@ impl @comparison {
     LARGER_THAN: @comparison::{id: 1},
     SMALLER_THAN: @comparison::{id: 2},
 
-    id: (&self) -> @int {
+    id: (self) -> @int {
         return self.id
     },
 
-    _display_: (&self) -> @string {
+    _display_: (self) -> @string {
         return match self.id {
             ==0 => "EQUAL_TO",
             ==1 => "LARGER_THAN",
@@ -20,7 +20,7 @@ impl @comparison {
 }
 
 impl @item {
-    add: (&self, amount: @int) {
+    add: (self, amount: @int) {
         $.add(trigger {
             OBJ_ID: 1817,
             COUNT: amount,

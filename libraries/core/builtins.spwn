@@ -8,7 +8,7 @@ impl @builtins {
     	
 	#[doc("\ng")]
 	print: #[builtin] (
-		&self: @builtins,
+		self: @builtins,
 		...args: (_)[],
 		end: @string = "\n",
 		sep: @string = " ",
@@ -16,37 +16,37 @@ impl @builtins {
 	
 	#[doc("\nfghfddggfd")]
 	add: #[builtin] (
-		&self: @builtins,
+		self: @builtins,
 		object: @object,
 		ignore_context: @bool = false,
 	) {},
 	
 	#[doc("\ndfdf")]
 	epsilon: #[builtin] (
-		&self: @builtins,
+		self: @builtins,
 	) -> @epsilon {},
 	
 	#[doc("\ndfdf")]
 	trigger_fn_context: #[builtin] (
-		&self: @builtins,
+		self: @builtins,
 	) -> @group {},
 	
 	#[doc("\ndfdf")]
 	assert: #[builtin] (
-		&self: @builtins,
+		self: @builtins,
 		value: @bool,
 	) {},
 	
 	#[doc("\ngg")]
 	assert_eq: #[builtin] (
-		&self: @builtins,
+		self: @builtins,
 		left: _,
 		right: _,
 	) {},
 	
 	#[doc("\ngfg")]
 	hash: #[builtin] (
-		&self: @builtins,
-		&value: _,
+		self: @builtins,
+		value: _,
 	) -> @int {},
 }

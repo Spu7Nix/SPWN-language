@@ -55,11 +55,7 @@ impl<'a> Compiler<'a> {
                     ($opcode_name:ident) => {{
                         let var_name;
                         let path_info = match &*left.pat {
-                            Pattern::Path {
-                                var,
-                                path,
-                                is_ref: false,
-                            } => {
+                            Pattern::Path { var, path } => {
                                 var_name = *var;
                                 self.get_path_reg(*var, false, path, scope, builder, stmt.span)?
                             },

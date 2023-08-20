@@ -460,35 +460,35 @@ impl Compiler<'_> {
             },
             Pattern::MaybeDestructure(_) => todo!(),
             Pattern::InstanceDestructure(..) => todo!(),
-            Pattern::Path { var, path, is_ref } => {
-                if *is_ref && !path.is_empty() {
-                    return Err(CompileError::IllegalAssign {
-                        area: self.make_area(pattern.span),
-                    });
-                }
+            Pattern::Path { var, path } => {
+                // if *is_ref && !path.is_empty() {
+                //     return Err(CompileError::IllegalAssign {
+                //         area: self.make_area(pattern.span),
+                //     });
+                // }
                 // println!("{}", try_new_var);
 
                 let path_info =
                     self.get_path_reg(*var, try_new_var, path, scope, builder, pattern.span)?;
 
-                if *is_ref {
-                    match path_info.exists {
-                        Some(mutable) => {
-                            builder.assign_ref(expr_reg, path_info.reg, mutable, pattern.span)
-                        },
-                        None => builder.copy_ref(expr_reg, path_info.reg, pattern.span),
-                    }
-                } else {
-                    match path_info.exists {
-                        Some(mutable) => {
-                            builder.assign_deep(expr_reg, path_info.reg, mutable, pattern.span)
-                        },
-                        None => builder.write_deep(expr_reg, path_info.reg, pattern.span),
-                    }
+                // if *is_ref {
+                //     match path_info.exists {
+                //         Some(mutable) => {
+                //             builder.assign_ref(expr_reg, path_info.reg, mutable, pattern.span)
+                //         },
+                //         None => builder.copy_ref(expr_reg, path_info.reg, pattern.span),
+                //     }
+                // } else {
+                match path_info.exists {
+                    Some(mutable) => {
+                        builder.assign_deep(expr_reg, path_info.reg, mutable, pattern.span)
+                    },
+                    None => builder.write_deep(expr_reg, path_info.reg, pattern.span),
                 }
+                // }
                 builder.load_const(true, out_reg, pattern.span);
             },
-            Pattern::Mut { name, is_ref } => {
+            Pattern::Mut { name } => {
                 let var_reg = builder.next_reg();
                 self.scopes[scope].vars.insert(
                     *name,
@@ -498,11 +498,28 @@ impl Compiler<'_> {
                         reg: var_reg,
                     },
                 );
-                if *is_ref {
-                    builder.copy_ref(expr_reg, var_reg, pattern.span);
-                } else {
-                    builder.write_deep(expr_reg, var_reg, pattern.span);
-                }
+                // if *is_ref {
+                //     builder.copy_ref(expr_reg, var_reg, pattern.span);
+                // } else {
+                builder.write_deep(expr_reg, var_reg, pattern.span);
+                // }
+                builder.load_const(true, out_reg, pattern.span);
+            },
+            Pattern::Ref { name } => {
+                let var_reg = builder.next_reg();
+                self.scopes[scope].vars.insert(
+                    *name,
+                    VarData {
+                        mutable: true,
+                        def_span: pattern.span,
+                        reg: var_reg,
+                    },
+                );
+                // if *is_ref {
+                builder.copy_ref(expr_reg, var_reg, pattern.span);
+                // } else {
+                // builder.write_deep(expr_reg, var_reg, pattern.span);
+                // }
                 builder.load_const(true, out_reg, pattern.span);
             },
             Pattern::MacroPattern { args, .. } => {

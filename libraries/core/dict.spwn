@@ -8,15 +8,15 @@ impl @dict {
     	
 	#[doc("\nfdf")]
 	get_or_insert: #[builtin] (
-		&mut self: @dict,
+		self: @dict,
 		key: @string,
-		&value: _,
+		value: _,
 	) -> _ {},
 	
 	#[doc("\ndfdfdf")]
 	insert: #[builtin] (
-		&mut self: @dict,
+		self: @dict,
 		key: @string,
-		&value: _,
+		value: _,
 	) {},
 }

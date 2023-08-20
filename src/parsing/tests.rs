@@ -763,6 +763,7 @@ fn test_is_pattern() -> ParseResult<()> {
         Pattern::Mut { .. } => (),
         Pattern::IfGuard { .. } => (),
         Pattern::Empty => (),
+        Pattern::Ref { .. } => (),
     };
 
     let e: ExprNode = Ex::Int(1).node();
@@ -879,15 +880,9 @@ fn test_is_pattern() -> ParseResult<()> {
                 Pt::Path {
                     var: spur!("x"),
                     path: vec![],
-                    is_ref: false
                 }
                 .node(),
-                Pt::Path {
-                    var: spur!("y"),
-                    path: vec![],
-                    is_ref: true
-                }
-                .node()
+                Pt::Ref { name: spur!("y") }.node()
             ])
             .node(),
             Ex::Array(vec![Ex::Int(1).node(), Ex::Int(2).node()]).node()
@@ -917,7 +912,6 @@ fn test_is_pattern() -> ParseResult<()> {
                     Pt::Path {
                         var: spur!("x"),
                         path: vec![],
-                        is_ref: false
                     }
                     .node()
                 )])
@@ -935,7 +929,6 @@ fn test_is_pattern() -> ParseResult<()> {
                 Pt::Path {
                     var: spur!("x"),
                     path: vec![],
-                    is_ref: false
                 }
                 .node()
             ))
@@ -952,15 +945,7 @@ fn test_is_pattern() -> ParseResult<()> {
     let t = parse("&x = 1")?;
     stmt_eq!(
         t,
-        St::Assign(
-            Pt::Path {
-                var: spur!("x"),
-                path: vec![],
-                is_ref: true
-            }
-            .node(),
-            Ex::Int(1).node()
-        )
+        St::Assign(Pt::Ref { name: spur!("x") }.node(), Ex::Int(1).node())
     );
     let t = parse("x[0].y::z = 1")?;
     stmt_eq!(
@@ -973,36 +958,16 @@ fn test_is_pattern() -> ParseResult<()> {
                     AssignPath::Member(spur!("y")),
                     AssignPath::Associated(spur!("z"))
                 ],
-                is_ref: false
             }
             .node(),
             Ex::Int(1).node()
         )
     );
 
-    let t = parse("&mut x = 1")?;
-    stmt_eq!(
-        t,
-        St::Assign(
-            Pt::Mut {
-                name: spur!("x"),
-                is_ref: true
-            }
-            .node(),
-            Ex::Int(1).node()
-        )
-    );
     let t = parse("mut x = 1")?;
     stmt_eq!(
         t,
-        St::Assign(
-            Pt::Mut {
-                name: spur!("x"),
-                is_ref: false
-            }
-            .node(),
-            Ex::Int(1).node()
-        )
+        St::Assign(Pt::Mut { name: spur!("x") }.node(), Ex::Int(1).node())
     );
 
     let t = parse("1 is (@int | @float) if x > 2")?;
@@ -1137,19 +1102,13 @@ fn test_macro() -> ParseResult<()> {
                     pattern: Pt::Path {
                         var: spur!("a"),
                         path: vec![],
-                        is_ref: false
                     }
                     .node(),
                     default: None,
                 },
                 MacroArg::Single {
                     pattern: Pt::Both(
-                        Pt::Path {
-                            var: spur!("b"),
-                            path: vec![],
-                            is_ref: true
-                        }
-                        .node(),
+                        Pt::Ref { name: spur!("b") }.node(),
                         Pt::Type(spur!("int")).node()
                     )
                     .node(),
@@ -1159,7 +1118,6 @@ fn test_macro() -> ParseResult<()> {
                     pattern: Pt::Path {
                         var: spur!("c"),
                         path: vec![],
-                        is_ref: false
                     }
                     .node(),
                     default: Some(Ex::Int(20).node()),
@@ -1169,7 +1127,6 @@ fn test_macro() -> ParseResult<()> {
                         Pt::Path {
                             var: spur!("d"),
                             path: vec![],
-                            is_ref: false
                         }
                         .node(),
                         Pt::Type(spur!("bool")).node()
@@ -1189,12 +1146,7 @@ fn test_macro() -> ParseResult<()> {
         Ex::Macro {
             args: vec![MacroArg::Spread {
                 pattern: Pt::Both(
-                    Pt::Path {
-                        var: spur!("b"),
-                        path: vec![],
-                        is_ref: true
-                    }
-                    .node(),
+                    Pt::Ref { name: spur!("b") }.node(),
                     Pt::Type(spur!("int")).node()
                 )
                 .node(),
@@ -1231,7 +1183,6 @@ fn test_trigger_func() -> ParseResult<()> {
                 Pt::Path {
                     var: spur!("a"),
                     path: vec![],
-                    is_ref: false
                 }
                 .node(),
                 Ex::Int(10).node()
@@ -1382,15 +1333,7 @@ fn test_assign() -> ParseResult<()> {
     let t = parse("&a = 10")?;
     stmt_eq!(
         t,
-        St::Assign(
-            Pt::Path {
-                var: spur!("a"),
-                path: vec![],
-                is_ref: true
-            }
-            .node(),
-            Ex::Int(10).node()
-        )
+        St::Assign(Pt::Ref { name: spur!("a") }.node(), Ex::Int(10).node())
     );
 
     Ok(())
@@ -1420,7 +1363,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::PlusEq,
@@ -1435,7 +1377,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::MinusEq,
@@ -1450,7 +1391,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::MultEq,
@@ -1465,7 +1405,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::DivEq,
@@ -1480,7 +1419,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::PowEq,
@@ -1495,7 +1433,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::ModEq,
@@ -1510,7 +1447,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::BinAndEq,
@@ -1525,7 +1461,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::BinOrEq,
@@ -1540,7 +1475,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::ShiftLeftEq,
@@ -1555,7 +1489,6 @@ fn test_assign_op() -> ParseResult<()> {
             Pt::Path {
                 var: spur!("a"),
                 path: vec![],
-                is_ref: false
             }
             .node(),
             AssignOp::ShiftRightEq,
@@ -1616,13 +1549,11 @@ fn test_for() -> ParseResult<()> {
                 Pt::Path {
                     var: spur!("x"),
                     path: vec![],
-                    is_ref: false
                 }
                 .node(),
                 Pt::Path {
                     var: spur!("y"),
                     path: vec![],
-                    is_ref: false
                 }
                 .node()
             ])
@@ -1656,7 +1587,6 @@ fn test_try_catch() -> ParseResult<()> {
                 Pt::Path {
                     var: spur!("e"),
                     path: vec![],
-                    is_ref: false
                 }
                 .node()
             ),
@@ -1677,7 +1607,6 @@ fn test_arrow() -> ParseResult<()> {
                 Pt::Path {
                     var: spur!("a"),
                     path: vec![],
-                    is_ref: false
                 }
                 .node(),
                 Ex::Int(10).node()
@@ -1793,7 +1722,6 @@ fn test_overload() -> ParseResult<()> {
                                     Pt::Path {
                                         var: spur!("left"),
                                         path: vec![],
-                                        is_ref: false
                                     }
                                     .node(),
                                     Pt::Type(spur!("int")).node()
@@ -1806,7 +1734,6 @@ fn test_overload() -> ParseResult<()> {
                                     Pt::Path {
                                         var: spur!("right"),
                                         path: vec![],
-                                        is_ref: false
                                     }
                                     .node(),
                                     Pt::Type(spur!("string")).node()
@@ -1828,7 +1755,6 @@ fn test_overload() -> ParseResult<()> {
                                     Pt::Path {
                                         var: spur!("left"),
                                         path: vec![],
-                                        is_ref: false
                                     }
                                     .node(),
                                     Pt::Type(spur!("foo")).node()
@@ -1841,7 +1767,6 @@ fn test_overload() -> ParseResult<()> {
                                     Pt::Path {
                                         var: spur!("right"),
                                         path: vec![],
-                                        is_ref: false
                                     }
                                     .node(),
                                     Pt::Type(spur!("foo")).node()
@@ -1876,8 +1801,7 @@ fn test_overload() -> ParseResult<()> {
                         pattern: Pt::Both(
                             Pt::Path {
                                 var: spur!("value"),
-                                path: vec![],
-                                is_ref: false
+                                path: vec![]
                             }
                             .node(),
                             Pt::Type(spur!("bool")).node()

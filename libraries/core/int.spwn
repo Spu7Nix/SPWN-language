@@ -8,7 +8,7 @@ impl @int {
     	
 	#[doc("\nfghfddggfd")]
 	max: #[builtin] (
-		&self: @int,
+		self: @int,
 		other: (@int) | (@float),
 	) {},
 }

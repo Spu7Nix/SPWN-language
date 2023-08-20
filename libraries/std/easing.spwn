@@ -27,11 +27,11 @@ impl @easing {
     BACK_IN: et(17),
     BACK_OUT: et(18),
 
-    id: (&self) -> @int {
+    id: (self) -> @int {
         return self.id
     },
 
-    _display_: (&self) -> @string {
+    _display_: (self) -> @string {
         return match self.id {
             ==0 => "NONE",
             ==1 => "EASE_IN_OUT",

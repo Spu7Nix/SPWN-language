@@ -8,75 +8,75 @@ impl @array {
     	
 	#[doc("\nfghfddggfd")]
 	push: #[builtin] (
-		&mut self: @array,
+		&self: @array,
 		elem: _,
 	) {},
 	
 	#[doc("\nfgdfgdfg")]
 	is_empty: #[builtin] (
-		&self: @array,
+		self: @array,
 	) {},
 	
 	#[doc("\nlolool")]
 	reverse: #[builtin] (
-		&mut self: @array,
+		&self: @array,
 	) {},
 	
 	#[doc("\nlolool")]
 	clear: #[builtin] (
-		&mut self: @array,
+		&self: @array,
 	) {},
 	
 	#[doc("\nlolool")]
 	pop: #[builtin] (
-		&mut self: @array,
+		&self: @array,
 	) {},
 	
 	#[doc("\nlols")]
 	remove: #[builtin] (
-		&mut self: @array,
+		&self: @array,
 		index: @int,
 	) {},
 	
 	#[doc("\t\nldlw")]
 	shift: #[builtin] (
-		&mut self: @array,
+		&self: @array,
 	) {},
 	
 	#[doc("\nsds")]
 	unshift: #[builtin] (
-		&mut self: @array,
+		&self: @array,
 		elem: _,
 	) {},
 	
 	#[doc("\nsdhefuh")]
 	insert: #[builtin] (
-		&mut self: @array,
+		&self: @array,
 		index: @int,
 		elem: _,
 	) {},
 	
 	#[doc("\ndwhud")]
 	map: #[builtin] (
-		&self: @array,
+		self: @array,
 		func: @macro,
 	) {},
 	
 	#[doc("\nswuhd")]
 	all: #[builtin] (
-		&self: @array,
+		self: @array,
 		func: @macro,
 	) {},
 	
 	#[doc("\nswuhd")]
 	any: #[builtin] (
-		&self: @array,
+		self: @array,
 		func: @macro,
 	) {},
 	
 	#[doc("\ndds")]
 	filter: #[builtin] (
-		&self: @array,
+		self: @array,
 		func: @macro,
 	) {},
 }

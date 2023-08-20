@@ -370,12 +370,14 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
         // var[0].cock::binky[79] etc
         var: S,
         path: Vec<AssignPath<E, S>>,
-        is_ref: bool,
     },
     Mut {
-        // mut var OR &mut var
+        // mut var
         name: S,
-        is_ref: bool,
+    },
+    Ref {
+        // mut var
+        name: S,
     },
 
     IfGuard {
@@ -404,7 +406,8 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
             },
             Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.is_self(interner)),
             Pattern::Path { var, .. } => &*interner.resolve(var) == "self",
-            Pattern::Mut { name, .. } => &*interner.resolve(name) == "self",
+            Pattern::Mut { name } => &*interner.resolve(name) == "self",
+            Pattern::Ref { name } => &*interner.resolve(name) == "self",
             Pattern::IfGuard { pat, .. } => pat.pat.is_self(interner),
             _ => false,
         }
@@ -412,7 +415,8 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
 
     pub fn get_name(&self) -> Option<Spur> {
         match self {
-            Pattern::Mut { name, .. } => Some(*name),
+            Pattern::Mut { name } => Some(*name),
+            Pattern::Ref { name } => Some(*name),
             Pattern::Path { var, path, .. } if path.is_empty() => Some(*var),
             Pattern::Both(a, ..) => a.pat.get_name(),
             _ => None,
@@ -429,8 +433,9 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
                 map.iter().any(|(_, p)| p.pat.needs_mut())
             },
             Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.needs_mut()),
-            Pattern::Mut { is_ref, .. } => *is_ref,
+            // Pattern::Mut { .. } => *is_ref,
             Pattern::IfGuard { pat, .. } => pat.pat.needs_mut(),
+            Pattern::Ref { .. } => true,
             _ => false,
         }
     }

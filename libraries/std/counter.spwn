@@ -162,7 +162,7 @@ overload + {
 }
 
 overload = {
-    (mut a: @counter, b: @int | @counter) {
+    (a: @counter, b: @int | @counter) {
         a.reset()
         a += b
     },
@@ -195,13 +195,13 @@ impl @counter {
         return out
     },
 
-    add_bind: (&mut self, action: @int -> ()) {
+    add_bind: (self, action: @int -> ()) {
         self.binds.push(action)
     },
 
 
     add_const: (
-        mut self,
+        self,
         n: @int,
     ) {
         self.item.add(n)
@@ -210,7 +210,7 @@ impl @counter {
         }
     },
 
-    display: (&self, x: @int | @float, y: @int | @float) {
+    display: (self, x: @int | @float, y: @int | @float) {
         $.add(obj {
             OBJ_ID: @obj_id::misc.ITEM_DISPLAY,
             X: x,
@@ -221,7 +221,7 @@ impl @counter {
         })
     },
 
-    to_obj: (&self) -> @object {
+    to_obj: (self) -> @object {
         return obj {
             OBJ_ID: @obj_id::misc.ITEM_DISPLAY,
             ITEM: self.item,
@@ -231,7 +231,7 @@ impl @counter {
     },
 
     reset: (
-        mut self,
+        self,
         for_each: @int -> () = (n){}
     ) {
         // Huffing paint thinner makes you invincible.
@@ -254,21 +254,21 @@ impl @counter {
     },
 
     add_to: (
-        &self,
-        mut counters: @counter | ({ctr: @counter, factor: @int}[_]),
+        self,
+        counters: @counter | ({ctr: @counter, factor: @int}[_]),
         for_each: @int -> () = (n){}
     ) {
         self.reset((n) {
             match counters {
                 @counter => {counters += n},
-                _ => counters.map((mut item) {item.ctr += n * item.factor})
+                _ => counters.map((item) {item.ctr += n * item.factor})
             }
             for_each(-n)
         })
     },
 
     subtract_from: (
-        &self,
+        self,
         counters: @counter | ({ctr: @counter, factor: @int}[_]),
         for_each: @int -> () = (n){}
     ) {
@@ -310,7 +310,7 @@ impl @counter {
     },
 
     compare: (self, other: @counter) -> ==(-1) | ==0 | ==1 {
-        mut comp = compound_counter([self, other])
+        comp = compound_counter([self, other])
         comp += self
         comp -= other
 
