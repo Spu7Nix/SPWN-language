@@ -13,38 +13,38 @@ impl_type! {
 
 
         /// fghfddggfd
-        fn push(&mut Array(slf) as "self", elem) {
+        fn push(&Array(slf) as "self", elem) {
             slf.borrow_mut().push(vm.deep_clone_ref(elem, false));
 
             Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// fgdfgdfg
-        fn is_empty(&Array(slf) as "self") {
+        fn is_empty(Array(slf) as "self") {
             let is_empty = slf.borrow().is_empty();
             Multi::new_single(ctx, Ok(Value::Bool(is_empty).into_value_ref(area)))
         }
 
         /// lolool
-        fn reverse(&mut Array(slf) as "self") {
+        fn reverse(&Array(slf) as "self") {
             slf.borrow_mut().reverse();
             Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// lolool
-        fn clear(&mut Array(slf) as "self") {
+        fn clear(&Array(slf) as "self") {
             slf.borrow_mut().clear();
             Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// lolool
-        fn pop(&mut Array(slf) as "self") {
+        fn pop(&Array(slf) as "self") {
             let elem = slf.borrow_mut().pop().map(|a| Value::Maybe(Some(a))).unwrap_or(Value::Maybe(None));
             Multi::new_single(ctx, Ok(elem.into_value_ref(area)))
         }
 
         /// lols
-        fn remove(&mut Array(slf) as "self", Int(index) as "index") {
+        fn remove(&Array(slf) as "self", Int(index) as "index") {
             let len = slf.borrow().len();
 
             let idx = match index_wrap(*index.borrow(), len, ValueType::Array, &area, vm) {
@@ -57,7 +57,7 @@ impl_type! {
         }
 
         ///ldlw
-        fn shift(&mut Array(slf) as "self") {
+        fn shift(&Array(slf) as "self") {
             let len = slf.borrow().len();
             let elem = slf.borrow_mut().remove(match index_wrap(0, len, ValueType::Array, &area, vm) {
                 Ok(idx) => idx,
@@ -67,13 +67,13 @@ impl_type! {
         }
 
         /// sds
-        fn unshift(&mut Array(slf) as "self", elem) {
+        fn unshift(&Array(slf) as "self", elem) {
             slf.borrow_mut().insert(0, vm.deep_clone_ref(elem, false));
             Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))
         }
 
         /// sdhefuh
-        fn insert(&mut Array(slf) as "self", Int(index) as "index", elem) {
+        fn insert(&Array(slf) as "self", Int(index) as "index", elem) {
             let len = slf.borrow().len();
 
             let idx = match index_wrap(*index.borrow(), len, ValueType::Array, &area, vm) {
@@ -86,7 +86,7 @@ impl_type! {
         }
 
         /// dwhud
-        fn map(&Array(slf) as "self", func: Macro) {
+        fn map(Array(slf) as "self", func: Macro) {
 
             let arr = slf.borrow().clone();
             let mut ret = Multi::new_single(ctx, Ok(vec![]));
@@ -116,7 +116,7 @@ impl_type! {
 
 
         /// swuhd
-        fn all(&Array(slf) as "self", func: Macro) {
+        fn all(Array(slf) as "self", func: Macro) {
             let arr = slf.borrow().clone();
             let mut ret = Multi::new_single(ctx, Ok(true));
 
@@ -162,7 +162,7 @@ impl_type! {
         }
 
         /// swuhd
-        fn any(&Array(slf) as "self", func: Macro) {
+        fn any(Array(slf) as "self", func: Macro) {
             let arr = slf.borrow().clone();
             let mut ret = Multi::new_single(ctx, Ok(false));
 
@@ -209,7 +209,7 @@ impl_type! {
 
         /// dds
         ///
-        fn filter(&Array(slf) as "self", func: Macro) {
+        fn filter(Array(slf) as "self", func: Macro) {
             let arr = slf.borrow().clone();
             let mut ret = Multi::new_single(ctx, Ok(vec![]));
 

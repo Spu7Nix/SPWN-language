@@ -4,7 +4,7 @@ use lasso::Spur;
 use super::{ParseResult, Parser};
 use crate::lexing::tokens::Token;
 use crate::list_helper;
-use crate::parsing::ast::{AssignPath, Pattern, PatternNode};
+use crate::parsing::ast::{AssignPath, DictDestructureKey, Pattern, PatternNode, Vis};
 use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable};
 
@@ -69,13 +69,21 @@ impl<'a> Parser<'a> {
                         self.deprecated_features.let_not_mut.insert(span);
                     }
 
+                    if self.next_is(Token::Slf)? {
+                        let prev = self.span();
+                        self.next()?;
+                        return Err(SyntaxError::MutSelf {
+                            area: self.make_area(prev.extend(self.span())),
+                        });
+                    }
+
                     self.expect_tok(Token::Ident)?;
                     Pattern::Mut {
                         name: self.slice_interned(),
                         // is_ref: false,
                     }
                 },
-                Token::Ident => {
+                Token::Ident | Token::Slf => {
                     let name = self.slice_interned();
 
                     let mut path = vec![];
@@ -109,13 +117,22 @@ impl<'a> Parser<'a> {
 
                     Pattern::Path { var: name, path }
                 },
-                Token::BinAnd => {
-                    self.expect_tok(Token::Ident)?;
-                    Pattern::Ref {
-                        name: self.slice_interned(),
-                    }
-                },
+                Token::BinAnd => match self.peek()? {
+                    Token::Slf | Token::Ident => {
+                        self.next()?;
 
+                        Pattern::Ref {
+                            name: self.slice_interned(),
+                        }
+                    },
+                    t => {
+                        return Err(SyntaxError::UnexpectedToken {
+                            expected: "`self` or ident".into(),
+                            found: t,
+                            area: self.make_area(self.span()),
+                        })
+                    },
+                },
                 Token::LSqBracket => {
                     let mut v = vec![];
                     list_helper!(self, RSqBracket {
@@ -124,7 +141,51 @@ impl<'a> Parser<'a> {
                     Pattern::ArrayDestructure(v)
                 },
                 Token::LBracket => {
-                    let map = dictlike_destructure!();
+                    let mut map = AHashMap::new();
+
+                    list_helper!(self, RBracket {
+                        let key = match self.next()? {
+                            Token::Ident => DictDestructureKey::Ident(self.intern_string(self.slice())),
+                            t @ (Token::Private | Token::Type) => {
+                                let vis = if matches!(t, Token::Private) {
+                                    self.next()?;
+                                    Vis::Private
+                                } else {
+                                    Vis::Public
+                                };
+
+                                self.expect_tok(Token::Type)?;
+
+                                DictDestructureKey::Type(vis(self.intern_string(self.slice())))
+                            }
+                            other => {
+                                return Err(SyntaxError::UnexpectedToken {
+                                    expected: "key".into(),
+                                    found: other,
+                                    area: self.make_area(self.span()),
+                                })
+                            }
+                        };
+
+                        let key_span = self.span();
+
+                        let elem = if self.next_is(Token::Colon)? {
+                            self.next()?;
+                            self.parse_pattern()?
+                        } else {
+                            todo!()
+                            // PatternNode {
+                            //     pat: Box::new(Pattern::Path {
+                            //         var: key,
+                            //         path: vec![],
+                            //     }),
+                            //     span: key_span,
+                            // }
+                        };
+
+                        map.insert(key.spanned(key_span), elem);
+                    });
+
                     Pattern::DictDestructure(map)
                 },
                 Token::TypeIndicator => {

@@ -96,6 +96,7 @@ impl<'a> Compiler<'a> {
                     AssignOp::BinOrEq => assign_op!(BinOrEq),
                     AssignOp::ShiftLeftEq => assign_op!(ShiftLeftEq),
                     AssignOp::ShiftRightEq => assign_op!(ShiftRightEq),
+                    AssignOp::BinXorEq => assign_op!(BinXorEq),
                 }
             },
             Statement::If {

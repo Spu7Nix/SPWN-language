@@ -167,7 +167,7 @@ macro_rules! operators {
 }
 
 operators! {
-    Assign: [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, ShiftLeftEq, ShiftRightEq];
+    Assign: [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinXorEq, ShiftLeftEq, ShiftRightEq];
     // lowest precedence
     // Right => [Assign];
     // Right => [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];
@@ -176,6 +176,8 @@ operators! {
     // Left => [Is];
     Left => [BinOr, Or];
     Left => [BinAnd, And];
+    // todo: is prec right?
+    Left => [BinXor];
     // Unary => [Eq, Neq, Gt, Gte, Lt, Lte];
     Unary => [ExclMark];
     Left => [Eq, Neq, Gt, Gte, Lt, Lte];

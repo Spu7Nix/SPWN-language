@@ -424,5 +424,17 @@ error_maker! {
             target_area: CodeArea,
             attribute: String,
         },
+
+        // ==================================================================
+        #[
+            Message: "Found `mut self`", Note: Some("`mut self` is unlikely the behaviour you want as it will clone `self`. Instead, to make `self` mutable, take a mutable reference: `&self`".into());
+            Main Area: area;
+            Labels: [
+                area => "Found here";
+            ]
+        ]
+        MutSelf {
+            area: CodeArea,
+        },
     }
 }

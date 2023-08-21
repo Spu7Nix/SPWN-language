@@ -422,13 +422,15 @@ impl Compiler<'_> {
                                         -> CompileResult<UnoptRegister>,
                                 > = Box::new(move |compiler, builder| {
                                     let elem_reg = builder.next_reg();
-                                    builder.member(
-                                        expr_reg,
-                                        elem_reg,
-                                        key.map(|s| compiler.resolve_32(&s)),
-                                        false,
-                                        pattern.span,
-                                    );
+
+                                    todo!("dict destructure key");
+                                    // builder.member(
+                                    //     expr_reg,
+                                    //     elem_reg,
+                                    //     key.map(|s| compiler.resolve_32(&s)),
+                                    //     false,
+                                    //     pattern.span,
+                                    // );
 
                                     compiler.compile_pattern_check(
                                         elem_reg,

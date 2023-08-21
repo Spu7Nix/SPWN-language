@@ -153,8 +153,8 @@ fn test_lexer() -> LexError<()> {
     tok!(t, Token::Div, "/");
     let t = lex("%")?;
     tok!(t, Token::Mod, "%");
-    let t = lex("^")?;
-    tok!(t, Token::Pow, "^");
+    let t = lex("**")?;
+    tok!(t, Token::Pow, "**");
     let t = lex("+=")?;
     tok!(t, Token::PlusEq, "+=");
     let t = lex("-=")?;
@@ -165,8 +165,8 @@ fn test_lexer() -> LexError<()> {
     tok!(t, Token::DivEq, "/=");
     let t = lex("%=")?;
     tok!(t, Token::ModEq, "%=");
-    let t = lex("^=")?;
-    tok!(t, Token::PowEq, "^=");
+    let t = lex("**=")?;
+    tok!(t, Token::PowEq, "**=");
     let t = lex("&=")?;
     tok!(t, Token::BinAndEq, "&=");
     let t = lex("|=")?;
@@ -179,6 +179,10 @@ fn test_lexer() -> LexError<()> {
     tok!(t, Token::BinAnd, "&");
     let t = lex("|")?;
     tok!(t, Token::BinOr, "|");
+    let t = lex("^")?;
+    tok!(t, Token::BinXor, "^");
+    let t = lex("^=")?;
+    tok!(t, Token::BinXorEq, "^=");
     let t = lex("<<")?;
     tok!(t, Token::ShiftLeft, "<<");
     let t = lex(">>")?;
@@ -262,6 +266,9 @@ fn test_lexer() -> LexError<()> {
 
     let t = lex("")?;
     tok!(t, Token::Eof, "");
+
+    let t = lex("self")?;
+    tok!(t, Token::Slf, "self");
 
     Ok(())
 }

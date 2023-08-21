@@ -13,7 +13,7 @@ impl_type! {
         Functions(ctx, vm, program, area):
 
         /// fdf
-        fn get_or_insert(&mut Dict(slf) as "self", String(key) as "key", &value) -> "_" {
+        fn get_or_insert(&Dict(slf) as "self", String(key) as "key", &value) -> "_" {
             let mut slf = slf.borrow_mut();
             let v = slf.entry(Rc::clone(&*key.borrow())).or_insert(VisSource::Public(value.clone()));
 
@@ -23,7 +23,7 @@ impl_type! {
         }
 
         /// dfdfdf
-        fn insert(&mut Dict(slf) as "self", String(key) as "key", &value) {
+        fn insert(&Dict(slf) as "self", String(key) as "key", &value) {
             slf.borrow_mut().insert(Rc::clone(&*key.borrow()), VisSource::Public(value.clone()));
 
             Multi::new_single(ctx, Ok(Value::Empty.into_value_ref(area)))

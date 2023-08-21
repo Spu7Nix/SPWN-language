@@ -1,0 +1,3 @@
+impl @a {
+    a: (mut self) {}
+}

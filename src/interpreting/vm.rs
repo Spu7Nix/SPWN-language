@@ -759,6 +759,9 @@ impl Vm {
                     Opcode::BinOr { a, b, to } => {
                         bin_op!(BinOr, a, b, to);
                     },
+                    Opcode::BinXor { a, b, to } => {
+                        bin_op!(BinXor, a, b, to);
+                    },
                     Opcode::BinAnd { a, b, to } => {
                         bin_op!(BinAnd, a, b, to);
                     },
@@ -832,6 +835,9 @@ impl Vm {
                     },
                     Opcode::BinOrEq { a, b, left_mut } => {
                         assign_op!(BinOrEq, a, b, left_mut);
+                    },
+                    Opcode::BinXorEq { a, b, left_mut } => {
+                        assign_op!(BinXorEq, a, b, left_mut);
                     },
                     Opcode::ShiftLeftEq { a, b, left_mut } => {
                         assign_op!(ShiftLeftEq, a, b, left_mut);

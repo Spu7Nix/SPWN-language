@@ -12,8 +12,9 @@ use super::parser::Parser;
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
 use crate::parsing::ast::{
-    AssignPath, AttrArgs, AttrItem, AttrStyle, Attribute, DictItem, Import, ImportType, MacroArg,
-    MacroCode, ObjKeyType, ObjectType, Pattern, PatternNode, StringFlags, Vis,
+    AssignPath, AttrArgs, AttrItem, AttrStyle, Attribute, DictDestructureKey, DictItem, Import,
+    ImportType, MacroArg, MacroCode, ObjKeyType, ObjectType, Pattern, PatternNode, StringFlags,
+    Vis,
 };
 use crate::parsing::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::parsing::parser::ParseResult;
@@ -497,6 +498,7 @@ fn test_ops() -> ParseResult<()> {
         BinOp::Mod => (),
         BinOp::Pow => (),
         BinOp::As => (),
+        BinOp::BinXor => (),
     };
 
     let t = parse("5..100")?;
@@ -540,6 +542,12 @@ fn test_ops() -> ParseResult<()> {
     expr_eq!(
         t,
         Ex::Op(Ex::Bool(false).node(), BinOp::And, Ex::Bool(false).node())
+    );
+
+    let t = parse("1 ^ 2")?;
+    expr_eq!(
+        t,
+        Ex::Op(Ex::Int(1).node(), BinOp::BinXor, Ex::Int(2).node())
     );
 
     let t = parse("0x9DE == true")?;
@@ -604,7 +612,7 @@ fn test_ops() -> ParseResult<()> {
     expr_eq!(t, Ex::Op(Ex::Int(1).node(), BinOp::Div, Ex::Int(1).node(),));
     let t = parse("1 % 1")?;
     expr_eq!(t, Ex::Op(Ex::Int(1).node(), BinOp::Mod, Ex::Int(1).node(),));
-    let t = parse("1 ^ 1")?;
+    let t = parse("1 ** 1")?;
     expr_eq!(t, Ex::Op(Ex::Int(1).node(), BinOp::Pow, Ex::Int(1).node(),));
 
     let t = parse("2 as false")?;
@@ -894,13 +902,14 @@ fn test_is_pattern() -> ParseResult<()> {
         t,
         St::Assign(
             Pt::DictDestructure(AHashMap::from([(
-                span!(spur!("x")),
+                span!(DictDestructureKey::Ident(spur!("x"))),
                 Pt::Type(spur!("float")).node()
             )]))
             .node(),
             Ex::Empty.node()
         )
     );
+    // TODO: module dict destructure test
     let t = parse("@a::{ x } = ()")?;
     stmt_eq!(
         t,
@@ -1354,6 +1363,7 @@ fn test_assign_op() -> ParseResult<()> {
         AssignOp::BinOrEq => (),
         AssignOp::ShiftLeftEq => (),
         AssignOp::ShiftRightEq => (),
+        AssignOp::BinXorEq => (),
     }
 
     let t = parse("a += 1")?;
@@ -1412,7 +1422,7 @@ fn test_assign_op() -> ParseResult<()> {
         )
     );
 
-    let t = parse("a ^= 1")?;
+    let t = parse("a **= 1")?;
     stmt_eq!(
         t,
         St::AssignOp(
@@ -1422,6 +1432,20 @@ fn test_assign_op() -> ParseResult<()> {
             }
             .node(),
             AssignOp::PowEq,
+            Ex::Int(1).node()
+        )
+    );
+
+    let t = parse("a ^= 1")?;
+    stmt_eq!(
+        t,
+        St::AssignOp(
+            Pt::Path {
+                var: spur!("a"),
+                path: vec![],
+            }
+            .node(),
+            AssignOp::BinXorEq,
             Ex::Int(1).node()
         )
     );

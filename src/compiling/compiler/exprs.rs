@@ -176,6 +176,7 @@ impl Compiler<'_> {
                     BinOp::Lte => bin_op!(Lte),
 
                     BinOp::BinOr => bin_op!(BinOr),
+                    BinOp::BinXor => bin_op!(BinXor),
                     BinOp::BinAnd => bin_op!(BinAnd),
                     BinOp::Range => bin_op!(Range),
                     BinOp::In => bin_op!(In),

@@ -11,7 +11,7 @@ impl_type! {
 
 
         /// fghfddggfd
-        fn max(&Int(slf) as "self", other: Int | Float) {
+        fn max(Int(slf) as "self", other: Int | Float) {
             other! {
                 Int(n) => {
                     if *slf.borrow() > *n.borrow() {

@@ -627,6 +627,27 @@ pub fn bin_or(
     })
 }
 
+fn bin_xor(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    program: &Rc<Program>,
+) -> RuntimeResult<Value> {
+    Ok(match (&a.value, &b.value) {
+        (Value::Int(a), Value::Int(b)) => Value::Int(*a ^ *b),
+        _ => {
+            return Err(RuntimeError::InvalidOperands {
+                a: (a.value.get_type(), a.area.clone()),
+                b: (b.value.get_type(), b.area.clone()),
+                op: BinOp::BinXor,
+                area: vm.make_area(span, program),
+                call_stack: vm.get_call_stack(),
+            })
+        },
+    })
+}
+
 fn shift_left(
     a: &StoredValue,
     b: &StoredValue,
@@ -724,6 +745,7 @@ impl BinOp {
             BinOp::Div => Either::Left(div),
             BinOp::Mod => Either::Left(modulo),
             BinOp::Pow => Either::Left(pow),
+            BinOp::BinXor => Either::Left(bin_xor),
             // BinOp::As => Either::Right(pow),
             BinOp::In => Either::Right(in_op),
             _ => unreachable!(),
@@ -744,6 +766,7 @@ impl AssignOp {
             AssignOp::BinOrEq => bin_or,
             AssignOp::ShiftLeftEq => shift_left,
             AssignOp::ShiftRightEq => shift_right,
+            AssignOp::BinXorEq => bin_xor,
         }
     }
 }

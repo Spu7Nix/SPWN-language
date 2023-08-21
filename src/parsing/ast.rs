@@ -342,9 +342,17 @@ pub enum Statement {
 
 pub type Statements = Vec<StmtNode>;
 
+// the key for a dict destructure
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DictDestructureKey<T, S> {
+    Ident(S),
+    // types are only valid in module destructures
+    Type(Vis<T>),
+}
+
 // T = type, P = pattern, E = expression, S = string
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Pattern<T, P, E, S: Hash + Eq> {
+pub enum Pattern<T: Hash + Eq, P, E, S: Hash + Eq> {
     Any, // _
 
     Type(T),      // @<type>
@@ -363,11 +371,14 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
     ArrayPattern(P, P), // <pattern>[<pattern>]
     DictPattern(P),     // <pattern>{:}
 
-    ArrayDestructure(Vec<P>),                        // [ <pattern> ]
-    DictDestructure(AHashMap<Spanned<S>, P>),        // { key: <pattern> ETC }
+    ArrayDestructure(Vec<P>), // [ <pattern> ]
+    // { <key>(: <pattern>)? ETC } for normal dict
+    // { <key>(: <pattern>)? / (<visibility>)? @<type>(: <pattern>)? } for module destructures
+    DictDestructure(AHashMap<Spanned<DictDestructureKey<T, S>>, P>),
     MaybeDestructure(Option<P>),                     // <pattern>? or ?
-    InstanceDestructure(T, AHashMap<Spanned<S>, P>), // @typ::{ key: <pattern> ETC }
+    InstanceDestructure(T, AHashMap<Spanned<S>, P>), // @typ::{ <key>(: <pattern>)? ETC }
 
+    // ()
     Empty,
 
     Path {
@@ -397,7 +408,7 @@ pub enum Pattern<T, P, E, S: Hash + Eq> {
     },
 }
 
-impl<T, E> Pattern<T, PatternNode, E, Spur> {
+impl<T: Hash + Eq, E> Pattern<T, PatternNode, E, Spur> {
     pub fn is_self(&self, interner: &Interner) -> bool {
         match self {
             Pattern::Either(a, b) => a.pat.is_self(interner) || b.pat.is_self(interner),
@@ -405,7 +416,8 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
             Pattern::ArrayPattern(a, b) => a.pat.is_self(interner) || b.pat.is_self(interner),
             Pattern::DictPattern(a) => a.pat.is_self(interner),
             Pattern::ArrayDestructure(v) => v.iter().any(|p| p.pat.is_self(interner)),
-            Pattern::DictDestructure(map) | Pattern::InstanceDestructure(_, map) => {
+            Pattern::DictDestructure(map) => map.iter().any(|(_, p)| p.pat.is_self(interner)),
+            Pattern::InstanceDestructure(_, map) => {
                 map.iter().any(|(_, p)| p.pat.is_self(interner))
             },
             Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.is_self(interner)),
@@ -433,9 +445,8 @@ impl<T, E> Pattern<T, PatternNode, E, Spur> {
             Pattern::ArrayPattern(elem, ..) => elem.pat.needs_mut(),
             Pattern::DictPattern(elem) => elem.pat.needs_mut(),
             Pattern::ArrayDestructure(v) => v.iter().any(|p| p.pat.needs_mut()),
-            Pattern::DictDestructure(map) | Pattern::InstanceDestructure(_, map) => {
-                map.iter().any(|(_, p)| p.pat.needs_mut())
-            },
+            Pattern::DictDestructure(map) => map.iter().any(|(_, p)| p.pat.needs_mut()),
+            Pattern::InstanceDestructure(_, map) => map.iter().any(|(_, p)| p.pat.needs_mut()),
             Pattern::MaybeDestructure(v) => v.as_ref().is_some_and(|p| p.pat.needs_mut()),
             // Pattern::Mut { .. } => *is_ref,
             Pattern::IfGuard { pat, .. } => pat.pat.needs_mut(),

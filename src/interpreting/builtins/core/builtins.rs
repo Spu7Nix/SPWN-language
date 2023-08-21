@@ -20,7 +20,7 @@ impl_type! {
 
         /// g
         fn print(
-            &Builtins{} as "self",
+            Builtins{} as "self",
             ...args,
             String(end) as "end" = r#""\n""#,
             String(sep) as "sep" = r#"" ""#,
@@ -52,7 +52,7 @@ impl_type! {
 
         /// fghfddggfd
         fn add(
-            &Builtins{} as "self",
+            Builtins{} as "self",
             Object {
                 params,
                 typ,
@@ -89,18 +89,18 @@ impl_type! {
         }
 
         /// dfdf
-        fn epsilon(&Builtins{} as "self") -> "@epsilon" {
+        fn epsilon(Builtins{} as "self") -> "@epsilon" {
             Multi::new_single(ctx, Ok(Value::Epsilon.into_value_ref(area)))
         }
 
         /// dfdf
-        fn trigger_fn_context(&Builtins{} as "self") -> "@group" {
+        fn trigger_fn_context(Builtins{} as "self") -> "@group" {
             let context_g = Value::Group(ctx.group);
             Multi::new_single(ctx, Ok(context_g.into_value_ref(area)))
         }
 
         /// dfdf
-        fn assert(&Builtins{} as "self", Bool(value) as "value") {
+        fn assert(Builtins{} as "self", Bool(value) as "value") {
             if !*value.borrow() {
                 return Multi::new_single(ctx, Err(RuntimeError::AssertionFailed { area, call_stack: vm.get_call_stack() }))
             }
@@ -108,7 +108,7 @@ impl_type! {
         }
 
         /// gg
-        fn assert_eq(&Builtins{} as "self", left, right) {
+        fn assert_eq(Builtins{} as "self", left, right) {
             if !value_ops::equality(&left.borrow().value, &right.borrow().value) {
                 return Multi::new_single(ctx, Err(RuntimeError::EqAssertionFailed { area, call_stack: vm.get_call_stack() }));
             }
@@ -116,7 +116,7 @@ impl_type! {
         }
 
         /// gfg
-        fn hash(&Builtins{} as "self", &value) -> "@int" {
+        fn hash(Builtins{} as "self", &value) -> "@int" {
             let mut state = DefaultHasher::default();
             vm.hash_value(value, &mut state);
             let hash = state.finish();
@@ -125,7 +125,7 @@ impl_type! {
         }
 
         /// gfg
-        fn version(&Builtins{} as "self") -> "[@int, @int, @int, @int?]" {
+        fn version(Builtins{} as "self") -> "[@int, @int, @int, @int?]" {
             let semver = semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("BUG: invalid semver format");
 
             let v =
@@ -153,7 +153,7 @@ impl_type! {
         }
 
         /// gfg
-        fn args(&Builtins{} as "self") -> "@string[]" {
+        fn args(Builtins{} as "self") -> "@string[]" {
             let args: Vec<ValueRef> = vm.trailing_args.iter().map(
                 |s| {
                     Value::String(

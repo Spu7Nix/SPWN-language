@@ -157,7 +157,7 @@ opcodes! {
     Div { [a], [b], [to] },
     #[delve(display = |a, b, to| format!("{a} % {b} -> {to}"))]
     Mod { [a], [b], [to] },
-    #[delve(display = |a, b, to| format!("{a} ^ {b} -> {to}"))]
+    #[delve(display = |a, b, to| format!("{a} ** {b} -> {to}"))]
     Pow { [a], [b], [to] },
     #[delve(display = |a, b, to| format!("{a} == {b} -> {to}"))]
     Eq { [a], [b], [to] },
@@ -175,6 +175,8 @@ opcodes! {
     BinOr { [a], [b], [to] },
     #[delve(display = |a, b, to| format!("{a} & {b} -> {to}"))]
     BinAnd { [a], [b], [to] },
+    #[delve(display = |a, b, to| format!("{a} ^ {b} -> {to}"))]
+    BinXor { [a], [b], [to] },
     #[delve(display = |a, b, to| format!("{a}..{b} -> {to}"))]
     Range { [a], [b], [to] },
     #[delve(display = |a, b, to| format!("{a} in {b} -> {to}"))]
@@ -194,7 +196,7 @@ opcodes! {
     MultEq { [a], [b], left_mut: bool },
     #[delve(display = |a, b, m: &bool| format!("{}{a} /= {b}", if *m {"(mut) "} else {""}))]
     DivEq { [a], [b], left_mut: bool },
-    #[delve(display = |a, b, m: &bool| format!("{}{a} ^= {b}", if *m {"(mut) "} else {""}))]
+    #[delve(display = |a, b, m: &bool| format!("{}{a} **= {b}", if *m {"(mut) "} else {""}))]
     PowEq { [a], [b], left_mut: bool },
     #[delve(display = |a, b, m: &bool| format!("{}{a} %= {b}", if *m {"(mut) "} else {""}))]
     ModEq { [a], [b], left_mut: bool },
@@ -202,6 +204,8 @@ opcodes! {
     BinAndEq { [a], [b], left_mut: bool },
     #[delve(display = |a, b, m: &bool| format!("{}{a} |= {b}", if *m {"(mut) "} else {""}))]
     BinOrEq { [a], [b], left_mut: bool },
+    #[delve(display = |a, b, m: &bool| format!("{}{a} ^= {b}", if *m {"(mut) "} else {""}))]
+    BinXorEq { [a], [b], left_mut: bool },
     #[delve(display = |a, b, m: &bool| format!("{}{a} <<= {b}", if *m {"(mut) "} else {""}))]
     ShiftLeftEq { [a], [b], left_mut: bool },
     #[delve(display = |a, b, m: &bool| format!("{}{a} >>= {b}", if *m {"(mut) "} else {""}))]

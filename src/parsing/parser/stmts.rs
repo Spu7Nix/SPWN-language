@@ -180,7 +180,7 @@ impl Parser<'_> {
                     } else {
                         return Err(SyntaxError::UnexpectedToken {
                             found: tok,
-                            expected: "unary operator".to_string(),
+                            expected: "unary operator".into(),
                             area: self.make_area(self.span()),
                         });
                     }
@@ -193,7 +193,7 @@ impl Parser<'_> {
                 } else {
                     return Err(SyntaxError::UnexpectedToken {
                         found: tok,
-                        expected: "binary operator".to_string(),
+                        expected: "binary operator".into(),
                         area: self.make_area(self.span()),
                     });
                 };

@@ -70,6 +70,8 @@ pub enum Token {
     ShiftRightEq,
     BinAnd,
     BinOr,
+    BinXor,
+    BinXorEq,
     ShiftLeft,
     ShiftRight,
     And,
@@ -104,6 +106,7 @@ pub enum Token {
     Ident,
     Newline,
     Eof,
+    Slf,
 }
 
 impl Token {
@@ -142,15 +145,15 @@ impl Token {
             Self::Plus => "+",
             Self::Minus => "-",
             Self::Mult => "*",
+            Self::Pow => "**",
             Self::Div => "/",
             Self::Mod => "%",
-            Self::Pow => "^",
             Self::PlusEq => "+=",
             Self::MinusEq => "-=",
             Self::MultEq => "*=",
             Self::DivEq => "/=",
             Self::ModEq => "%=",
-            Self::PowEq => "^=",
+            Self::PowEq => "**=",
             Self::Assign => "=",
             Self::LParen => "(",
             Self::RParen => ")",
@@ -191,6 +194,8 @@ impl Token {
             Self::Dollar => "$",
             Self::Import => "import",
             Self::As => "as",
+            Self::BinXor => "^",
+            Self::BinXorEq => "^=",
             Self::BinAndEq => "&=",
             Self::BinOrEq => "|=",
             Self::BinAnd => "&",
@@ -212,6 +217,7 @@ impl Token {
             Self::Unary => "unary",
             Self::Throw => "throw",
             Self::Epsilon => "ε",
+            Self::Slf => "self",
         }
     }
 }

@@ -282,6 +282,15 @@ impl<'a> Lexer<'a> {
             },
             b'*' => {
                 ret!(match self.read() {
+                    Some(b'*') => {
+                        match self.read() {
+                            Some(b'=') => {
+                                self.bump(1);
+                                Token::PowEq
+                            },
+                            _ => Token::Pow,
+                        }
+                    },
                     Some(b'=') => {
                         self.bump(1);
                         Token::MultEq
@@ -330,10 +339,10 @@ impl<'a> Lexer<'a> {
                 ret!(match self.read() {
                     Some(b'=') => {
                         self.bump(1);
-                        Token::PowEq
+                        Token::BinXorEq
                     },
                     _ => {
-                        Token::Pow
+                        Token::BinXor
                     },
                 });
             },
@@ -481,6 +490,7 @@ impl<'a> Lexer<'a> {
                     "import" => Token::Import,
                     "is" => Token::Is,
                     "as" => Token::As,
+                    "self" => Token::Slf,
                     "_" => Token::Any,
                     "r" => {
                         macro_rules! raw_string {

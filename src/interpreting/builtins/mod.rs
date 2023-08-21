@@ -27,10 +27,10 @@ macro_rules! raw_macro {
         > {
             // $crate::interpreting::value::Value
             use $crate::interpreting::value::value_structs::*;
-            
+
             $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
             $crate::interpreting::builtins::impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
-            
+
             $($code)*
         }
     };
@@ -38,7 +38,7 @@ macro_rules! raw_macro {
         let $fn_name:ident = [ $slf:ident;
             $(
                 $capture:ident: $c_typ:ty $(= $c_var:expr)? $(=> $ref_iter:expr)?
-            ),* 
+            ),*
             $(,)?
         ]( $($args:tt)* ) { $($code:tt)*} $ctx:ident $vm:ident $program:ident $area:ident $extra:ident
     ) => {
@@ -68,7 +68,7 @@ macro_rules! raw_macro {
                 type Args<'a, 'b> = (Vec<ValueRef>, Context, &'a mut Vm, &'b Rc<Program>, CodeArea);
                 impl FnOnce<Args<'_, '_>> for /?@data/ {
                     type Output = Multi<RuntimeResult<ValueRef>>;
-                
+
                     extern "rust-call" fn call_once(mut self, args: Args) -> Self::Output {
                         (self.__fn)(args.0, args.1, args.2, args.3, args.4, &mut self)
                     }
@@ -111,10 +111,10 @@ macro_rules! raw_macro {
                     > {
                         // $crate::interpreting::value::Value
                         use $crate::interpreting::value::value_structs::*;
-                        
+
                         $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
                         $crate::interpreting::builtins::impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
-                        
+
                         $($code)*
                     }
                     /?@data/ {
@@ -155,7 +155,7 @@ macro_rules! impl_type {
                 $(#[raw($fn_raw:literal)])?
                 $(#[doc = $fn_doc:expr])+
                 fn $func_name:ident($($args:tt)*)
-                
+
                 $(-> $ret_type:literal)? {
                     $($code:tt)*
                 }
@@ -164,7 +164,7 @@ macro_rules! impl_type {
     ) => {
         impl $crate::interpreting::value::type_aliases::$value_typ {
             pub fn get_override_fn(self, name: &str) -> Option<$crate::interpreting::value::BuiltinFn> {
-                
+
                 $(
 
                     $crate::interpreting::builtins::raw_macro! { fn $func_name($($args)*) { $($code)* } $ctx $vm $program $area}
@@ -177,7 +177,7 @@ macro_rules! impl_type {
                     // ) -> $crate::interpreting::vm::RuntimeResult<()> {
                     //     // $crate::interpreting::value::Value
                     //     use $crate::interpreting::value::value_structs::*;
-                        
+
                     //     $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
                     //     $crate::interpreting::builtins::impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
                     //     // todo!()
@@ -273,14 +273,14 @@ macro_rules! impl_type {
     (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident)) => {};
 
     // any kind of argument
-    (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) &mut $ident:ident $($t:tt)*) => {
-        $crate::interpreting::builtins::impl_type! { @ArgsB[$ __ $idx, true]($args, $vm, $area) $ident $($t)* }
-    };
-    (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) mut $ident:ident $($t:tt)*) => {
-        $crate::interpreting::builtins::impl_type! { @ArgsB[$ __ $idx, true]($args, $vm, $area) $ident $($t)* }
-    };
+    // (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) &mut $ident:ident $($t:tt)*) => {
+    //     $crate::interpreting::builtins::impl_type! { @ArgsB[$ __ $idx, true]($args, $vm, $area) $ident $($t)* }
+    // };
+    // (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) mut $ident:ident $($t:tt)*) => {
+    //     $crate::interpreting::builtins::impl_type! { @ArgsB[$ __ $idx, true]($args, $vm, $area) $ident $($t)* }
+    // };
     (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) & $ident:ident $($t:tt)*) => {
-        $crate::interpreting::builtins::impl_type! { @ArgsB[$ __ $idx, false]($args, $vm, $area) $ident $($t)* }
+        $crate::interpreting::builtins::impl_type! { @ArgsB[$ __ $idx, true]($args, $vm, $area) $ident $($t)* }
     };
     (@ArgsA[$idx:expr]($args:ident, $vm:ident, $area:ident) $ident:ident $($t:tt)*) => {
         $crate::interpreting::builtins::impl_type! { @ArgsB[$ __ $idx, false]($args, $vm, $area) $ident $($t)* }
@@ -312,16 +312,16 @@ macro_rules! impl_type {
                 };
             }
         }
-        
+
         $crate::interpreting::builtins::impl_type! { @ArgsA[$idx + 1]($args, $vm, $area) $($($t)*)? }
     };
 
     // tuple variant destructure argument
     (
         @ArgsB[$_:tt __ $idx:expr, $mut:expr]($args:ident, $vm:ident, $area:ident)
-        
+
         $variant:ident ($field:ident) $(if $pattern:literal)? as $spwn_name:literal $( = $default:literal )?
-        
+
         // rest
         $(, $($t:tt)*)?
     ) => {
@@ -342,7 +342,7 @@ macro_rules! impl_type {
     ) => {
         paste::paste! {
             let getter = [< $variant Getter >]::<'_, $mut>::make_from(& $args[$idx]);
-            
+
             $(
                 let $crate::interpreting::builtins::impl_type! {@FieldBind $field $($bind)?} = getter.$field;
             )*
@@ -372,7 +372,7 @@ macro_rules! impl_type {
     // multiple type argument
     (
         @ArgsB[$_:tt __ $idx:expr, $mut:expr]($args:ident, $vm:ident, $area:ident)
-        
+
         $var:ident : $($typ:ident $(if $pattern:literal)?)|+ $(as $spwn_name:literal)? $( = $default:literal )?
 
         // rest
@@ -401,7 +401,7 @@ macro_rules! impl_type {
                                 $_( { $_( $destr_field:ident $_(: $destr_bind:ident)? ),* $_(,)? } )?
                             => $code:expr
                         ),*
-        
+
                         $_(,)?
                     ) => {
                         match /?@v/ {
@@ -434,17 +434,17 @@ macro_rules! impl_type {
     (@FieldBind $field:ident $bind:ident) => {
         $bind
     };
-    
+
     (@SpwnArgsGenA($out:ident)) => {};
 
-    (@SpwnArgsGenA($out:ident) &mut $ident:ident $($t:tt)*) => {
-        $out += "\n\t\t&mut ";
-        $crate::interpreting::builtins::impl_type! { @SpwnArgsGenB($out) $ident $($t)* }
-    };
-    (@SpwnArgsGenA($out:ident) mut $ident:ident $($t:tt)*) => {
-        $out += "\n\t\tmut ";
-        $crate::interpreting::builtins::impl_type! { @SpwnArgsGenB($out) $ident $($t)* }
-    };
+    // (@SpwnArgsGenA($out:ident) &mut $ident:ident $($t:tt)*) => {
+    //     $out += "\n\t\t&mut ";
+    //     $crate::interpreting::builtins::impl_type! { @SpwnArgsGenB($out) $ident $($t)* }
+    // };
+    // (@SpwnArgsGenA($out:ident) mut $ident:ident $($t:tt)*) => {
+    //     $out += "\n\t\tmut ";
+    //     $crate::interpreting::builtins::impl_type! { @SpwnArgsGenB($out) $ident $($t)* }
+    // };
     (@SpwnArgsGenA($out:ident) & $ident:ident $($t:tt)*) => {
         $out += "\n\t\t&";
         $crate::interpreting::builtins::impl_type! { @SpwnArgsGenB($out) $ident $($t)* }
@@ -453,7 +453,7 @@ macro_rules! impl_type {
         $out += "\n\t\t";
         $crate::interpreting::builtins::impl_type! { @SpwnArgsGenB($out) $ident $($t)* }
     };
-    
+
     (
         @SpwnArgsGenA($out:ident)
 
@@ -492,14 +492,14 @@ macro_rules! impl_type {
             $out += &format!(" & ({})", $pattern);
         )?
         $out += ")[],";
-        
+
         $crate::interpreting::builtins::impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
     };
     (
         @SpwnArgsGenB($out:ident)
 
         $var:ident $(: $typ:ident)? $(if $pattern:literal)? $(as $spwn_name:literal)? $( = $default:literal )?
-        
+
         // rest
         $(, $($t:tt)*)?
     ) => {
@@ -525,7 +525,7 @@ macro_rules! impl_type {
         $(
             $out += &format!(" & ({})", $pattern);
         )?
-        
+
         $(
             $out += &format!(" = {}", $default);
         )?
@@ -534,9 +534,9 @@ macro_rules! impl_type {
     };
     (
         @SpwnArgsGenB($out:ident)
-        
+
         $variant:ident $( ( $($t1:tt)* ) )? $( { $($t2:tt)* } )? $(if $pattern:literal)? as $spwn_name:literal $( = $default:literal )?
-        
+
         // rest
         $(, $($t:tt)*)?
     ) => {
@@ -558,7 +558,7 @@ macro_rules! impl_type {
         @SpwnArgsGenB($out:ident)
 
         $var:ident : $($typ:ident $(if $pattern:literal)?)|+ $(as $spwn_name:literal)? $( = $default:literal )?
-        
+
         // rest
         $(, $($t:tt)*)?
     ) => {
@@ -591,30 +591,31 @@ macro_rules! impl_type {
         $crate::interpreting::builtins::impl_type! { @SpwnArgsGenA($out) $($($t)*)? }
     };
 
-    
+
 
     // no more args
     (@ArgsCheckCloneA[$idx:expr]($args:ident, $vm:ident)) => {};
 
     // any kind of argument
-    (@ArgsCheckCloneA[$idx:expr]($args:ident, $vm:ident) &mut $ident:ident $($t:tt)*) => {
-        $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneB[$ __ $idx, true]($args, $vm) $ident $($t)* }
-    };
-    (@ArgsCheckCloneA[$idx:expr]($args:ident, $vm:ident) mut $ident:ident $($t:tt)*) => {
-        {
-            let new = $crate::interpreting::vm::DeepClone::deep_clone_ref($vm, &$args[$idx]);
-            $args[$idx] = new;
-        }
-        $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneB[$ __ $idx, true]($args, $vm) $ident $($t)* }
-    };
+    // (@ArgsCheckCloneA[$idx:expr]($args:ident, $vm:ident) &mut $ident:ident $($t:tt)*) => {
+    //     $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneB[$ __ $idx, true]($args, $vm) $ident $($t)* }
+    // };
+    // (@ArgsCheckCloneA[$idx:expr]($args:ident, $vm:ident) mut $ident:ident $($t:tt)*) => {
+    //     {
+    //         let new = $crate::interpreting::vm::DeepClone::deep_clone_ref($vm, &$args[$idx]);
+    //         $args[$idx] = new;
+    //     }
+    //     $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneB[$ __ $idx, true]($args, $vm) $ident $($t)* }
+    // };
     (@ArgsCheckCloneA[$idx:expr]($args:ident, $vm:ident) & $ident:ident $($t:tt)*) => {
-        $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneB[$ __ $idx, false]($args, $vm) $ident $($t)* }
+        $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneB[$ __ $idx, true]($args, $vm) $ident $($t)* }
     };
     (@ArgsCheckCloneA[$idx:expr]($args:ident, $vm:ident) $ident:ident $($t:tt)*) => {
-        {
-            let new = $crate::interpreting::vm::DeepClone::deep_clone_ref($vm, &$args[$idx], false);
-            $args[$idx] = new;
-        }
+        // {
+        //     let new = $crate::interpreting::vm::DeepClone::deep_clone_ref($vm, &$args[$idx], false);
+        //     $args[$idx] = new;
+        // }
+        // $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneB[$ __ $idx, false]($args, $vm) $ident $($t)* }
         $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneB[$ __ $idx, false]($args, $vm) $ident $($t)* }
     };
 
@@ -633,9 +634,9 @@ macro_rules! impl_type {
     // tuple variant destructure argument
     (
         @ArgsCheckCloneB[$_:tt __ $idx:expr, $mut:expr]($args:ident, $vm:ident)
-        
+
         $variant:ident ($field:ident) $(if $pattern:literal)? as $spwn_name:literal $( = $default:literal )?
-        
+
         // rest
         $(, $($t:tt)*)?
     ) => {
@@ -668,7 +669,7 @@ macro_rules! impl_type {
     // multiple type argument
     (
         @ArgsCheckCloneB[$_:tt __ $idx:expr, $mut:expr]($args:ident, $vm:ident)
-        
+
         $var:ident : $($typ:ident $(if $pattern:literal)?)|+ $(as $spwn_name:literal)? $( = $default:literal )?
 
         // rest
