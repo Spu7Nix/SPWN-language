@@ -315,6 +315,7 @@ impl<'a> Compiler<'a> {
                     source_hash: self.src_hash(),
                 };
                 let name_str = self.resolve_32(name.value());
+
                 self.type_def_map.insert(
                     custom_id,
                     TypeDef {
@@ -326,18 +327,6 @@ impl<'a> Compiler<'a> {
 
                 self.available_custom_types
                     .insert(*name.value(), name.map(|_| custom_id));
-            },
-            Statement::ExtractImport(import) => {
-                let import_reg = builder.next_reg();
-                let (names, s, types) = self.compile_import(
-                    import,
-                    stmt.span,
-                    Rc::clone(&self.src),
-                    self.src.get_variant(),
-                )?;
-                builder.import(import_reg, s, stmt.span);
-
-                self.extract_import(&names, &types, scope, import_reg, builder, stmt.span);
             },
             Statement::Impl { name, items } => {
                 let mut new_items = items.clone();

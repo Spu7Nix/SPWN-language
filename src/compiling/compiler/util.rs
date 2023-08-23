@@ -220,19 +220,17 @@ impl Compiler<'_> {
 
                     for (k, s) in &bytecode.custom_types {
                         let name = self.intern(&s.value().value);
-                        // self.available_custom_types
-                        //     .insert(name, s.clone().map(|_| *k));
+                        self.available_custom_types
+                            .insert(name, s.clone().map(|_| *k));
 
-                        if s.is_pub() {
-                            self.type_def_map.insert(
-                                *k,
-                                TypeDef {
-                                    src: Rc::clone(&self.src),
-                                    def_span: s.value().span,
-                                    name: String32::from(&***s.value()).into(),
-                                },
-                            );
-                        }
+                        self.type_def_map.insert(
+                            *k,
+                            TypeDef {
+                                src: Rc::clone(&self.src),
+                                def_span: s.value().span,
+                                name: String32::from(&***s.value()).into(),
+                            },
+                        );
 
                         // self.custom_type_defs.insert(
                         //     TypeDef {

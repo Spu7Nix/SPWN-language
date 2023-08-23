@@ -107,7 +107,7 @@ pub struct StmtNode {
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub struct PatternNode {
-    pub pat: Box<Pattern<Spur, PatternNode, ExprNode, Spur>>,
+    pub pat: Box<Pattern>,
     pub span: CodeSpan,
 }
 
@@ -125,14 +125,20 @@ impl From<DictItem> for &'static str {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum MacroArg<D, P> {
-    Single { pattern: P, default: Option<D> },
-    Spread { pattern: P },
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub enum MacroArg {
+    Single {
+        pattern: PatternNode,
+        default: Option<ExprNode>,
+    },
+    Spread {
+        pattern: PatternNode,
+    },
 }
 
-impl<D, P> MacroArg<D, P> {
-    pub fn pattern(&self) -> &P {
+impl MacroArg {
+    pub fn pattern(&self) -> &PatternNode {
         match self {
             MacroArg::Single { pattern, .. } => pattern,
             MacroArg::Spread { pattern } => pattern,
@@ -234,7 +240,7 @@ pub enum Expression {
     },
 
     Macro {
-        args: Vec<MacroArg<ExprNode, PatternNode>>,
+        args: Vec<MacroArg>,
         ret_pat: Option<PatternNode>,
         code: MacroCode,
     },
@@ -258,6 +264,10 @@ pub enum Expression {
     Epsilon,
 
     Import(Import),
+    ExtractImport {
+        import: Import,
+        destructure: Option<Spanned<AHashMap<Spanned<ModuleDestructureKey>, Option<PatternNode>>>>,
+    },
 
     Dbg(ExprNode, bool),
 
@@ -326,8 +336,6 @@ pub enum Statement {
         members: Option<Vec<Vis<DictItem>>>,
     },
 
-    ExtractImport(Import),
-
     Impl {
         name: Spanned<Spur>,
         items: Vec<Vis<DictItem>>,
@@ -343,72 +351,69 @@ pub enum Statement {
 pub type Statements = Vec<StmtNode>;
 
 // the key for a dict destructure
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum DictDestructureKey<T, S> {
-    Ident(S),
-    // types are only valid in module destructures
-    Type(Vis<T>),
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ModuleDestructureKey {
+    Ident(Spur),
+    Type(Vis<Spur>),
 }
 
-// T = type, P = pattern, E = expression, S = string
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Pattern<T: Hash + Eq, P, E, S: Hash + Eq> {
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub enum Pattern {
     Any, // _
 
-    Type(T),      // @<type>
-    Either(P, P), // <pattern> | <pattern>
-    Both(P, P),   // <pattern> & <pattern>, <pattern>: <pattern>
+    Type(Spur),                       // @<type>
+    Either(PatternNode, PatternNode), // <pattern> | <pattern>
+    Both(PatternNode, PatternNode),   // <pattern> & <pattern>, <pattern>: <pattern>
 
-    Eq(E),  // == <expr>
-    Neq(E), // != <expr>
-    Lt(E),  // < <expr>
-    Lte(E), // <= <expr>
-    Gt(E),  // > <expr>
-    Gte(E), // >= <expr>
+    Eq(ExprNode),  // == <expr>
+    Neq(ExprNode), // != <expr>
+    Lt(ExprNode),  // < <expr>
+    Lte(ExprNode), // <= <expr>
+    Gt(ExprNode),  // > <expr>
+    Gte(ExprNode), // >= <expr>
 
-    In(E), // in <pattern>
+    In(ExprNode), // in <pattern>
 
-    ArrayPattern(P, P), // <pattern>[<pattern>]
-    DictPattern(P),     // <pattern>{:}
+    ArrayPattern(PatternNode, PatternNode), // <pattern>[<pattern>]
+    DictPattern(PatternNode),               // <pattern>{:}
 
-    ArrayDestructure(Vec<P>), // [ <pattern> ]
-    // { <key>(: <pattern>)? ETC } for normal dict
-    // { <key>(: <pattern>)? / (<visibility>)? @<type>(: <pattern>)? } for module destructures
-    DictDestructure(AHashMap<Spanned<DictDestructureKey<T, S>>, P>),
-    MaybeDestructure(Option<P>),                     // <pattern>? or ?
-    InstanceDestructure(T, AHashMap<Spanned<S>, P>), // @typ::{ <key>(: <pattern>)? ETC }
+    ArrayDestructure(Vec<PatternNode>), // [ <pattern> ]
+    DictDestructure(AHashMap<Spanned<Spur>, PatternNode>), // { key: <pattern> ETC }
+    MaybeDestructure(Option<PatternNode>), // <pattern>? or ?
+    InstanceDestructure(Spur, AHashMap<Spanned<Spur>, PatternNode>), // @typ::{ <key>(: <pattern>)? ETC }
 
     // ()
     Empty,
 
     Path {
         // var[0].cock::binky[79] etc
-        var: S,
-        path: Vec<AssignPath<E, S>>,
+        var: Spur,
+        path: Vec<AssignPath>,
     },
     Mut {
         // mut var
-        name: S,
+        name: Spur,
     },
     Ref {
         // mut var
-        name: S,
+        name: Spur,
     },
 
     IfGuard {
         // <pattern> if <expr>
-        pat: P,
-        cond: E,
+        pat: PatternNode,
+        cond: ExprNode,
     },
 
     MacroPattern {
         // (<pattern>...) -> <pattern>
-        args: Vec<P>,
-        ret: P,
+        args: Vec<PatternNode>,
+        ret: PatternNode,
     },
 }
 
-impl<T: Hash + Eq, E> Pattern<T, PatternNode, E, Spur> {
+impl Pattern {
     pub fn is_self(&self, interner: &Interner) -> bool {
         match self {
             Pattern::Either(a, b) => a.pat.is_self(interner) || b.pat.is_self(interner),
@@ -456,12 +461,12 @@ impl<T: Hash + Eq, E> Pattern<T, PatternNode, E, Spur> {
     }
 }
 
-// T = type, E = expression, S = string
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AssignPath<E, S: Hash + Eq> {
-    Index(E),
-    Member(S),
-    Associated(S),
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub enum AssignPath {
+    Index(ExprNode),
+    Member(Spur),
+    Associated(Spur),
 }
 
 impl Expression {

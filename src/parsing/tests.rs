@@ -1,9 +1,7 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use ahash::AHashMap;
 use itertools::Either;
-use lasso::{Rodeo, Spur};
 
 use super::ast::{
     Ast, ExprNode, Expression as Ex, Statement as St, StmtNode, StringContent, StringType,
@@ -12,16 +10,14 @@ use super::parser::Parser;
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
 use crate::parsing::ast::{
-    AssignPath, AttrArgs, AttrItem, AttrStyle, Attribute, DictDestructureKey, DictItem, Import,
-    ImportType, MacroArg, MacroCode, ObjKeyType, ObjectType, Pattern, PatternNode, StringFlags,
-    Vis,
+    AssignPath, AttrArgs, AttrItem, AttrStyle, Attribute, DictItem, Import, ImportType, MacroArg,
+    MacroCode, ModuleDestructureKey, ObjKeyType, ObjectType, Pattern as Pt, PatternNode,
+    StringFlags, Vis,
 };
 use crate::parsing::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::parsing::parser::ParseResult;
 use crate::sources::{CodeSpan, Spanned, SpwnSource};
 use crate::util::interner::Interner;
-
-type Pt = Pattern<Spur, PatternNode, ExprNode, Spur>;
 
 trait IntoNode<T>
 where
@@ -109,7 +105,7 @@ macro_rules! span {
 
 macro_rules! spur {
     ($str:literal) => {{
-        let mut v = unsafe { INTERNER.as_ref().unwrap() };
+        let v = unsafe { INTERNER.as_ref().unwrap() };
         v.get_or_intern($str)
     }};
 }
@@ -164,6 +160,7 @@ const _: () = {
         Ex::Obj(..) => (),
         Ex::Dbg(..) => (),
         Ex::Match { .. } => (),
+        Ex::ExtractImport {..} => (),
     }
     match St::Break {
         St::Expr(..) => (),
@@ -178,7 +175,6 @@ const _: () = {
         St::Break => (),
         St::Continue => (),
         St::TypeDef { .. } => (),
-        St::ExtractImport(..) => (),
         St::Impl { .. } => (),
         St::Overload { .. } => (),
         St::Throw(..) => (),
@@ -748,30 +744,30 @@ fn test_is_pattern() -> ParseResult<()> {
     // useless match so this errors if we ever add/remove patterns
     // if this errors please add / remove the respective tests
     match Pt::Any {
-        Pattern::Any => (),
-        Pattern::Type(..) => (),
-        Pattern::Either(..) => (),
-        Pattern::Both(..) => (),
-        Pattern::Eq(..) => (),
-        Pattern::Neq(..) => (),
-        Pattern::Lt(..) => (),
-        Pattern::Lte(..) => (),
-        Pattern::Gt(..) => (),
-        Pattern::Gte(..) => (),
+        Pt::Any => (),
+        Pt::Type(..) => (),
+        Pt::Either(..) => (),
+        Pt::Both(..) => (),
+        Pt::Eq(..) => (),
+        Pt::Neq(..) => (),
+        Pt::Lt(..) => (),
+        Pt::Lte(..) => (),
+        Pt::Gt(..) => (),
+        Pt::Gte(..) => (),
 
-        Pattern::MacroPattern { .. } => (),
-        Pattern::In(..) => (),
-        Pattern::ArrayPattern(..) => (),
-        Pattern::DictPattern(..) => (),
-        Pattern::ArrayDestructure(..) => (),
-        Pattern::DictDestructure(..) => (),
-        Pattern::MaybeDestructure(..) => (),
-        Pattern::InstanceDestructure(..) => (),
-        Pattern::Path { .. } => (),
-        Pattern::Mut { .. } => (),
-        Pattern::IfGuard { .. } => (),
-        Pattern::Empty => (),
-        Pattern::Ref { .. } => (),
+        Pt::MacroPattern { .. } => (),
+        Pt::In(..) => (),
+        Pt::ArrayPattern(..) => (),
+        Pt::DictPattern(..) => (),
+        Pt::ArrayDestructure(..) => (),
+        Pt::DictDestructure(..) => (),
+        Pt::MaybeDestructure(..) => (),
+        Pt::InstanceDestructure(..) => (),
+        Pt::Path { .. } => (),
+        Pt::Mut { .. } => (),
+        Pt::IfGuard { .. } => (),
+        Pt::Empty => (),
+        Pt::Ref { .. } => (),
     };
 
     let e: ExprNode = Ex::Int(1).node();
@@ -902,14 +898,13 @@ fn test_is_pattern() -> ParseResult<()> {
         t,
         St::Assign(
             Pt::DictDestructure(AHashMap::from([(
-                span!(DictDestructureKey::Ident(spur!("x"))),
+                span!(spur!("x")),
                 Pt::Type(spur!("float")).node()
             )]))
             .node(),
             Ex::Empty.node()
         )
     );
-    // TODO: module dict destructure test
     let t = parse("@a::{ x } = ()")?;
     stmt_eq!(
         t,
@@ -1689,21 +1684,56 @@ fn test_typedef() -> ParseResult<()> {
 #[test]
 fn test_extract_import() -> ParseResult<()> {
     let t = parse("extract import lib")?;
-    stmt_eq!(
+    expr_eq!(
         t,
-        St::ExtractImport(Import {
-            path: "lib".into(),
-            typ: ImportType::Library
-        })
+        Ex::ExtractImport {
+            import: Import {
+                path: "lib".into(),
+                typ: ImportType::Library
+            },
+            destructure: None,
+        }
     );
 
-    let t = parse(r#"extract import "test.spwn""#)?;
-    stmt_eq!(
+    let t = parse(r#"extract { @foo, private @bar, x: y, z } import "test.spwn""#)?;
+    expr_eq!(
         t,
-        St::ExtractImport(Import {
-            path: "test.spwn".into(),
-            typ: ImportType::File
-        })
+        Ex::ExtractImport {
+            import: Import {
+                path: "test.spwn".into(),
+                typ: ImportType::File
+            },
+            destructure: Some(span!(AHashMap::from([
+                (
+                    span!(ModuleDestructureKey::Type(Vis::Public(spur!("foo")))),
+                    None
+                ),
+                (
+                    span!(ModuleDestructureKey::Type(Vis::Private(spur!("bar")))),
+                    None
+                ),
+                (
+                    span!(ModuleDestructureKey::Ident(spur!("x"))),
+                    Some(
+                        Pt::Path {
+                            var: spur!("y"),
+                            path: vec![]
+                        }
+                        .node()
+                    )
+                ),
+                (
+                    span!(ModuleDestructureKey::Ident(spur!("z"))),
+                    Some(
+                        Pt::Path {
+                            var: spur!("z"),
+                            path: vec![]
+                        }
+                        .node()
+                    )
+                )
+            ])))
+        }
     );
 
     Ok(())

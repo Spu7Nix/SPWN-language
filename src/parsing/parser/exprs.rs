@@ -1,3 +1,4 @@
+use ahash::AHashMap;
 use lasso::Spur;
 
 use super::{ParseResult, Parser};
@@ -6,8 +7,8 @@ use crate::gd::object_keys::OBJECT_KEYS;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{
-    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, ObjKeyType,
-    ObjectType, Pattern, PatternNode, StringContent, StringType,
+    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, ModuleDestructureKey,
+    ObjKeyType, ObjectType, Pattern, PatternNode, StringContent, StringType, Vis,
 };
 use crate::parsing::error::SyntaxError;
 use crate::parsing::operators::operators::{self, unary_prec};
@@ -354,6 +355,94 @@ impl Parser<'_> {
                     let import_type = self.parse_import()?;
 
                     Expression::Import(import_type).spanned(start.extend(self.span()))
+                },
+                Token::Extract => {
+                    self.next()?;
+
+                    let map = match self.peek()? {
+                        Token::Import => {
+                            self.next()?;
+
+                            None
+                        },
+                        Token::LBracket => {
+                            self.next()?;
+
+                            let start_span = self.span();
+
+                            let mut map = AHashMap::new();
+
+                            list_helper!(self, RBracket {
+                                match self.next()? {
+                                    Token::Ident => {
+                                        let key = self.intern_string(self.slice());
+
+                                        let key_span = self.span();
+
+                                        let elem = if self.next_is(Token::Colon)? {
+                                            self.next()?;
+                                            self.parse_pattern()?
+                                        } else {
+                                            PatternNode {
+                                                pat: Box::new(Pattern::Path {
+                                                    var: key,
+                                                    path: vec![],
+                                                }),
+                                                span: key_span,
+                                            }
+                                        };
+
+                                        map.insert( ModuleDestructureKey::Ident(key).spanned(key_span), Some(elem));
+                                    },
+                                    t @ (Token::Private | Token::TypeIndicator) => {
+                                        let vis = match t {
+                                            Token::Private => {
+                                                self.expect_tok(Token::TypeIndicator)?;
+                                                Vis::Private
+                                            },
+                                            Token::TypeIndicator => {
+                                                Vis::Public
+                                            }
+                                            _ => unreachable!(),
+                                        };
+
+                                        let key = ModuleDestructureKey::Type(vis(self.intern_string(&self.slice()[1..])));
+                                        let key_span = self.span();
+
+                                        map.insert(key.spanned(key_span), None);
+                                    }
+                                    other => {
+                                        return Err(SyntaxError::UnexpectedToken {
+                                            expected: "ident or type".into(),
+                                            found: other,
+                                            area: self.make_area(self.span()),
+                                        })
+                                    }
+                                };
+                            });
+
+                            let map = Some(map.spanned(start_span.extend(self.span())));
+
+                            self.expect_tok(Token::Import)?;
+
+                            map
+                        },
+                        other => {
+                            return Err(SyntaxError::UnexpectedToken {
+                                expected: "`import` or destructure pattern".into(),
+                                found: other,
+                                area: self.make_area(self.span()),
+                            })
+                        },
+                    };
+
+                    let import_type = self.parse_import()?;
+
+                    Expression::ExtractImport {
+                        import: import_type,
+                        destructure: map,
+                    }
+                    .spanned(start.extend(self.span()))
                 },
                 Token::Match => {
                     self.next()?;

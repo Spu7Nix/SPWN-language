@@ -5,7 +5,7 @@ use base64::Engine;
 use itertools::{Either, Itertools};
 use widestring::utf32str;
 
-use super::{CompileResult, Compiler, DeferredTriggerFunc, ScopeID};
+use super::{CompileResult, Compiler, DeferredTriggerFunc, ScopeID, TypeDef};
 use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::bytecode::{CallExpr, Constant, Register, UnoptRegister};
 use crate::compiling::compiler::{Scope, ScopeType, VarData};
@@ -14,8 +14,8 @@ use crate::compiling::opcodes::{Opcode, RuntimeStringFlag};
 use crate::gd::ids::IDClass;
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{
-    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, ObjKeyType,
-    ObjectType, StringType, VisTrait,
+    ExprNode, Expression, MacroArg, MacroCode, MatchBranch, MatchBranchCode, ModuleDestructureKey,
+    ObjKeyType, ObjectType, StringType, Vis, VisTrait,
 };
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::{CodeSpan, Spannable, SpwnSource, ZEROSPAN};
@@ -606,16 +606,177 @@ impl Compiler<'_> {
                 Ok(dest)
             },
             Expression::Import(import) => {
-                let out = builder.next_reg();
+                let import_reg = builder.next_reg();
                 let (_, s, _) = self.compile_import(
                     import,
                     expr.span,
                     Rc::clone(&self.src),
                     self.src.get_variant(),
                 )?;
-                builder.import(out, s, expr.span);
+                builder.import(import_reg, s, expr.span);
 
-                Ok(out)
+                Ok(import_reg)
+            },
+            Expression::ExtractImport {
+                import,
+                destructure,
+            } => {
+                let import_reg = builder.next_reg();
+                let (names, import_src, types) = self.compile_import(
+                    import,
+                    expr.span,
+                    Rc::clone(&self.src),
+                    self.src.get_variant(),
+                )?;
+                builder.import(import_reg, import_src, expr.span);
+
+                if let Some(dest) = destructure {
+                    let out_reg = builder.next_reg();
+
+                    // almost the same as the dict destructure pattern but it needs to be handled
+                    // manually here as we need access to the import and types which isnt sensible to
+                    // pass to `compile_pattern_check`
+                    self.and_op(
+                        &[
+                            &|_, builder| {
+                                let dict_typ = builder.next_reg();
+                                builder.load_const(ValueType::Module, dict_typ, dest.span);
+
+                                let expr_typ = builder.next_reg();
+                                builder.type_of(import_reg, expr_typ, dest.span);
+
+                                let eq_reg = builder.next_reg();
+                                builder.pure_eq(expr_typ, dict_typ, eq_reg, dest.span);
+
+                                Ok(eq_reg)
+                            },
+                            // &|_, builder| {
+                            //     let pat_len = builder.next_reg();
+                            //     builder.load_const(dest.len() as i64, pat_len, dest.span);
+
+                            //     let expr_len = builder.next_reg();
+                            //     builder.len(import_reg, expr_len, dest.span);
+
+                            //     let gte_reg = builder.next_reg();
+                            //     builder.pure_gte(expr_len, pat_len, gte_reg, dest.span);
+
+                            //     Ok(gte_reg)
+                            // },
+                            &|compiler, builder| {
+                                // todo!()
+                                let mut funcs = vec![];
+
+                                for (key, elem) in dest.iter() {
+                                    let f: Box<
+                                        dyn Fn(
+                                            &mut Compiler<'_>,
+                                            &mut CodeBuilder<'_>,
+                                        )
+                                            -> CompileResult<UnoptRegister>,
+                                    > = Box::new(|compiler, builder| {
+                                        let elem_reg = builder.next_reg();
+
+                                        match &**key {
+                                            ModuleDestructureKey::Ident(i) => {
+                                                builder.member(
+                                                    import_reg,
+                                                    elem_reg,
+                                                    compiler.resolve_32(i).spanned(key.span),
+                                                    false,
+                                                    key.span,
+                                                );
+
+                                                compiler.compile_pattern_check(
+                                                    elem_reg,
+                                                    elem.as_ref().expect(
+                                                        "BUG: mod destructure ident missing elem",
+                                                    ),
+                                                    true,
+                                                    scope,
+                                                    builder,
+                                                )
+                                            },
+                                            ModuleDestructureKey::Type(t) => {
+                                                let out_reg = builder.next_reg();
+
+                                                let name = t.value();
+
+                                                builder.type_member(
+                                                    import_reg,
+                                                    elem_reg,
+                                                    compiler.resolve_32(name).spanned(key.span),
+                                                    key.span,
+                                                );
+                                                let id = types.iter().find(|(_, s)| s == name);
+
+                                                if let Some(id) = id {
+                                                    compiler
+                                                        .available_custom_types
+                                                        .insert(*name, t.map(|_| id.0));
+
+                                                    let name_str = compiler.resolve(name);
+
+                                                    // let td = TypeDef {
+                                                    //     src: Rc::clone(&compiler.src),
+                                                    //     def_span: key.span,
+                                                    //     name: String32::from(&*name_str).into(),
+                                                    // };
+
+                                                    compiler.type_def_map.insert(
+                                                        id.0,
+                                                        TypeDef {
+                                                            src: Rc::clone(&compiler.src),
+                                                            def_span: key.span,
+                                                            name: String32::from(&*name_str).into(),
+                                                        },
+                                                    );
+
+                                                    // compiler.local_type_defs.insert(t.map(|_| {
+                                                    //     TypeDef {
+                                                    //         src: Rc::clone(&compiler.src),
+                                                    //         def_span: key.span,
+                                                    //         name: *name,
+                                                    //     }
+                                                    // }));
+                                                    // if t.is_pub() {}
+
+                                                    builder.load_const(true, out_reg, key.span);
+                                                } else {
+                                                    builder.load_const(false, out_reg, key.span);
+                                                }
+
+                                                Ok(out_reg)
+                                            },
+                                        }
+                                    });
+
+                                    funcs.push(f);
+                                }
+
+                                let all_reg = builder.next_reg();
+                                builder.load_const(true, all_reg, dest.span);
+
+                                compiler.and_op(
+                                    &funcs.iter().map(|e| &**e).collect_vec()[..],
+                                    all_reg,
+                                    dest.span,
+                                    builder,
+                                )?;
+
+                                Ok(all_reg)
+                            },
+                        ],
+                        out_reg,
+                        dest.span,
+                        builder,
+                    )?;
+
+                    builder.mismatch_throw_if_false(out_reg, import_reg, dest.span);
+                } else {
+                    self.extract_import(&names, &types, scope, import_reg, builder, expr.span);
+                }
+
+                Ok(import_reg)
             },
             Expression::Instance { base, items } => {
                 let dest = builder.next_reg();

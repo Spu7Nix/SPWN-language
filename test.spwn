@@ -1,3 +1,9 @@
-impl @a {
-    a: (mut self) {}
-}
+zz = extract { @foo, a: c, b } import "test2.spwn"
+
+dbg zz;
+dbg c;
+dbg b;
+
+dbg @foo;
+
+// dbg @bar;

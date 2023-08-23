@@ -21,7 +21,7 @@ impl Compiler<'_> {
         &mut self,
         var: Spur,
         try_new: bool,
-        path: &[AssignPath<ExprNode, Spur>],
+        path: &[AssignPath],
         scope: ScopeID,
         builder: &mut CodeBuilder,
         span: CodeSpan,
@@ -423,14 +423,13 @@ impl Compiler<'_> {
                                 > = Box::new(move |compiler, builder| {
                                     let elem_reg = builder.next_reg();
 
-                                    todo!("dict destructure key");
-                                    // builder.member(
-                                    //     expr_reg,
-                                    //     elem_reg,
-                                    //     key.map(|s| compiler.resolve_32(&s)),
-                                    //     false,
-                                    //     pattern.span,
-                                    // );
+                                    builder.member(
+                                        expr_reg,
+                                        elem_reg,
+                                        key.map(|s| compiler.resolve_32(&s)),
+                                        false,
+                                        pattern.span,
+                                    );
 
                                     compiler.compile_pattern_check(
                                         elem_reg,

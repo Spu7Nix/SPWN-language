@@ -4,7 +4,7 @@ use lasso::Spur;
 use super::{ParseResult, Parser};
 use crate::lexing::tokens::Token;
 use crate::list_helper;
-use crate::parsing::ast::{AssignPath, DictDestructureKey, Pattern, PatternNode, Vis};
+use crate::parsing::ast::{AssignPath, Pattern, PatternNode, Vis};
 use crate::parsing::error::SyntaxError;
 use crate::sources::{CodeSpan, Spannable};
 
@@ -141,51 +141,7 @@ impl<'a> Parser<'a> {
                     Pattern::ArrayDestructure(v)
                 },
                 Token::LBracket => {
-                    let mut map = AHashMap::new();
-
-                    list_helper!(self, RBracket {
-                        let key = match self.next()? {
-                            Token::Ident => DictDestructureKey::Ident(self.intern_string(self.slice())),
-                            t @ (Token::Private | Token::Type) => {
-                                let vis = if matches!(t, Token::Private) {
-                                    self.next()?;
-                                    Vis::Private
-                                } else {
-                                    Vis::Public
-                                };
-
-                                self.expect_tok(Token::Type)?;
-
-                                DictDestructureKey::Type(vis(self.intern_string(self.slice())))
-                            }
-                            other => {
-                                return Err(SyntaxError::UnexpectedToken {
-                                    expected: "key".into(),
-                                    found: other,
-                                    area: self.make_area(self.span()),
-                                })
-                            }
-                        };
-
-                        let key_span = self.span();
-
-                        let elem = if self.next_is(Token::Colon)? {
-                            self.next()?;
-                            self.parse_pattern()?
-                        } else {
-                            todo!()
-                            // PatternNode {
-                            //     pat: Box::new(Pattern::Path {
-                            //         var: key,
-                            //         path: vec![],
-                            //     }),
-                            //     span: key_span,
-                            // }
-                        };
-
-                        map.insert(key.spanned(key_span), elem);
-                    });
-
+                    let map = dictlike_destructure!();
                     Pattern::DictDestructure(map)
                 },
                 Token::TypeIndicator => {

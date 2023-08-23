@@ -64,6 +64,7 @@ impl Expression {
             Expression::TriggerFuncCall(..) => AT::TriggerFuncCall,
             Expression::Import(..) => AT::Import,
             Expression::Match { .. } => AT::Match,
+            Expression::ExtractImport { .. } => AT::ExtractImport,
             _ => AT::Unknown,
         }
     }
@@ -84,7 +85,6 @@ impl Statement {
             Statement::Break => AT::Break,
             Statement::Continue => AT::Continue,
             Statement::TypeDef { .. } => AT::TypeDef,
-            Statement::ExtractImport(..) => AT::ExtractImport,
             Statement::Impl { .. } => AT::Impl,
             Statement::Overload { .. } => AT::Overload,
             Statement::Throw(..) => AT::Throw,

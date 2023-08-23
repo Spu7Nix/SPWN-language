@@ -1,3 +1,14 @@
-private type @lol
+private type @bar
 
-dbg @lol
+type @foo
+
+impl @foo {
+    x: () { return "x" }
+}
+
+a = 40
+
+return {
+    a,
+    b: ["a"],
+}

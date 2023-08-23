@@ -292,14 +292,22 @@ where
 macro_rules! new_id_wrapper {
     ($($name:ident : $inner:ty;)*) => {
         $(
-            #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Deref, derive_more::DerefMut, serde::Serialize, serde::Deserialize)]
+            #[derive(
+                Clone,
+                Copy,
+                Debug,
+                PartialEq,
+                Eq,
+                PartialOrd,
+                Ord,
+                Hash,
+                derive_more::Display,
+                derive_more::Deref,
+                derive_more::DerefMut,
+                serde::Serialize,
+                serde::Deserialize
+            )]
             pub struct $name(pub $inner);
-
-            impl std::fmt::Display for $name {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{}({})", stringify!($name), self.0)
-                }
-            }
 
             impl From<usize> for $name {
                 fn from(value: usize) -> Self {

@@ -1,5 +1,6 @@
 
 extract import "test.spwn"
 
-dbg @thing::lol
-dbg @lol
+dbg @foo
+dbg @foo::x()
+// dbg @bar

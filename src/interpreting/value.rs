@@ -517,11 +517,7 @@ impl ValueType {
         format!(
             "@{}",
             match self {
-                Self::Custom(t) => format!(
-                    "<{}: {:?}>",
-                    vm.type_def_map[&t].name.as_ref().to_string(),
-                    t
-                ),
+                Self::Custom(t) => format!("{}", vm.type_def_map[&t].name.as_ref().to_string()),
                 _ => <ValueType as Into<&str>>::into(self).into(),
             }
         )

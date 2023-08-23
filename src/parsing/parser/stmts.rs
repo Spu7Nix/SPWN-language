@@ -215,14 +215,6 @@ impl Parser<'_> {
 
                 Statement::Overload { op, macros }
             },
-            Token::Extract => {
-                self.next()?;
-                self.expect_tok(Token::Import)?;
-
-                let import_type = self.parse_import()?;
-
-                Statement::ExtractImport(import_type)
-            },
             Token::Throw => {
                 self.next()?;
 
