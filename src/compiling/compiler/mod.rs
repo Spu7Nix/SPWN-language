@@ -12,6 +12,7 @@ use std::io::Write;
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use allow_until::{allow_until, AllowUntil};
 use itertools::Itertools;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
@@ -65,11 +66,14 @@ pub struct Scope {
     typ: Option<ScopeType>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, AllowUntil)]
 pub struct TypeDef<S> {
     pub src: Rc<SpwnSource>,
     pub def_span: CodeSpan,
     pub name: S,
+
+    #[allow_until(version = ">=1.0.0")]
+    pub(crate) deprecated_syntax: bool,
 }
 
 pub struct DeferredTriggerFunc {
@@ -79,6 +83,7 @@ pub struct DeferredTriggerFunc {
     pub span: CodeSpan,
 }
 
+#[derive(AllowUntil)]
 pub struct Compiler<'a> {
     src: Rc<SpwnSource>,
     interner: Interner,
@@ -91,7 +96,10 @@ pub struct Compiler<'a> {
     pub type_def_map: &'a mut TypeDefMap,
 
     pub local_type_defs: SlabMap<LocalTypeID, Vis<TypeDef<Spur>>>,
-    pub available_custom_types: AHashMap<Spur, Vis<CustomTypeID>>,
+
+    // bool represents if it uses deprecated syntax
+    #[allow_until(version = ">=1.0.0", reason = "remove the bool")]
+    pub available_custom_types: AHashMap<Spur, (Vis<CustomTypeID>, bool)>,
 
     deferred_trigger_func_stack: Vec<Vec<DeferredTriggerFunc>>,
 

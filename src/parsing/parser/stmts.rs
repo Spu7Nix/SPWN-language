@@ -138,7 +138,7 @@ impl Parser<'_> {
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
 
-                if self.skip_tok(Token::RBracket)? {
+                if self.skip_tok(Token::LBracket)? {
                     let members = self.parse_dictlike(true)?;
 
                     Statement::TypeDef {

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use allow_until::AllowUntil;
 use base64::Engine;
 use delve::{EnumDisplay, EnumToStr};
 use derive_more::Deref;
@@ -299,7 +300,7 @@ pub enum ObjKeyType {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug, Clone, EnumToStr)]
+#[derive(Debug, Clone, EnumToStr, AllowUntil)]
 pub enum Statement {
     Expr(ExprNode),
     Assign(PatternNode, ExprNode),
@@ -333,6 +334,7 @@ pub enum Statement {
     TypeDef {
         name: Vis<Spur>,
         // wont be optional after 1.0.0
+        #[allow_until(version = ">=1.0.0", reason = "remove the option")]
         members: Option<Vec<Vis<DictItem>>>,
     },
 

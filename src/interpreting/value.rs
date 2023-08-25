@@ -135,19 +135,43 @@ macro_rules! value {
         $(
             $(#[$($meta:meta)*] )?
             $name:ident
-                $( ( $tuple_typ:ty ) )?
-                $( { $( $n:ident: $t1:ty ,)* } )?
+                $(
+                    (
+                        $tuple_typ:ty
+                    )
+                )?
+                $(
+                    {
+                        $(
+                            $(#[$($field_meta:meta)*] )?
+                            $n:ident: $t1:ty ,
+                        )*
+                    }
+                )?
             ,
         )*
 
         => $i_name:ident { $( $i_field:ident: $i_typ:ty ,)* }
         ,
     ) => {
-        #[derive(Debug, Clone, PartialEq, Default)]
+        #[derive(Debug, Clone, PartialEq, Default, allow_until::AllowUntil)]
         pub enum Value {
             $(
                 $(#[$($meta)*])?
-                $name $( ( $tuple_typ ) )? $( { $( $n: $t1 ,)* } )?,
+                $name
+                $(
+                    (
+                        $tuple_typ
+                    )
+                )?
+                $(
+                    {
+                        $(
+                            $(#[$($field_meta)*] )?
+                            $n: $t1 ,
+                        )*
+                    }
+                )?,
             )*
             $i_name { $( $i_field: $i_typ ,)* },
         }
@@ -484,7 +508,9 @@ value! {
 
     Module {
         exports: AHashMap<ImmutCloneStr32, ValueRef>,
-        types: Vec<Vis<CustomTypeID>>,
+        // bool represents if it uses deprecated syntax
+        #[allow_until(version = ">=1.0.0", reason = "remove the bool")]
+        types: Vec<(Vis<CustomTypeID>, bool)>,
     },
 
     TriggerFunction {

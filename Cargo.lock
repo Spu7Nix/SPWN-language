@@ -64,6 +64,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "allow-until"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fdbd171d421657f7b51054a71b791228ea9d3c29cc1f873647fba177e37f5c3"
+dependencies = [
+ "semver 1.0.18",
+]
+
+[[package]]
 name = "anstream"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1516,6 +1525,7 @@ version = "0.9.0-beta.1"
 dependencies = [
  "aes",
  "ahash 0.8.3",
+ "allow-until",
  "ariadne",
  "base64 0.21.2",
  "bincode",

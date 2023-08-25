@@ -1,9 +1,7 @@
-zz = extract { @foo, a: c, b } import "test2.spwn"
+type @a {}
 
-dbg zz;
-dbg c;
-dbg b;
-
-dbg @foo;
-
-// dbg @bar;
+impl @a {
+    a: (self) {
+        self.poo;
+    }
+}

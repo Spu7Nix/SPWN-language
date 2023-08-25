@@ -277,6 +277,8 @@ impl<'a> Compiler<'a> {
             Statement::TypeDef { name, members } => {
                 // todo: members
 
+                let is_depr_syntax = members.is_some();
+
                 if !matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
                     return Err(CompileError::TypeDefNotGlobal {
                         area: self.make_area(stmt.span),
@@ -302,13 +304,12 @@ impl<'a> Compiler<'a> {
                     });
                 };
 
-                let def = TypeDef {
+                let id = self.local_type_defs.insert(name.map(|_| TypeDef {
                     src: Rc::clone(&self.src),
                     def_span: stmt.span,
                     name: *name.value(),
-                };
-
-                let id = self.local_type_defs.insert(name.map(|_| def));
+                    deprecated_syntax: is_depr_syntax,
+                }));
 
                 let custom_id = CustomTypeID {
                     local: id,
@@ -322,11 +323,12 @@ impl<'a> Compiler<'a> {
                         src: Rc::clone(&self.src),
                         def_span: stmt.span,
                         name: name_str,
+                        deprecated_syntax: is_depr_syntax,
                     },
                 );
 
                 self.available_custom_types
-                    .insert(*name.value(), name.map(|_| custom_id));
+                    .insert(*name.value(), (name.map(|_| custom_id), is_depr_syntax));
             },
             Statement::Impl { name, items } => {
                 let mut new_items = items.clone();

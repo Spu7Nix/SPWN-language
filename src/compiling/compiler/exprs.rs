@@ -707,12 +707,13 @@ impl Compiler<'_> {
                                                     compiler.resolve_32(name).spanned(key.span),
                                                     key.span,
                                                 );
-                                                let id = types.iter().find(|(_, s)| s == name);
+                                                let typ =
+                                                    types.iter().find(|(_, (s, _))| s == name);
 
-                                                if let Some(id) = id {
+                                                if let Some((id, (_, depr))) = typ {
                                                     compiler
                                                         .available_custom_types
-                                                        .insert(*name, t.map(|_| id.0));
+                                                        .insert(*name, (t.map(|_| *id), *depr));
 
                                                     let name_str = compiler.resolve(name);
 
@@ -723,11 +724,12 @@ impl Compiler<'_> {
                                                     // };
 
                                                     compiler.type_def_map.insert(
-                                                        id.0,
+                                                        *id,
                                                         TypeDef {
                                                             src: Rc::clone(&compiler.src),
                                                             def_span: key.span,
                                                             name: String32::from(&*name_str).into(),
+                                                            deprecated_syntax: *depr,
                                                         },
                                                     );
 

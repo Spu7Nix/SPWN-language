@@ -127,7 +127,7 @@ impl<'a> Parser<'a> {
                     },
                     t => {
                         return Err(SyntaxError::UnexpectedToken {
-                            expected: "`self` or ident".into(),
+                            expected: "`self` or identifier".into(),
                             found: t,
                             area: self.make_area(self.span()),
                         })

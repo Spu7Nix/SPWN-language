@@ -251,14 +251,17 @@ impl ProtoBytecode {
             custom_types: compiler
                 .available_custom_types
                 .iter()
-                .map(|(name, id_vis)| {
+                .map(|(name, (id_vis, depr_syntax))| {
                     (
                         *id_vis.value(),
-                        id_vis.as_ref().map(|id| {
-                            compiler
-                                .resolve(name)
-                                .spanned(compiler.type_def_map[id].def_span)
-                        }),
+                        (
+                            id_vis.as_ref().map(|id| {
+                                compiler
+                                    .resolve(name)
+                                    .spanned(compiler.type_def_map[id].def_span)
+                            }),
+                            *depr_syntax,
+                        ),
                     )
                 })
                 .collect(),

@@ -53,7 +53,7 @@ impl Compiler<'_> {
                     },
                     _ => {
                         return Err(CompileError::InvalidAttributeArgType {
-                            expected: "ident",
+                            expected: "identifier",
                             args_area: self.make_area(expr.span),
                         })
                     },

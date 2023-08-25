@@ -5,6 +5,7 @@ use std::ops::Index;
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use allow_until::AllowUntil;
 use colored::Colorize;
 use delve::{EnumDisplay, VariantNames};
 use derive_more::{Deref, DerefMut, Display, From};
@@ -207,7 +208,7 @@ pub struct Function<T: RegNum> {
 pub type OptFunction = Function<u8>;
 pub type UnoptFunction = Function<usize>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, AllowUntil)]
 pub struct Bytecode<T: RegNum> {
     pub source_hash: Digest,
     pub version: Version,
@@ -216,7 +217,9 @@ pub struct Bytecode<T: RegNum> {
 
     pub functions: Vec<Function<T>>,
 
-    pub custom_types: AHashMap<CustomTypeID, Vis<Spanned<ImmutStr>>>,
+    // bool represents if it uses deprecated syntax
+    #[allow_until(version = ">=1.0.0", reason = "remove the bool")]
+    pub custom_types: AHashMap<CustomTypeID, (Vis<Spanned<ImmutStr>>, bool)>,
 
     pub export_names: Vec<ImmutStr>,
     pub import_paths: Vec<SpwnSource>,
@@ -308,7 +311,7 @@ mod debug_bytecode {
                     .join(", "),
             );
             println!("- Custom types:");
-            for (id, s) in &self.custom_types {
+            for (id, (s, _)) in &self.custom_types {
                 let t = format!(
                     "    {}@{}",
                     if s.is_priv() { "priv " } else { "" }.bright_red(),

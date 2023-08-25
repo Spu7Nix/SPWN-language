@@ -1231,9 +1231,14 @@ impl Vm {
                                             .bytecode
                                             .custom_types
                                             .iter()
-                                            .map(|(id, v)| match v {
-                                                Vis::Public(_) => Vis::Public(*id),
-                                                Vis::Private(_) => Vis::Private(*id),
+                                            .map(|(id, (v, depr))| {
+                                                (
+                                                    match v {
+                                                        Vis::Public(_) => Vis::Public(*id),
+                                                        Vis::Private(_) => Vis::Private(*id),
+                                                    },
+                                                    *depr,
+                                                )
                                             })
                                             .collect(),
                                     };
@@ -1603,9 +1608,9 @@ impl Vm {
 
                         match &from.value {
                             Value::Module { types, .. } => {
-                                let typ = types
+                                let (typ, _) = types
                                     .iter()
-                                    .find(|k| *self.type_def_map[k.value()].name == *key)
+                                    .find(|(k, _)| *self.type_def_map[k.value()].name == *key)
                                     .ok_or(RuntimeError::NonexistentTypeMember {
                                         area: self.make_area(opcode_span, &program),
                                         type_name: key.to_string(),
@@ -3022,13 +3027,13 @@ impl Vm {
             Value::Iterator(_) => format!("<iterator at {:?}>", value.as_ptr()),
             Value::Type(t) => t.runtime_display(self),
             Value::Module { exports, types } => {
-                let types_str = if types.iter().any(|p| p.is_pub()) {
+                let types_str = if types.iter().any(|(p, _)| p.is_pub()) {
                     format!(
                         "; {}",
                         types
                             .iter()
-                            .filter(|p| p.is_pub())
-                            .map(|p| ValueType::Custom(*p.value()).runtime_display(self))
+                            .filter(|(p, _)| p.is_pub())
+                            .map(|(p, _)| ValueType::Custom(*p.value()).runtime_display(self))
                             .join(", ")
                     )
                 } else {

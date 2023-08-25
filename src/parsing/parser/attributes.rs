@@ -212,8 +212,7 @@ impl Parser<'_> {
         let mut namespace = None;
 
         match self.next()? {
-            // overload is its own token but we want it to look like an ident here for `#[overload(...)]`
-            Token::Ident | Token::Overload => (),
+            Token::Ident => (),
             tok => {
                 return Err(SyntaxError::UnexpectedToken {
                     expected: Token::Ident.to_str().into(),

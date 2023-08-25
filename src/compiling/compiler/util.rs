@@ -128,7 +128,7 @@ impl Compiler<'_> {
                 builder.load_const(v, reg, span);
             },
             Err(_) => match self.available_custom_types.get(v) {
-                Some(k) => builder.load_const(ValueType::Custom(*k.value()), reg, span),
+                Some((k, _)) => builder.load_const(ValueType::Custom(*k.value()), reg, span),
                 None => {
                     return Err(CompileError::NonexistentType {
                         area: self.make_area(span),
@@ -149,7 +149,7 @@ impl Compiler<'_> {
     ) -> CompileResult<(
         ImmutVec<ImmutStr>,
         SpwnSource,
-        ImmutVec<(CustomTypeID, Spur)>,
+        ImmutVec<(CustomTypeID, (Spur, bool))>,
     )> {
         let base_dir = importer_src.path().parent().unwrap();
         let mut path = base_dir.to_path_buf();
@@ -218,10 +218,10 @@ impl Compiler<'_> {
                         )?;
                     }
 
-                    for (k, s) in &bytecode.custom_types {
+                    for (k, (s, depr)) in &bytecode.custom_types {
                         let name = self.intern(&s.value().value);
                         self.available_custom_types
-                            .insert(name, s.clone().map(|_| *k));
+                            .insert(name, (s.clone().map(|_| *k), *depr));
 
                         self.type_def_map.insert(
                             *k,
@@ -229,6 +229,7 @@ impl Compiler<'_> {
                                 src: Rc::clone(&self.src),
                                 def_span: s.value().span,
                                 name: String32::from(&***s.value()).into(),
+                                deprecated_syntax: *depr,
                             },
                         );
 
@@ -291,8 +292,8 @@ impl Compiler<'_> {
         let custom_types = self.bytecode_map[&new_src]
             .custom_types
             .iter()
-            .filter(|(_, v)| v.is_pub())
-            .map(|(id, s)| (*id, self.intern(&s.value().value)))
+            .filter(|(_, (v, _))| v.is_pub())
+            .map(|(id, (s, depr))| (*id, (self.intern(&s.value().value), *depr)))
             .collect();
 
         // self.deprecated
@@ -305,7 +306,7 @@ impl Compiler<'_> {
     pub fn extract_import(
         &mut self,
         names: &[ImmutStr],
-        types: &[(CustomTypeID, Spur)],
+        types: &[(CustomTypeID, (Spur, bool))],
         scope: ScopeID,
         import_reg: UnoptRegister,
         builder: &mut CodeBuilder,
@@ -333,8 +334,9 @@ impl Compiler<'_> {
             )
         }
 
-        for (id, name) in types.iter() {
-            self.available_custom_types.insert(*name, Vis::Public(*id));
+        for (id, (name, depr)) in types.iter() {
+            self.available_custom_types
+                .insert(*name, (Vis::Public(*id), *depr));
         }
     }
 

@@ -174,10 +174,9 @@ operators! {
     Left => [Range];
     Left => [In];
     // Left => [Is];
-    Left => [BinOr, Or];
     Left => [BinAnd, And];
-    // todo: is prec right?
     Left => [BinXor];
+    Left => [BinOr, Or];
     // Unary => [Eq, Neq, Gt, Gte, Lt, Lte];
     Unary => [ExclMark];
     Left => [Eq, Neq, Gt, Gte, Lt, Lte];

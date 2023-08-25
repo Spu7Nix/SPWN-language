@@ -119,7 +119,7 @@ impl Parser<'_> {
                     self.next()?;
                     Expression::Epsilon.spanned(start)
                 },
-                Token::Ident => {
+                Token::Ident | Token::Slf => {
                     self.next()?;
                     let var_name = self.slice_interned();
                     let var_span = self.span();
@@ -413,7 +413,7 @@ impl Parser<'_> {
                                     }
                                     other => {
                                         return Err(SyntaxError::UnexpectedToken {
-                                            expected: "ident or type".into(),
+                                            expected: "identifier or type indicator".into(),
                                             found: other,
                                             area: self.make_area(self.span()),
                                         })
@@ -429,7 +429,7 @@ impl Parser<'_> {
                         },
                         other => {
                             return Err(SyntaxError::UnexpectedToken {
-                                expected: "`import` or destructure pattern".into(),
+                                expected: "`import` or module destructure pattern".into(),
                                 found: other,
                                 area: self.make_area(self.span()),
                             })
