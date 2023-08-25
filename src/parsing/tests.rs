@@ -12,7 +12,7 @@ use crate::gd::object_keys::ObjectKey;
 use crate::parsing::ast::{
     AssignPath, AttrArgs, AttrItem, AttrStyle, Attribute, DictItem, Import, ImportType, MacroArg,
     MacroCode, ModuleDestructureKey, ObjKeyType, ObjectType, Pattern as Pt, PatternNode,
-    StringFlags, Vis,
+    StringFlags, TypeDefItem, Vis,
 };
 use crate::parsing::operators::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::parsing::parser::ParseResult;
@@ -1670,10 +1670,10 @@ fn test_typedef() -> ParseResult<()> {
         t,
         St::TypeDef {
             name: Vis::Private(spur!("A")),
-            members: Some(vec![Vis::Public(DictItem {
+            members: Some(vec![Vis::Public(TypeDefItem {
                 name: span!(spur!("a")),
                 attributes: vec![],
-                value: Some(Ex::Type(spur!("@int")).node()),
+                value: Pt::Type(spur!("@int")).node(),
             })])
         }
     );

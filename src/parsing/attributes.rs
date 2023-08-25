@@ -35,6 +35,7 @@ pub enum AttributeTarget {
     Break,
     Continue,
     TypeDef,
+    TypeDefItem,
     ExtractImport,
     Impl,
     Overload,
@@ -186,6 +187,7 @@ pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
                 AttributeTarget::Assign,
                 AttributeTarget::TypeDef,
                 AttributeTarget::DictItem,
+                AttributeTarget::TypeDefItem,
             ],
         },
         Attribute {
@@ -202,6 +204,7 @@ pub static ATTRIBUTES: Lazy<Arc<Vec<Attribute>>> = Lazy::new(|| {
                 AttributeTarget::Assign,
                 AttributeTarget::TypeDef,
                 AttributeTarget::DictItem,
+                AttributeTarget::TypeDefItem,
             ],
         },
         Attribute {

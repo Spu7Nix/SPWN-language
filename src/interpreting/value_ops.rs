@@ -8,7 +8,7 @@ use super::context::Context;
 use super::error::RuntimeError;
 use super::multi::Multi;
 use super::value::{StoredValue, Value, ValueType};
-use super::vm::{Program, RuntimeResult, Vm};
+use super::vm::{DeepClone, Program, RuntimeResult, Vm};
 use crate::compiling::bytecode::OptRegister;
 use crate::gd::gd_object::ObjParam;
 use crate::parsing::ast::VisTrait;
@@ -248,6 +248,15 @@ fn plus(
             );
             Value::String(v.into())
         },
+
+        (Value::Array(v1), Value::Array(v2)) => {
+            let mut out = vec![];
+            for i in v1.iter().chain(v2) {
+                out.push(vm.deep_clone(i, false).into());
+            }
+
+            Value::Array(out)
+        },
         _ => {
             return Err(RuntimeError::InvalidOperands {
                 a: (a.value.get_type(), a.area.clone()),
@@ -299,6 +308,14 @@ fn mult(
 
         (Value::Int(n), Value::String(s)) | (Value::String(s), Value::Int(n)) => {
             Value::String(s.as_ref().repeat((*n).max(0) as usize).into())
+        },
+        (Value::Int(n), Value::Array(v)) | (Value::Array(v), Value::Int(n)) => {
+            let mut out = vec![];
+            for i in v.iter().cycle().take(*n as usize * v.len()) {
+                out.push(vm.deep_clone(i, false).into());
+            }
+
+            Value::Array(out)
         },
 
         _ => {

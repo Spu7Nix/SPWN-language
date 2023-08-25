@@ -1,7 +1,4 @@
-type @a {}
 
-impl @a {
-    a: (self) {
-        self.poo;
-    }
-}
+
+dbg [1, 2, 3] + [5]
+

@@ -120,6 +120,14 @@ pub struct DictItem {
     pub value: Option<ExprNode>,
 }
 
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub struct TypeDefItem {
+    pub name: Spanned<Spur>,
+    pub attributes: Vec<Attribute>,
+    pub value: PatternNode,
+}
+
 impl From<DictItem> for &'static str {
     fn from(_: DictItem) -> Self {
         "Dict Item"
@@ -335,7 +343,7 @@ pub enum Statement {
         name: Vis<Spur>,
         // wont be optional after 1.0.0
         #[allow_until(version = ">=1.0.0", reason = "remove the option")]
-        members: Option<Vec<Vis<DictItem>>>,
+        members: Option<Vec<Vis<TypeDefItem>>>,
     },
 
     Impl {

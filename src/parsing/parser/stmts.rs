@@ -1,7 +1,8 @@
 use super::{ParseResult, Parser};
 use crate::lexing::tokens::Token;
 use crate::list_helper;
-use crate::parsing::ast::{Statement, Statements, StmtNode, Vis};
+use crate::parsing::ast::{Statement, Statements, StmtNode, TypeDefItem, Vis};
+use crate::parsing::attributes::AttributeTarget;
 use crate::parsing::error::SyntaxError;
 use crate::parsing::operators::operators::Operator;
 use crate::sources::{CodeSpan, Spannable};
@@ -139,11 +140,59 @@ impl Parser<'_> {
                 let name = self.slice()[1..].to_string();
 
                 if self.skip_tok(Token::LBracket)? {
-                    let members = self.parse_dictlike(true)?;
+                    let mut items = vec![];
+
+                    list_helper!(self, RBracket {
+                        let attributes = self.parse_outer_attributes()?;
+
+                        let start = self.peek_span()?;
+
+                        let vis = if self.next_is(Token::Private)? {
+                            self.next()?;
+                            Vis::Private
+                        } else {
+                            Vis::Public
+                        };
+
+                        let key = match self.next()? {
+                            Token::Int => self.intern_string(self.parse_int(self.slice(), 10).to_string()),
+                            Token::HexInt => self.intern_string(self.parse_int(&self.slice()[2..], 16).to_string()),
+                            Token::OctalInt => self.intern_string(self.parse_int(&self.slice()[2..], 8).to_string()),
+                            Token::BinaryInt => self.intern_string(self.parse_int(&self.slice()[2..], 2).to_string()),
+                            Token::SeximalInt => self.intern_string(self.parse_int(&self.slice()[2..], 6).to_string()),
+                            Token::DozenalInt => self.intern_string(self.parse_int(&self.slice()[2..], 12).to_string()),
+                            Token::String => {
+                                let s = self.parse_compile_time_string()?;
+                                self.intern_string(s)
+                            },
+                            Token::Ident => self.intern_string(self.slice()),
+                            other => {
+                                return Err(SyntaxError::UnexpectedToken {
+                                    expected: "key".into(),
+                                    found: other,
+                                    area: self.make_area(self.span()),
+                                })
+                            }
+                        };
+
+                        let key_span = self.span();
+
+                        self.expect_tok(Token::Colon)?;
+
+                        let pat = self.parse_pattern()?;
+
+                        let item_span = start.extend(self.span());
+
+                        self.check_attributes(&attributes, Some(AttributeTarget::TypeDefItem.spanned(item_span)))?;
+
+                        items.push(vis(TypeDefItem { name: key.spanned(key_span), attributes, value: pat }));
+                    });
+
+                    // Ok(items)
 
                     Statement::TypeDef {
                         name: vis(self.intern_string(name)),
-                        members: Some(members),
+                        members: Some(items),
                     }
                 } else {
                     let span = self.span();
