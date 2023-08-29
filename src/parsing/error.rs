@@ -53,7 +53,7 @@ error_maker! {
                 area => "Expected `{}`, found `{}`": expected.to_str(), found;
             ]
         ]
-        UnxpectedCharacter {
+        UnexpectedCharacter {
             expected: Token,
             found: String,
             area: CodeArea,

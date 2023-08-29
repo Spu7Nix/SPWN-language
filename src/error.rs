@@ -17,7 +17,7 @@ pub enum SpwnError {
     FailedToReadSaveFile(#[from] io::Error),
 
     #[error("Unsupported Operating System")]
-    UsuppportedOS,
+    UnsupportedOS,
 
     #[error("`--lib`/`-l` argument expected a library name, got SPWN file instead")]
     DocExpectedLibrary,
