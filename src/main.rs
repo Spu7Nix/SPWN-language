@@ -111,7 +111,7 @@ fn main() -> Result<(), SpwnError> {
                 } else if cfg!(target_os = "android") {
                     PathBuf::from("/data/data/com.robtopx.geometryjump/CCLocalLevels.dat")
                 } else {
-                    return Err(SpwnError::UsuppportedOS);
+                    return Err(SpwnError::UnsupportedOS);
                 })
             } else {
                 None

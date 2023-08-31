@@ -257,7 +257,7 @@ impl Parser<'_> {
         let next = chars.next().unwrap_or(' ');
 
         if !matches!(next, '{') {
-            return Err(SyntaxError::UnxpectedCharacter {
+            return Err(SyntaxError::UnexpectedCharacter {
                 expected: Token::LBracket,
                 found: next.to_string(),
                 area: self.make_area(self.span()),
@@ -279,14 +279,14 @@ impl Parser<'_> {
         match next {
             Some('}') => (),
             Some(t) => {
-                return Err(SyntaxError::UnxpectedCharacter {
+                return Err(SyntaxError::UnexpectedCharacter {
                     expected: Token::RBracket,
                     found: t.to_string(),
                     area: self.make_area(self.span()),
                 })
             },
             None => {
-                return Err(SyntaxError::UnxpectedCharacter {
+                return Err(SyntaxError::UnexpectedCharacter {
                     expected: Token::RBracket,
                     found: "end of string".into(),
                     area: self.make_area(self.span()),
