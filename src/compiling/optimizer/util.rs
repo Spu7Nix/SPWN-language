@@ -6,11 +6,8 @@ impl<T: RegNum> Opcode<Register<T>> {
         let mut successors = match *self {
             Opcode::Jump { to } => return vec![to],
             Opcode::JumpIfFalse { check, to } => vec![to],
-            // Opcode::JumpIfEmpty { check, to } => vec![to],
             Opcode::UnwrapOrJump { check, to } => vec![to],
             Opcode::Return { src, module_ret } => return vec![],
-            // Opcode::PushContextGroup { src } => todo!(),
-            // Opcode::PopGroupStack { fn_reg } => todo!(),
             Opcode::YeetContext => return vec![],
             Opcode::EnterArrowStatement { skip } => vec![skip],
             Opcode::Throw { reg } => return vec![],

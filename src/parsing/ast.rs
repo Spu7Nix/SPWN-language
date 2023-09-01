@@ -339,12 +339,7 @@ pub enum Statement {
     Break,
     Continue,
 
-    TypeDef {
-        name: Vis<Spur>,
-        // wont be optional after 1.0.0
-        #[allow_until(version = ">=1.0.0", reason = "remove the option")]
-        members: Option<Vec<Vis<TypeDefItem>>>,
-    },
+    TypeDef(Vis<Spur>),
 
     Impl {
         name: Spanned<Spur>,
@@ -370,54 +365,71 @@ pub enum ModuleDestructureKey {
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub enum Pattern {
-    Any, // _
+    /// _
+    Any,
 
-    Type(Spur),                       // @<type>
-    Either(PatternNode, PatternNode), // <pattern> | <pattern>
-    Both(PatternNode, PatternNode),   // <pattern> & <pattern>, <pattern>: <pattern>
+    /// @<type>
+    Type(Spur),
+    /// <pattern> | <pattern>
+    Either(PatternNode, PatternNode),
+    /// <pattern> & <pattern>, <pattern>: <pattern>
+    Both(PatternNode, PatternNode),
 
-    Eq(ExprNode),  // == <expr>
-    Neq(ExprNode), // != <expr>
-    Lt(ExprNode),  // < <expr>
-    Lte(ExprNode), // <= <expr>
-    Gt(ExprNode),  // > <expr>
-    Gte(ExprNode), // >= <expr>
+    /// == <expr>
+    Eq(ExprNode),
+    /// != <expr>
+    Neq(ExprNode),
+    /// < <expr>
+    Lt(ExprNode),
+    /// <= <expr>
+    Lte(ExprNode),
+    /// > <expr>
+    Gt(ExprNode),
+    /// >= <expr>
+    Gte(ExprNode),
 
-    In(ExprNode), // in <pattern>
+    In(ExprNode),
 
-    ArrayPattern(PatternNode, PatternNode), // <pattern>[<pattern>]
-    DictPattern(PatternNode),               // <pattern>{:}
+    /// <pattern>[<pattern>]
+    ArrayPattern(PatternNode, PatternNode),
+    /// <pattern>{:}
+    DictPattern(PatternNode),
 
-    ArrayDestructure(Vec<PatternNode>), // [ <pattern> ]
-    DictDestructure(AHashMap<Spanned<Spur>, PatternNode>), // { key: <pattern> ETC }
-    MaybeDestructure(Option<PatternNode>), // <pattern>? or ?
-    InstanceDestructure(Spur, AHashMap<Spanned<Spur>, PatternNode>), // @typ::{ <key>(: <pattern>)? ETC }
+    /// [ <pattern> ]
+    ArrayDestructure(Vec<PatternNode>),
 
-    // ()
+    /// { key: <pattern> ... }
+    DictDestructure(AHashMap<Spanned<Spur>, PatternNode>),
+    /// <pattern>? or ?
+    MaybeDestructure(Option<PatternNode>),
+    /// @typ::{ <key>(: <pattern>)? ... }
+    InstanceDestructure(Spur, AHashMap<Spanned<Spur>, PatternNode>),
+
+    /// ()
     Empty,
 
+    /// index, member, associated member
     Path {
-        // var[0].cock::binky[79] etc
         var: Spur,
         path: Vec<AssignPath>,
     },
+    /// mut var
     Mut {
-        // mut var
         name: Spur,
     },
+    /// mut var
     Ref {
-        // mut var
         name: Spur,
     },
 
+    /// <pattern> if <expr>
     IfGuard {
-        // <pattern> if <expr>
         pat: PatternNode,
         cond: ExprNode,
     },
 
+    /// (<pattern>...) -> <pattern>
     MacroPattern {
-        // (<pattern>...) -> <pattern>
         args: Vec<PatternNode>,
         ret: PatternNode,
     },

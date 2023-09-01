@@ -227,21 +227,6 @@ impl BytecodeMap {
                 .to_report()
             )
         }
-        for &span in &bytecode.deprecated_features.empty_type_def {
-            eprintln!(
-                "{}",
-                DeprecatedWarning {
-                    message: "Empty type definition".into(),
-                    area: CodeArea {
-                        span,
-                        src: src.clone(),
-                    },
-                    area_message: "Found type definition with no members".into(),
-                    note: Some("This feature has been deprecated since 0.9.0. The new syntax for type definitions is `type @<type> { <members> }`".into()),
-                }
-                .to_report()
-            )
-        }
 
         self.0.insert((**src).clone(), Rc::new(bytecode));
     }

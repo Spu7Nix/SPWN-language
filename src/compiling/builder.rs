@@ -251,17 +251,14 @@ impl ProtoBytecode {
             custom_types: compiler
                 .available_custom_types
                 .iter()
-                .map(|(name, (id_vis, depr_syntax))| {
+                .map(|(name, id_vis)| {
                     (
                         *id_vis.value(),
-                        (
-                            id_vis.as_ref().map(|id| {
-                                compiler
-                                    .resolve(name)
-                                    .spanned(compiler.type_def_map[id].def_span)
-                            }),
-                            *depr_syntax,
-                        ),
+                        id_vis.as_ref().map(|id| {
+                            compiler
+                                .resolve(name)
+                                .spanned(compiler.type_def_map[id].def_span)
+                        }),
                     )
                 })
                 .collect(),
@@ -401,52 +398,6 @@ impl<'a> CodeBuilder<'a> {
         self.proto_bytecode.new_func(f, args, captured_regs, span)
     }
 
-    // pub fn new_object<F>(
-    //     &mut self,
-    //     len: u16,
-    //     dest: UnoptRegister,
-    //     f: F,
-    //     span: CodeSpan,
-    //     typ: ObjectType,
-    // ) -> CompileResult<()>
-    // where
-    //     F: FnOnce(
-    //         &mut FuncBuilder,
-    //         &mut Vec<(Spanned<ObjKeyType>, UnoptRegister)>,
-    //     ) -> CompileResult<()>,
-    // {
-    //     self.push_opcode_spanned(
-    //         ProtoOpcode::Raw(match typ {
-    //             ObjectType::Object => UnoptOpcode::AllocObject { size: len, dest },
-    //             ObjectType::Trigger => UnoptOpcode::AllocTrigger { size: len, dest },
-    //         }),
-    //         span,
-    //     );
-
-    //     let mut items = vec![];
-    //     f(self, &mut items)?;
-
-    //     for (k, r) in items {
-    //         self.push_opcode_spanned(
-    //             match k.value {
-    //                 ObjKeyType::Name(k) => ProtoOpcode::Raw(UnoptOpcode::PushObjectElemKey {
-    //                     elem: r,
-    //                     obj_key: k,
-    //                     dest,
-    //                 }),
-    //                 ObjKeyType::Num(n) => ProtoOpcode::Raw(UnoptOpcode::PushObjectElemUnchecked {
-    //                     elem: r,
-    //                     obj_key: n,
-    //                     dest,
-    //                 }),
-    //             },
-    //             k.span,
-    //         )
-    //     }
-
-    //     Ok(())
-    // }
-
     fn push_opcode(&mut self, opcode: ProtoOpcode, span: CodeSpan) {
         self.current_block()
             .content
@@ -509,13 +460,6 @@ impl<'a> CodeBuilder<'a> {
 
     pub fn alloc_dict(&mut self, dest: UnoptRegister, capacity: u16, span: CodeSpan) {
         self.push_opcode(ProtoOpcode::Raw(Opcode::AllocDict { dest, capacity }), span)
-    }
-
-    pub fn alloc_obj(&mut self, dest: UnoptRegister, capacity: u16, span: CodeSpan) {
-        self.push_opcode(
-            ProtoOpcode::Raw(Opcode::AllocObject { dest, capacity }),
-            span,
-        )
     }
 
     pub fn insert_dict_elem(

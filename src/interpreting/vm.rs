@@ -512,11 +512,16 @@ impl Vm {
             } = opcodes[ip];
 
             if self.context_stack.len() > RECURSION_LIMIT {
-                // return Err(RuntimeError::RecursionLimit {
-                //     area: self.make_area(opcode_span, &program),
-                //     call_stack: self.get_call_stack(),
-                // });
-                todo!()
+                // let mut top = self.context_stack.last_mut().yeet_current().unwrap();
+                // top.ip += 1;
+
+                // return Multi::new_single(
+                //     top,
+                //     Err(RuntimeError::RecursionLimit {
+                //         area: self.make_area(opcode_span, &program),
+                //         call_stack: self.get_call_stack(),
+                //     }),
+                // );
             }
 
             // loop {
@@ -1231,14 +1236,9 @@ impl Vm {
                                             .bytecode
                                             .custom_types
                                             .iter()
-                                            .map(|(id, (v, depr))| {
-                                                (
-                                                    match v {
-                                                        Vis::Public(_) => Vis::Public(*id),
-                                                        Vis::Private(_) => Vis::Private(*id),
-                                                    },
-                                                    *depr,
-                                                )
+                                            .map(|(id, v)| match v {
+                                                Vis::Public(_) => Vis::Public(*id),
+                                                Vis::Private(_) => Vis::Private(*id),
                                             })
                                             .collect(),
                                     };
@@ -1264,16 +1264,47 @@ impl Vm {
                         return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::Dbg { reg, .. } => {
-                        self.olga_sex(reg, opcode_span, &program, &mut out_contexts);
+                        self.dbg(reg, opcode_span, &program, &mut out_contexts);
 
                         return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::Throw { reg } => {
-                        return Err(RuntimeError::ThrownError {
-                            area: self.make_area(opcode_span, &program),
-                            value: self.get_reg_ref(reg).clone(),
-                            call_stack: self.get_call_stack(),
-                        });
+                        let value = self.get_reg_ref(reg).clone();
+
+                        let mut top = self.context_stack.last_mut().yeet_current().unwrap();
+                        top.ip += 1;
+
+                        let value_str: Multi<Result<(), RuntimeError>> = self
+                            .runtime_display(top, &value, &value.borrow().area, &program)
+                            .try_map(|ctx, v| {
+                                (
+                                    ctx,
+                                    Err(RuntimeError::ThrownError {
+                                        area: self.make_area(opcode_span, &program),
+                                        value: value.clone(),
+                                        value_string: v,
+                                        call_stack: self.get_call_stack(),
+                                    }),
+                                )
+                            });
+
+                        self.insert_multi(value_str, |_, _| {}, &mut out_contexts);
+
+                        // we take the first string value ignoring any context splits
+                        // its either that or display nothing
+                        // let string = value_str
+                        //     .into_iter()
+                        //     .nth(0)
+                        //     .expect("idk will this error")
+                        //     .1?;
+
+                        // return Err(RuntimeError::ThrownError {
+                        //     area: self.make_area(opcode_span, &program),
+                        //     value,
+                        //     value_string: string,
+                        //     call_stack: self.get_call_stack(),
+                        // });
+                        return Ok(LoopFlow::ContinueLoop);
                     },
                     Opcode::Import { id, dest } => {
                         let import = &program.bytecode.import_paths[*id as usize];
@@ -1608,9 +1639,9 @@ impl Vm {
 
                         match &from.value {
                             Value::Module { types, .. } => {
-                                let (typ, _) = types
+                                let typ = types
                                     .iter()
-                                    .find(|(k, _)| *self.type_def_map[k.value()].name == *key)
+                                    .find(|k| *self.type_def_map[k.value()].name == *key)
                                     .ok_or(RuntimeError::NonexistentTypeMember {
                                         area: self.make_area(opcode_span, &program),
                                         type_name: key.to_string(),
@@ -2002,7 +2033,7 @@ impl Vm {
             .collect()
     }
 
-    fn olga_sex(
+    fn dbg(
         &mut self,
         reg: Register<u8>,
         opcode_span: CodeSpan,
@@ -2047,7 +2078,7 @@ impl Vm {
     ) {
         if let Some(t) = ctx.stack.last_mut().unwrap().try_catches.pop() {
             let val = match err {
-                RuntimeError::ThrownError { value, .. } => value,
+                RuntimeError::ThrownError { value, area, .. } => value,
                 _ => Value::Error(unsafe {
                     mem::transmute::<_, u64>(mem::discriminant(&err)) as usize
                 })
@@ -3027,13 +3058,13 @@ impl Vm {
             Value::Iterator(_) => format!("<iterator at {:?}>", value.as_ptr()),
             Value::Type(t) => t.runtime_display(self),
             Value::Module { exports, types } => {
-                let types_str = if types.iter().any(|(p, _)| p.is_pub()) {
+                let types_str = if types.iter().any(|p| p.is_pub()) {
                     format!(
                         "; {}",
                         types
                             .iter()
-                            .filter(|(p, _)| p.is_pub())
-                            .map(|(p, _)| ValueType::Custom(*p.value()).runtime_display(self))
+                            .filter(|p| p.is_pub())
+                            .map(|p| ValueType::Custom(*p.value()).runtime_display(self))
                             .join(", ")
                     )
                 } else {

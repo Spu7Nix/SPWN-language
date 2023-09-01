@@ -468,12 +468,13 @@ error_maker! {
             Message: "Thrown error", Note: None;
             Main Area: area;
             Labels: [
-                area => "{}": "todo";
+                area => "{}": value_string;
             ]
         ]
         ThrownError {
             area: CodeArea,
             value: ValueRef,
+            value_string: String,
             [call_stack]
         },
 

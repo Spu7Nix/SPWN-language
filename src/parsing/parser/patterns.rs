@@ -240,6 +240,7 @@ impl<'a> Parser<'a> {
 
         loop {
             let start_span = node.span;
+
             let pat = match self.peek_strict()? {
                 Token::QMark => {
                     self.next()?;
@@ -274,6 +275,7 @@ impl<'a> Parser<'a> {
                     break;
                 },
             };
+
             node = PatternNode {
                 pat: Box::new(pat),
                 span: start_span.extend(self.span()),

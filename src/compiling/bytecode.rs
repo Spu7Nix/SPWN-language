@@ -108,7 +108,7 @@ impl Hash for Constant {
                 id.hash(state);
             },
             Constant::Array(v) => {
-                for i in v {
+                for _ in v {
                     v.hash(state)
                 }
             },
@@ -140,6 +140,23 @@ impl PartialEq for Constant {
             (Self::Float(l), Self::Float(r)) => l.to_bits() == r.to_bits(),
             (Self::Bool(l), Self::Bool(r)) => l == r,
             (Self::String(l), Self::String(r)) => l == r,
+            (Self::Type(l), Self::Type(r)) => l == r,
+            (Self::Id(lclass, lid), Self::Id(rclass, rid)) => lclass == rclass && lid == rid,
+            (Self::Array(l), Self::Array(r)) => l == r,
+            (Self::Dict(l), Self::Dict(r)) => l == r,
+            (Self::Maybe(l), Self::Maybe(r)) => l == r,
+            (Self::Builtins, Self::Builtins) => true,
+            (Self::Empty, Self::Empty) => true,
+            (
+                Self::Instance {
+                    typ: ltyp,
+                    items: litems,
+                },
+                Self::Instance {
+                    typ: rtyp,
+                    items: ritems,
+                },
+            ) => ltyp == rtyp && litems == ritems,
             _ => false,
         }
     }
@@ -217,9 +234,7 @@ pub struct Bytecode<T: RegNum> {
 
     pub functions: Vec<Function<T>>,
 
-    // bool represents if it uses deprecated syntax
-    #[allow_until(version = ">=1.0.0", reason = "remove the bool")]
-    pub custom_types: AHashMap<CustomTypeID, (Vis<Spanned<ImmutStr>>, bool)>,
+    pub custom_types: AHashMap<CustomTypeID, Vis<Spanned<ImmutStr>>>,
 
     pub export_names: Vec<ImmutStr>,
     pub import_paths: Vec<SpwnSource>,
@@ -311,7 +326,7 @@ mod debug_bytecode {
                     .join(", "),
             );
             println!("- Custom types:");
-            for (id, (s, _)) in &self.custom_types {
+            for (id, s) in &self.custom_types {
                 let t = format!(
                     "    {}@{}",
                     if s.is_priv() { "priv " } else { "" }.bright_red(),

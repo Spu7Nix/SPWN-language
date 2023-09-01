@@ -308,5 +308,17 @@ error_maker! {
             area_b: CodeArea,
             name: String,
         },
+
+        // ==================================================================
+        #[
+            Message: "Cannot destructure builtin type", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "Tried to destructure builtin type here";
+            ]
+        ]
+        BuiltinTypeDestructure {
+            area: CodeArea,
+        },
     }
 }

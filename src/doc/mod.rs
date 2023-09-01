@@ -81,12 +81,10 @@ impl<'a> DocCompiler<'a> {
 
     fn compile_stmt(&mut self, stmt: &StmtNode, src: &Rc<SpwnSource>) -> DocResult<()> {
         match &*stmt.stmt {
-            Statement::TypeDef { name, .. } if name.is_pub() => {
+            Statement::TypeDef(name) if name.is_pub() => {
                 let typ = self.new_type(true, &stmt.attributes, src)?;
 
                 self.types.insert((Rc::clone(src), *name.value()), typ);
-
-                // todo: check if we have members for static types maybe
             },
 
             Statement::Assign(..) => todo!(),

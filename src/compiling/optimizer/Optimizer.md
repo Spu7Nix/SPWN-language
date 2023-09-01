@@ -155,6 +155,8 @@ Each colour represents a new register. We can see that it has been optimised fro
 
 ## Function Captures
 
+TODO
+
 ## Function Arguments
 
 TODO

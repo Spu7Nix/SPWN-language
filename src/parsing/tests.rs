@@ -214,33 +214,9 @@ fn test_file_attrs() -> ParseResult<()> {
 #[test]
 fn test_attrs() -> ParseResult<()> {
     let t = parse(r#"#[doc(u"")] type @int"#)?;
-    stmt_eq!(
-        t,
-        St::TypeDef { name: Vis::Public(spur!("int")), members: None },
-        attrs: vec![Attribute {
-            style: AttrStyle::Outer,
-            item: AttrItem {
-                namespace: None,
-                name: span!(spur!("doc")),
-                args: AttrArgs::Eq(string!("", flags: { unindent: true }).node())
-            },
-            span: CodeSpan::internal()
-        }]
-    );
-    let t = parse(r##"#[doc = r#""#] type @int {}"##)?;
-    stmt_eq!(
-        t,
-        St::TypeDef { name: Vis::Public(spur!("int")), members: Some(vec![]) },
-        attrs: vec![Attribute {
-            style: AttrStyle::Outer,
-            item: AttrItem {
-                namespace: None,
-                name: span!(spur!("doc")),
-                args: AttrArgs::Eq(string!("", flags: { unindent: true }).node())
-            },
-            span: CodeSpan::internal()
-        }]
-    );
+    stmt_eq!(t, St::TypeDef(Vis::Public(spur!("int"))));
+    let t = parse(r##"#[doc = r#""#] type @int"##)?;
+    stmt_eq!(t, St::TypeDef(Vis::Public(spur!("int"))));
 
     let t = parse("#[debug_bytecode] () {}")?;
     expr_eq!(
@@ -1657,26 +1633,10 @@ fn test_control_flow() -> ParseResult<()> {
 #[test]
 fn test_typedef() -> ParseResult<()> {
     let t = parse("type @A")?;
-    stmt_eq!(
-        t,
-        St::TypeDef {
-            name: Vis::Public(spur!("A")),
-            members: None
-        }
-    );
+    stmt_eq!(t, St::TypeDef(Vis::Private(spur!("A"))));
 
-    let t = parse("private type @A { a: @int }")?;
-    stmt_eq!(
-        t,
-        St::TypeDef {
-            name: Vis::Private(spur!("A")),
-            members: Some(vec![Vis::Public(TypeDefItem {
-                name: span!(spur!("a")),
-                attributes: vec![],
-                value: Pt::Type(spur!("@int")).node(),
-            })])
-        }
-    );
+    let t = parse("private type @A")?;
+    stmt_eq!(t, St::TypeDef(Vis::Private(spur!("A"))));
 
     Ok(())
 }

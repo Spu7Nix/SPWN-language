@@ -71,9 +71,6 @@ pub struct TypeDef<S> {
     pub src: Rc<SpwnSource>,
     pub def_span: CodeSpan,
     pub name: S,
-
-    #[allow_until(version = ">=1.0.0")]
-    pub(crate) deprecated_syntax: bool,
 }
 
 pub struct DeferredTriggerFunc {
@@ -97,9 +94,7 @@ pub struct Compiler<'a> {
 
     pub local_type_defs: SlabMap<LocalTypeID, Vis<TypeDef<Spur>>>,
 
-    // bool represents if it uses deprecated syntax
-    #[allow_until(version = ">=1.0.0", reason = "remove the bool")]
-    pub available_custom_types: AHashMap<Spur, (Vis<CustomTypeID>, bool)>,
+    pub available_custom_types: AHashMap<Spur, Vis<CustomTypeID>>,
 
     deferred_trigger_func_stack: Vec<Vec<DeferredTriggerFunc>>,
 

@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::hash_map::Drain;
 use std::fmt;
+use std::hash::Hasher;
 use std::iter::Map;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
@@ -179,16 +180,13 @@ impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
 
 impl<T: std::hash::Hash + Eq> UniqueRegister<T> {
     pub fn make_vec(&mut self) -> Vec<T> {
-        unsafe {
-            let mut ve: Vec<MaybeUninit<T>> =
-                (0..self.len()).map(|_| MaybeUninit::uninit()).collect();
+        let mut ve: Vec<MaybeUninit<T>> = (0..self.len()).map(|_| MaybeUninit::uninit()).collect();
 
-            for (v, k) in self.drain() {
-                ve[v].write(k);
-            }
-
-            std::mem::transmute(ve)
+        for (v, k) in self.drain() {
+            ve[v].write(k);
         }
+
+        unsafe { std::mem::transmute(ve) }
     }
 }
 

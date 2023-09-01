@@ -508,9 +508,7 @@ value! {
 
     Module {
         exports: AHashMap<ImmutCloneStr32, ValueRef>,
-        // bool represents if it uses deprecated syntax
-        #[allow_until(version = ">=1.0.0", reason = "remove the bool")]
-        types: Vec<(Vis<CustomTypeID>, bool)>,
+        types: Vec<Vis<CustomTypeID>>,
     },
 
     TriggerFunction {
@@ -543,7 +541,7 @@ impl ValueType {
         format!(
             "@{}",
             match self {
-                Self::Custom(t) => format!("{}", vm.type_def_map[&t].name.as_ref().to_string()),
+                Self::Custom(t) => vm.type_def_map[&t].name.as_ref().to_string(),
                 _ => <ValueType as Into<&str>>::into(self).into(),
             }
         )

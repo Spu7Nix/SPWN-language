@@ -81,8 +81,6 @@ pub struct Context {
     pub stack: Vec<StackItem>,
 
     pub returned: RuntimeResult<Option<ValueRef>>,
-
-    pub storage: AHashMap<&'static str, ContextStorage>,
 }
 
 impl Eq for Context {
@@ -112,7 +110,6 @@ impl Context {
             group: Id::Specific(0),
             stack: vec![],
             returned: Ok(None),
-            storage: AHashMap::new(),
         }
     }
 
@@ -217,19 +214,6 @@ impl Vm {
 
         if let Ok(Some(v)) = &mut new.returned {
             *v = v.deep_clone_checked(self, &mut Some(&mut clone_map), true)
-        }
-
-        for (_, v) in &mut new.storage {
-            match v {
-                ContextStorage::Single(v) => {
-                    *v = v.deep_clone_checked(self, &mut Some(&mut clone_map), true)
-                },
-                ContextStorage::Vec(v) => {
-                    for v in v {
-                        *v = v.deep_clone_checked(self, &mut Some(&mut clone_map), true)
-                    }
-                },
-            }
         }
 
         self.context_stack.last_mut().contexts.push(new);

@@ -650,20 +650,7 @@ impl Compiler<'_> {
 
                                 Ok(eq_reg)
                             },
-                            // &|_, builder| {
-                            //     let pat_len = builder.next_reg();
-                            //     builder.load_const(dest.len() as i64, pat_len, dest.span);
-
-                            //     let expr_len = builder.next_reg();
-                            //     builder.len(import_reg, expr_len, dest.span);
-
-                            //     let gte_reg = builder.next_reg();
-                            //     builder.pure_gte(expr_len, pat_len, gte_reg, dest.span);
-
-                            //     Ok(gte_reg)
-                            // },
                             &|compiler, builder| {
-                                // todo!()
                                 let mut funcs = vec![];
 
                                 for (key, elem) in dest.iter() {
@@ -707,13 +694,12 @@ impl Compiler<'_> {
                                                     compiler.resolve_32(name).spanned(key.span),
                                                     key.span,
                                                 );
-                                                let typ =
-                                                    types.iter().find(|(_, (s, _))| s == name);
+                                                let typ = types.iter().find(|(_, s)| s == name);
 
-                                                if let Some((id, (_, depr))) = typ {
+                                                if let Some((id, _)) = typ {
                                                     compiler
                                                         .available_custom_types
-                                                        .insert(*name, (t.map(|_| *id), *depr));
+                                                        .insert(*name, t.map(|_| *id));
 
                                                     let name_str = compiler.resolve(name);
 
@@ -729,7 +715,6 @@ impl Compiler<'_> {
                                                             src: Rc::clone(&compiler.src),
                                                             def_span: key.span,
                                                             name: String32::from(&*name_str).into(),
-                                                            deprecated_syntax: *depr,
                                                         },
                                                     );
 

@@ -10,10 +10,6 @@ use crate::util::error::ErrorReport;
 // any features deprecated from <0.9 / any deprecated attributes
 #[derive(Default, Debug, Serialize, Deserialize, Clone, AllowUntil)]
 pub struct DeprecatedFeatures {
-    // use of `type @a` without explicit members `type @a { ... }`
-    #[allow_until(version = ">=1.0.0")]
-    pub empty_type_def: AHashSet<CodeSpan>,
-
     // use of `let` instead of `mut`
     #[allow_until(version = ">=1.0.0")]
     pub let_not_mut: AHashSet<CodeSpan>,
@@ -22,7 +18,6 @@ pub struct DeprecatedFeatures {
 impl DeprecatedFeatures {
     // used in the parser to merge after cloning
     pub fn extend(&mut self, other: DeprecatedFeatures) {
-        self.empty_type_def.extend(other.empty_type_def);
         self.let_not_mut.extend(other.let_not_mut);
     }
 }
