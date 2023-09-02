@@ -10,7 +10,7 @@ impl_type! {
     impl Dict {
         Constants:
 
-        Functions(ctx, vm, program, area):
+        Functions:
 
         /// fdf
         fn get_or_insert(&Dict(slf) as "self", String(key) as "key", &value) -> "_" {

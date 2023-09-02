@@ -34,12 +34,10 @@ pub struct BuiltinFn(
     ) -> Multi<RuntimeResult<ValueRef>>,
 );
 
-pub trait BuiltinClosure:
-    FnMut(Vec<ValueRef>, Context, &mut Vm, &Rc<Program>, CodeArea) -> Multi<RuntimeResult<ValueRef>>
-    + Debug
-{
+pub trait BuiltinClosure: Debug {
     fn shallow_clone(&self) -> Rc<RefCell<dyn BuiltinClosure>>;
     fn get_mut_refs<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut ValueRef> + 'a>;
+
     fn deep_clone_inner_refs(
         &mut self,
         vm: &Vm,
@@ -50,21 +48,15 @@ pub trait BuiltinClosure:
             *v = v.deep_clone_checked(vm, map, context_split);
         }
     }
-    // fn deep_clone_checked(&self, vm: &Vm, map: &mut Option<&mut CloneMap>) -> Self {
-    //     if let Some(m) = map {
-    //         if let Some(v) = m.get(self) {
-    //             return v.clone();
-    //         }
-    //         let new = vm.deep_clone_ref_map(self, map);
-    //         // goofy thing to avoid borrow checker
-    //         if let Some(m) = map {
-    //             m.insert(self, new.clone());
-    //         }
-    //         return new;
-    //     }
-    //     vm.deep_clone_ref_map(self, map)
-    // }
-    // fn closure_eq(&self) -> Box<dyn BuiltinClosure>;
+
+    fn call(
+        &mut self,
+        args: Vec<ValueRef>,
+        context: Context,
+        vm: &mut Vm,
+        program: &Rc<Program>,
+        area: CodeArea,
+    ) -> Multi<RuntimeResult<ValueRef>>;
 }
 
 // macro_rules! builtin- {

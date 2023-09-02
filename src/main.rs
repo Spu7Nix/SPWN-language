@@ -5,8 +5,6 @@
     clippy::type_complexity
 )]
 #![warn(clippy::branches_sharing_code)]
-#![feature(unboxed_closures)]
-#![feature(fn_traits)]
 
 use std::cell::RefCell;
 use std::error::Error;

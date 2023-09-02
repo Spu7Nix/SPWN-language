@@ -55,6 +55,7 @@ once_cell = "1.18.0"
 widestring = { git = "https://github.com/FlowVix/widestring-rs.git" }
 thiserror = "1.0.47"
 allow-until = "0.2.0"
+respan = "0.1.5"
 
 [dev-dependencies]
 stacker = "0.1.15"

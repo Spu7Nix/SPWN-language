@@ -4,7 +4,7 @@ impl_type! {
     impl Error {
         Constants:
 
-        Functions(ctx, vm, program, area):
+        Functions:
 
         /// dfdf
         fn dfgdfgdfgfdgfdgfg() {

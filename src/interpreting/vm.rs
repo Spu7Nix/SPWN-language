@@ -2323,7 +2323,7 @@ impl Vm {
                         let fn_ptr = fn_ptr.clone();
                         mem::drop(base_ref);
 
-                        let x = fn_ptr.borrow_mut()(
+                        let x = fn_ptr.borrow_mut().call(
                             {
                                 let mut out = Vec::with_capacity(fill.len());
                                 for (_, arg) in fill.clone().into_iter().enumerate() {
@@ -3206,17 +3206,18 @@ impl Vm {
                         arr: Vec<ValueRef> => self.arr.iter_mut(),
                         n: usize,
                     ] () {
-                        let ret = if extra.n >= extra.arr.len() {
+                        let ret = if *n >= arr.len() {
                             Value::Maybe(None)
                         } else {
-                            let n = extra.arr[extra.n].clone();
+                            let n = arr[*n].clone();
                             Value::Maybe(Some(n))
                         };
-                        extra.n += 1;
+                        *n += 1;
 
                         Multi::new_single(ctx, Ok(ret.into_value_ref(area)))
-                    } ctx vm program area extra
+                    }
                 }
+
                 MacroData {
                     target: MacroTarget::FullyRust {
                         fn_ptr: Rc::new(RefCell::new(next)),
@@ -3243,18 +3244,18 @@ impl Vm {
                         arr: Vec<(ImmutCloneStr32, VisSource<ValueRef>)> => self.arr.iter_mut().map(|(_, v)| v.value_mut()),
                         n: usize,
                     ] () {
-                        let ret = if extra.n >= extra.arr.len() {
+                        let ret = if *n >= arr.len() {
                             Value::Maybe(None)
                         } else {
-                            let (k, v) = extra.arr[extra.n].clone();
+                            let (k, v) = arr[*n].clone();
                             let k = Value::String(k).into_value_ref(area.clone());
                             let v = v.take_value();
                             Value::Maybe(Some(Value::Array(vec![k, v]).into_value_ref(area.clone())))
                         };
-                        extra.n += 1;
+                        *n += 1;
 
                         Multi::new_single(ctx, Ok(ret.into_value_ref(area)))
-                    } ctx vm program area extra
+                    }
                 }
                 MacroData {
                     target: MacroTarget::FullyRust {
@@ -3276,15 +3277,15 @@ impl Vm {
                         end: i64 = *end,
                         step: i64 = *step,
                     ] () {
-                        let ret = if extra.n == extra.end {
+                        let ret = if n == end {
                             Value::Maybe(None)
                         } else {
-                            Value::Maybe(Some(Value::Int(extra.n).into_value_ref(area.clone())))
+                            Value::Maybe(Some(Value::Int(*n).into_value_ref(area.clone())))
                         };
-                        extra.n += extra.step;
+                        *n += *step;
 
                         Multi::new_single(ctx, Ok(ret.into_value_ref(area)))
-                    } ctx vm program area extra
+                    }
                 }
                 MacroData {
                     target: MacroTarget::FullyRust {
@@ -3341,3 +3342,76 @@ impl Vm {
         Multi::new_single(ctx, Ok(data))
     }
 }
+
+// mod x {
+//     use super::*;
+
+//     // Recursive expansion of raw_macro! macro
+//     // ========================================
+
+//     #[allow(non_camel_case_types)]
+//     #[derive(Clone, Debug)]
+//     pub struct _randsym_874987d57ee54f48ba2d0b2c7529a018 {
+//         pub arr: Vec<ValueRef>,
+//         pub n: usize,
+//         __fn: fn(
+//             Vec<ValueRef>,
+//             Context,
+//             &mut Vm,
+//             &std::rc::Rc<Program>,
+//             CodeArea,
+//             &mut _randsym_874987d57ee54f48ba2d0b2c7529a018,
+//         ) -> Multi<RuntimeResult<ValueRef>>,
+//     }
+//     impl BuiltinClosure for _randsym_874987d57ee54f48ba2d0b2c7529a018 {
+//         fn shallow_clone(&self) -> Rc<RefCell<dyn BuiltinClosure>> {
+//             Rc::new(RefCell::new(self.clone()))
+//         }
+
+//         fn get_mut_refs<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut ValueRef> + 'a> {
+//             let iter = [].into_iter().chain((self.arr.iter_mut()));
+//             Box::new(iter)
+//         }
+
+//         fn call(
+//             &mut self,
+//             args: Vec<ValueRef>,
+//             context: Context,
+//             vm: &mut Vm,
+//             program: &Rc<Program>,
+//             area: CodeArea,
+//         ) -> Multi<RuntimeResult<ValueRef>> {
+//             (self.__fn)(args, context, vm, program, area, &mut self)
+//         }
+//     }
+
+//     fn x() {
+//         #[allow(unused)]
+//         let next = {
+//             #[allow(unused)]
+//             fn temp(
+//                 mut args: Vec<ValueRef>,
+//                 ctx: Context,
+//                 vm: &mut Vm,
+//                 program: &std::rc::Rc<Program>,
+//                 area: CodeArea,
+//                 _randsym_874987d57ee54f48ba2d0b2c7529a018 {
+//                     ref mut arr,
+//                     ref mut n,
+//                     ..
+//                 }: &mut _randsym_874987d57ee54f48ba2d0b2c7529a018,
+//             ) -> Multi<RuntimeResult<ValueRef>> {
+//                 use crate::interpreting::value::value_structs::*;
+//                 let ret = if n >= arr.len() {
+//                     Value::Maybe(None)
+//                 } else {
+//                     let n = arr[*n].clone();
+//                     Value::Maybe(Some(n))
+//                 };
+//                 *n += 1;
+//                 Multi::new_single(ctx, Ok(ret.into_value_ref(area)))
+//             }
+//             _randsym_874987d57ee54f48ba2d0b2c7529a018 { arr, n, __fn: temp }
+//         };
+//     }
+// }

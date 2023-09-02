@@ -16,7 +16,7 @@ impl_type! {
     impl Builtins {
         Constants:
 
-        Functions(ctx, vm, program, area):
+        Functions:
 
         /// g
         fn print(

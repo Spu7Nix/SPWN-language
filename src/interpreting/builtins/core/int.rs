@@ -7,7 +7,7 @@ impl_type! {
     impl Int {
         Constants:
 
-        Functions(ctx, vm, program, area):
+        Functions:
 
 
         /// fghfddggfd

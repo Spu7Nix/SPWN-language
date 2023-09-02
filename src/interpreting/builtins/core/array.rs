@@ -9,9 +9,7 @@ impl_type! {
     impl Array {
         Constants:
 
-        Functions(ctx, vm, program, area):
-
-
+        Functions:
         /// fghfddggfd
         fn push(&Array(slf) as "self", elem) {
             slf.borrow_mut().push(vm.deep_clone_ref(elem, false));

@@ -1339,6 +1339,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5ea92a5b6195c6ef2a0295ea818b312502c6fc94dde986c5553242e18fd4ce2"
 
 [[package]]
+name = "respan"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea687784bc3f7e5a1222c3b19be862b90ba8b05e9759ee5f7d23f32f70791cc8"
+
+[[package]]
 name = "rle-decode-fast"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1551,6 +1557,7 @@ dependencies = [
  "rand 0.8.5",
  "randsym",
  "regex",
+ "respan",
  "semver 1.0.18",
  "serde",
  "serde_json",
