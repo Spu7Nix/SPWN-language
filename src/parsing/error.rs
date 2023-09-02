@@ -156,80 +156,6 @@ error_maker! {
             first_used: CodeArea,
         },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Invalid number of arguments", Note: None;
-        //     Labels: [
-        //         area => "Attribute `{}` expected {} arguments, found `{}`": attribute, expected, found;
-        //     ]
-        // ]
-        // InvalidAttributeArgCount {
-        //     attribute: String,
-        //     expected: usize,
-        //     found: usize,
-
-        //     area: CodeArea,
-        // },
-
-        // // ==================================================================
-        // #[
-        //     Message: "Invalid type for attribute", Note: None;
-        //     Labels: [
-        //         area => "Attribute expected type `{}` as string literal": expected;
-        //     ]
-        // ]
-        // InvalidAttributeArgType {
-        //     expected: &'static str,
-        //     area: CodeArea,
-        // },
-
-        // // ==================================================================
-        // #[
-        //     Message: "Unknown attribute", Note: Some(format!("The valid attributes are: {}", list_join(valid)));
-        //     Labels: [
-        //         area => "Attribute `{}` does not exist": attribute;
-        //     ]
-        // ]
-        // UnknownAttribute {
-        //     attribute: String,
-        //     area: CodeArea,
-
-        //     valid: Vec<String>,
-        // },
-        // // ==================================================================
-        // #[
-        //     Message: "Mismatched attribute", Note: None;
-        //     Labels: [
-        //         area => "Attribute `{}` cannot be added to this element": attr;
-
-        //         expr_area => "{}": =>(match valid {
-        //             Some(v) => format!("The valid attributes for this element are: {}", list_join(v)),
-        //             None => "This element doesn't support any attributes".into(),
-        //         });
-        //     ]
-        // ]
-        // MismatchedAttribute {
-        //     area: CodeArea,
-        //     expr_area: CodeArea,
-        //     attr: String,
-
-        //     valid: Option<Vec<String>>,
-        // },
-
-        // // ==================================================================
-        // #[
-        //     Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are {}", attribute, list_join(fields)));
-        //     Labels: [
-        //         area => "Unexpected field `{}`": field;
-        //     ]
-        // ]
-        // InvalidAttributeField {
-        //     field: String,
-        //     area: CodeArea,
-        //     attribute: String,
-        //     fields: Vec<String>,
-        // },
-
         // ==================================================================
         #[
             Message: "Lexer error", Note: None;
@@ -292,9 +218,6 @@ error_maker! {
         SelfArgumentCannotBeSpread {
             area: CodeArea,
         },
-
-
-
 
         // ==================================================================
         #[
@@ -434,6 +357,30 @@ error_maker! {
             ]
         ]
         MutSelf {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Integer too large", Note: Some(format!("The maximum size for an integer is: {}", i64::MAX));
+            Main Area: area;
+            Labels: [
+                area => "Found integer here";
+            ]
+        ]
+        IntegerTooLarge {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Unknown object key", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "Found key here";
+            ]
+        ]
+        UnknownObjectKey {
             area: CodeArea,
         },
     }

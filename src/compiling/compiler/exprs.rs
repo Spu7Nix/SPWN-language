@@ -568,18 +568,24 @@ impl Compiler<'_> {
                 let dest = builder.next_reg();
 
                 let cond_reg = self.compile_expr(cond, scope, builder)?;
+
                 builder.new_block(|builder| {
                     let outer = builder.block;
 
                     builder.new_block(|builder| {
                         builder.jump(None, JumpType::EndIfFalse(cond_reg), ZEROSPAN);
+
                         let r = self.compile_expr(if_true, scope, builder)?;
                         builder.copy_deep(r, dest, if_true.span);
+
                         builder.jump(Some(outer), JumpType::End, ZEROSPAN);
+
                         Ok(())
                     })?;
+
                     let r = self.compile_expr(if_false, scope, builder)?;
                     builder.copy_deep(r, dest, if_false.span);
+
                     Ok(())
                 })?;
                 Ok(dest)
@@ -831,6 +837,7 @@ impl Compiler<'_> {
 
                 Ok(out_reg)
             },
+            #[cfg(debug_assertions)]
             Expression::Dbg(v, show_ptr) => {
                 let out = builder.next_reg();
                 let v = self.compile_expr(v, scope, builder)?;

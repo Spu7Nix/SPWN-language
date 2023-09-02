@@ -1,5 +1,9 @@
-f = () {
-    f()
+mut a if 1 == 0 = 4
+
+&b = a
+
+mut c = match 0 {
+    ==0 => b
 }
 
-f()
+c += 1

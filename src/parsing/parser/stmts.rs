@@ -139,8 +139,6 @@ impl Parser<'_> {
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
 
-                let span = self.span();
-
                 Statement::TypeDef(vis(self.intern_string(name)))
             },
             Token::Impl => {
@@ -211,44 +209,85 @@ impl Parser<'_> {
             _ => {
                 let mut check = self.clone();
 
-                match check.parse_pattern() {
-                    Ok(pat) => {
-                        let tok = check.peek()?;
-                        let ex = if tok == Token::Assign {
-                            check.next()?;
-                            self.lexer = check.lexer;
+                'inner: {
+                    match check.parse_pattern() {
+                        Ok(pat) => {
+                            let tok = check.peek()?;
 
-                            let mut e = self.parse_expr(true)?;
-                            e.attributes.extend(attrs);
+                            let ex = if tok == Token::Assign {
+                                check.next()?;
 
-                            Statement::Assign(pat, e)
-                        } else if let Some(op) = tok.to_assign_op() {
-                            check.next()?;
-                            self.lexer = check.lexer;
+                                /*
+                                   following code fixes:
+                                   ```
+                                   mut a = 4
+                                   &b = a
+                                   ```
+                                   where it previously would be interpreted as
+                                   ```
+                                   mut a = 4 & b
+                                   = a
+                                   ```
+                                */
 
-                            let mut e = self.parse_expr(true)?;
-                            e.attributes.extend(attrs);
+                                // `mut a = 4`
+                                //         ^ takes a snapshot here
+                                let mut bin_and_check = check.clone();
 
-                            Statement::AssignOp(pat, op, e)
-                        } else {
-                            let mut e = self.parse_expr(true)?;
-                            e.attributes.extend(attrs);
+                                // consumes the `4` and saves it
+                                let prev_pat_value = bin_and_check.parse_value(true)?;
 
+                                // `&b = a`
+                                // ^ takes a snapshot here
+                                let mut bin_and_check2 = bin_and_check.clone();
+
+                                // check to see if the `&` will be a reference assign or an op
+                                if bin_and_check2.next()? == Token::BinAnd {
+                                    bin_and_check2.parse_value(false)?;
+                                    if bin_and_check2.next()? == Token::Assign {
+                                        // here we want to backtrack to *after* we consumed the value,
+                                        // but before the start of the next statement (`&b = a`) hence
+                                        // why we needed to keep 2 different snapshots
+                                        self.lexer = bin_and_check.lexer;
+
+                                        break 'inner Statement::Assign(pat, prev_pat_value);
+                                    }
+                                }
+
+                                self.lexer = check.lexer;
+
+                                let mut e = self.parse_expr(true)?;
+                                e.attributes.extend(attrs);
+
+                                Statement::Assign(pat, e)
+                            } else if let Some(op) = tok.to_assign_op() {
+                                check.next()?;
+                                self.lexer = check.lexer;
+
+                                let mut e = self.parse_expr(true)?;
+                                e.attributes.extend(attrs);
+
+                                Statement::AssignOp(pat, op, e)
+                            } else {
+                                let mut e = self.parse_expr(true)?;
+                                e.attributes.extend(attrs);
+
+                                Statement::Expr(e)
+                            };
+
+                            self.deprecated_features.extend(check.deprecated_features);
+                            attrs = vec![];
+
+                            ex
+                        },
+                        Err(pattern_err) => {
+                            let e = self.parse_expr(true)?;
+                            if self.next_is(Token::Assign)? {
+                                return Err(pattern_err);
+                            }
                             Statement::Expr(e)
-                        };
-
-                        self.deprecated_features.extend(check.deprecated_features);
-                        attrs = vec![];
-
-                        ex
-                    },
-                    Err(pattern_err) => {
-                        let e = self.parse_expr(true)?;
-                        if self.next_is(Token::Assign)? {
-                            return Err(pattern_err);
-                        }
-                        Statement::Expr(e)
-                    },
+                        },
+                    }
                 }
             },
         };

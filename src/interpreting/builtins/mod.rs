@@ -168,23 +168,6 @@ macro_rules! impl_type {
                 $(
 
                     $crate::interpreting::builtins::raw_macro! { fn $func_name($($args)*) { $($code)* } $ctx $vm $program $area}
-                    // #[allow(unused)]
-                    // fn $func_name(
-                    //     mut args: Vec<$crate::interpreting::vm::ValueRef>,
-                    //     $vm: &mut $crate::Vm,
-                    //     $program: &std::rc::Rc<$crate::Program>,
-                    //     $area: $crate::sources::CodeArea,
-                    // ) -> $crate::interpreting::vm::RuntimeResult<()> {
-                    //     // $crate::interpreting::value::Value
-                    //     use $crate::interpreting::value::value_structs::*;
-
-                    //     $crate::interpreting::builtins::impl_type! { @ArgsCheckCloneA[0](args, $vm) $($args)* }
-                    //     $crate::interpreting::builtins::impl_type! { @ArgsA[0](args, $vm, $area) $($args)* }
-                    //     // todo!()
-                    //      $($code)* .rust_fn_return($vm, &$area, $program);
-                    //     Ok(())
-                    //     // Ok({ $($code)* }.into_value())
-                    // }
                 )*
 
                 match name {

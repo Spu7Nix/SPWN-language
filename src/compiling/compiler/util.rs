@@ -311,7 +311,7 @@ impl Compiler<'_> {
         builder: &mut CodeBuilder,
         span: CodeSpan,
     ) {
-        for name in &*names {
+        for name in names {
             let var_reg = builder.next_reg();
             let spur = self.intern(name);
 
@@ -352,7 +352,9 @@ impl Compiler<'_> {
         builder.new_block(|builder| {
             for elem in elems {
                 let r = elem(self, builder)?;
-                builder.copy_deep(r, dest, span);
+
+                builder.copy_shallow(r, dest, span);
+
                 builder.jump(None, JumpType::EndIfFalse(dest), span);
             }
             Ok(())
@@ -374,7 +376,9 @@ impl Compiler<'_> {
         builder.new_block(|builder| {
             for elem in elems {
                 let r = elem(self, builder)?;
-                builder.copy_deep(r, dest, span);
+
+                builder.copy_shallow(r, dest, span);
+
                 builder.jump(None, JumpType::EndIfTrue(dest), span);
             }
             Ok(())

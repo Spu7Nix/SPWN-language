@@ -18,12 +18,12 @@ impl<'a> Parser<'a> {
 
                 list_helper!(self, RBracket {
                     let key = match self.next()? {
-                        Token::Int => self.intern_string(self.parse_int(self.slice(), 10).to_string()),
-                        Token::HexInt => self.intern_string(self.parse_int(&self.slice()[2..], 16).to_string()),
-                        Token::OctalInt => self.intern_string(self.parse_int(&self.slice()[2..], 8).to_string()),
-                        Token::BinaryInt => self.intern_string(self.parse_int(&self.slice()[2..], 2).to_string()),
-                        Token::SeximalInt => self.intern_string(self.parse_int(&self.slice()[2..], 6).to_string()),
-                        Token::DozenalInt => self.intern_string(self.parse_int(&self.slice()[2..], 12).to_string()),
+                        Token::Int => self.intern_string(self.parse_int(self.slice(), 10)?.to_string()),
+                        Token::HexInt => self.intern_string(self.parse_int(&self.slice()[2..], 16)?.to_string()),
+                        Token::OctalInt => self.intern_string(self.parse_int(&self.slice()[2..], 8)?.to_string()),
+                        Token::BinaryInt => self.intern_string(self.parse_int(&self.slice()[2..], 2)?.to_string()),
+                        Token::SeximalInt => self.intern_string(self.parse_int(&self.slice()[2..], 6)?.to_string()),
+                        Token::DozenalInt => self.intern_string(self.parse_int(&self.slice()[2..], 12)?.to_string()),
                         Token::String => {
                             let s = self.parse_compile_time_string()?;
 

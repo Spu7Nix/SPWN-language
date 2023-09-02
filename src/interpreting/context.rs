@@ -73,6 +73,7 @@ impl ContextStorage {
 /// I am going to Eat this LIttle CHINESE BOY how old are you 18 LOUDER 18 I have have him absolutely giftwrapped in my signature details single button narrow peak lapelle
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context {
+    #[cfg(debug_assertions)]
     pub unique_id: usize,
 
     pub ip: usize,
@@ -95,6 +96,7 @@ impl Eq for Context {
 
 #[allow(clippy::new_without_default)]
 impl Context {
+    #[cfg(debug_assertions)]
     pub fn new_id() -> usize {
         static mut CONTEXT_DBG_ID: usize = 0;
         unsafe {
@@ -105,6 +107,7 @@ impl Context {
 
     pub fn new() -> Self {
         Self {
+            #[cfg(debug_assertions)]
             unique_id: Self::new_id(),
             ip: 0,
             group: Id::Specific(0),
@@ -200,7 +203,10 @@ impl Vm {
         let current = self.context_stack.current();
         let mut new = current.clone();
 
-        new.unique_id = Context::new_id();
+        #[cfg(debug_assertions)]
+        {
+            new.unique_id = Context::new_id();
+        }
 
         // lord forgive me for what i am about to do
 

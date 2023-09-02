@@ -197,10 +197,9 @@ lazy_static! {
 
 #[cfg(not(debug_assertions))]
 lazy_static! {
-    pub static ref BUILTIN_DIR: PathBuf = home::home_dir().expect("no home dir").join(format!(
-        ".spwn/versions/{}/libraries/",
-        env!("CARGO_PKG_VERSION")
-    ));
+    pub static ref BUILTIN_DIR: PathBuf = home::home_dir().expect("BUG: no home dir").join(
+        format!(".spwn/versions/{}/libraries/", env!("CARGO_PKG_VERSION"))
+    );
 }
 
 lazy_static! {

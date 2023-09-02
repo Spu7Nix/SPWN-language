@@ -97,6 +97,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             Opcode::ApplyStringFlag { flag, reg } => vec![reg],
             Opcode::WrapMaybe { from, to } => vec![from],
             Opcode::Return { src, module_ret } => vec![src],
+            #[cfg(debug_assertions)]
             Opcode::Dbg { reg, show_ptr } => vec![reg],
             Opcode::Throw { reg } => vec![reg],
             Opcode::Import { id, dest } => vec![],
@@ -223,6 +224,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             Opcode::ApplyStringFlag { flag, reg } => vec![reg],
             Opcode::WrapMaybe { from, to } => vec![to],
             Opcode::Return { src, module_ret } => vec![],
+            #[cfg(debug_assertions)]
             Opcode::Dbg { reg, show_ptr } => vec![],
             Opcode::Throw { reg } => vec![],
             Opcode::Import { id, dest } => vec![dest],

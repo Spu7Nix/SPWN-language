@@ -2,6 +2,7 @@ use std::io::ErrorKind;
 
 use delve::EnumDisplay;
 use serde::Deserialize;
+use thiserror::Error;
 
 use crate::util::hyperlink;
 
@@ -17,7 +18,7 @@ pub enum Message<'a> {
     RemoveObjectsByGroup(usize),
 }
 
-// TODO: make this less manual in the future if there are ever more options
+// TODO(future): make this less manual in the future if there are ever more options
 impl<'a> From<Message<'a>> for String {
     fn from(m: Message<'a>) -> Self {
         match m {
@@ -37,31 +38,26 @@ pub struct LiveEditorResult {
     pub error: Option<String>,
 }
 
-#[derive(EnumDisplay)]
+#[derive(Error, Debug)]
 pub enum WebSocketError {
-    #[delve(display = |kind| format!(
-        "Failed to connect to the Live Editor server ({kind}). Ensure that the Live Editor mod is installed, the editor is currently open, and there are no other active connections. ({})",
+    #[error(
+        "Failed to connect to the Live Editor server ({}). Ensure that the Live Editor mod is installed, the editor is currently open, and there are no other active connections. ({})",
+        .0,
         hyperlink::<_, &str>("https://github.com/iAndyHD3/WSLiveEditor", None)
-    ))]
+    )]
     FailedToConnect(ErrorKind),
 
-    #[delve(display = "Live Editor server returned an invalid json response.")]
+    #[error("Live Editor server returned an invalid json response.")]
     InvalidJsonResult,
 
-    #[delve(display = |o: &Option<String>| format!("Live Editor server returned an error{}", match o {
+    #[error("Live Editor server returned an error{}", match .0 {
         Some(s) => format!(": {s}"),
         None => ".".to_string()
-    }))]
+    })]
     LiveEditorError(Option<String>),
 
-    #[delve(display = |e| format!("{e}"))]
+    #[error("{}", .0)]
     Other(websocket::WebSocketError),
-}
-
-impl std::fmt::Debug for WebSocketError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self}")
-    }
 }
 
 impl From<websocket::WebSocketError> for WebSocketError {
@@ -77,10 +73,8 @@ impl From<websocket::WebSocketError> for WebSocketError {
             {
                 Self::FailedToConnect(ioerr.kind())
             },
-            // TODO: make more common ws errors clearer
+            // TODO(future): make more common ws errors clearer
             _ => Self::Other(err),
         }
     }
 }
-
-impl std::error::Error for WebSocketError {}

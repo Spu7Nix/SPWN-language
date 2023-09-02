@@ -278,6 +278,7 @@ pub enum Expression {
         destructure: Option<Spanned<AHashMap<Spanned<ModuleDestructureKey>, Option<PatternNode>>>>,
     },
 
+    #[cfg(debug_assertions)]
     Dbg(ExprNode, bool),
 
     Instance {

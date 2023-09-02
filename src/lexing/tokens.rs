@@ -45,6 +45,7 @@ pub enum Token {
     Impl,
     Overload,
     Unary,
+    #[cfg(debug_assertions)]
     Dbg,
     Private,
     Extract,
@@ -210,6 +211,7 @@ impl Token {
             Self::Extract => "extract",
             Self::Newline => "linebreak",
             Self::Spread => "...",
+            #[cfg(debug_assertions)]
             Self::Dbg => "dbg",
             Self::Private => "private",
             Self::Any => "_",

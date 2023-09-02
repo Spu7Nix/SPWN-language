@@ -11,7 +11,7 @@ use crate::parsing::ast::{
     ObjKeyType, ObjectType, Pattern, PatternNode, StringContent, StringType, Vis,
 };
 use crate::parsing::error::SyntaxError;
-use crate::parsing::operators::operators::{self, unary_prec};
+use crate::parsing::operators::operators::{self, unary_prec, BinOp};
 use crate::sources::{Spannable, Spanned};
 
 impl Parser<'_> {
@@ -27,27 +27,27 @@ impl Parser<'_> {
             match peek {
                 Token::Int => {
                     self.next()?;
-                    Expression::Int(self.parse_int(self.slice(), 10)).spanned(start)
+                    Expression::Int(self.parse_int(self.slice(), 10)?).spanned(start)
                 },
                 Token::HexInt => {
                     self.next()?;
-                    Expression::Int(self.parse_int(&self.slice()[2..], 16)).spanned(start)
+                    Expression::Int(self.parse_int(&self.slice()[2..], 16)?).spanned(start)
                 },
                 Token::OctalInt => {
                     self.next()?;
-                    Expression::Int(self.parse_int(&self.slice()[2..], 8)).spanned(start)
+                    Expression::Int(self.parse_int(&self.slice()[2..], 8)?).spanned(start)
                 },
                 Token::BinaryInt => {
                     self.next()?;
-                    Expression::Int(self.parse_int(&self.slice()[2..], 2)).spanned(start)
+                    Expression::Int(self.parse_int(&self.slice()[2..], 2)?).spanned(start)
                 },
                 Token::SeximalInt => {
                     self.next()?;
-                    Expression::Int(self.parse_int(&self.slice()[2..], 6)).spanned(start)
+                    Expression::Int(self.parse_int(&self.slice()[2..], 6)?).spanned(start)
                 },
                 Token::DozenalInt => {
                     self.next()?;
-                    Expression::Int(self.parse_int(&self.slice()[3..], 12)).spanned(start)
+                    Expression::Int(self.parse_int(&self.slice()[3..], 12)?).spanned(start)
                 },
                 Token::GoldenFloat => {
                     self.next()?;
@@ -305,8 +305,8 @@ impl Parser<'_> {
 
                     list_helper!(self, RBracket {
                         let key = match self.next()? {
-                            Token::Int => ObjKeyType::Num(self.parse_int(self.slice(), 10) as u8),
-                            Token::Ident => ObjKeyType::Name(OBJECT_KEYS[self.slice()]),
+                            Token::Int => ObjKeyType::Num(self.parse_int(self.slice(), 10)? as u8),
+                            Token::Ident => ObjKeyType::Name(*OBJECT_KEYS.get(self.slice()).ok_or(SyntaxError::UnknownObjectKey { area: self.make_area(self.span()) })?),
                             other => {
                                 return Err(SyntaxError::UnexpectedToken {
                                     expected: "key".into(),
@@ -471,6 +471,7 @@ impl Parser<'_> {
                     });
                     Expression::Match { value: v, branches }.spanned(start.extend(self.span()))
                 },
+                #[cfg(debug_assertions)]
                 Token::Dbg => {
                     self.next()?;
 
@@ -674,6 +675,7 @@ impl Parser<'_> {
 
         while operators::is_infix_prec(self.peek()?, prec) {
             let op = self.next()?;
+
             let right = if operators::prec_type(prec) == operators::OpType::Left {
                 match next_prec {
                     Some(next_prec) => self.parse_op(next_prec, allow_macros)?,

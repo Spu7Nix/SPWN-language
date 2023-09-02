@@ -3,6 +3,7 @@
 use std::rc::Rc;
 
 use itertools::{Either, Itertools};
+use rand::distributions::uniform::SampleBorrow;
 
 use super::context::Context;
 use super::error::RuntimeError;
@@ -225,6 +226,30 @@ fn in_op(
     // })
 }
 
+fn overflow_checked_op<A, B, R, F>(
+    op: F,
+    a: A,
+    b: B,
+    op_type: BinOp,
+    span: CodeSpan,
+    program: &Rc<Program>,
+    vm: &Vm,
+) -> RuntimeResult<R>
+where
+    A: Copy,
+    B: Copy,
+    F: FnOnce(A, B) -> Option<R>,
+{
+    match op(a, b) {
+        Some(v) => Ok(v),
+        None => Err(RuntimeError::OperatorOverflow {
+            op: op_type,
+            area: vm.make_area(span, program),
+            call_stack: vm.get_call_stack(),
+        }),
+    }
+}
+
 fn plus(
     a: &StoredValue,
     b: &StoredValue,
@@ -233,7 +258,15 @@ fn plus(
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
-        (Value::Int(a), Value::Int(b)) => Value::Int(*a + *b),
+        (Value::Int(a), Value::Int(b)) => Value::Int(overflow_checked_op(
+            i64::checked_add,
+            *a,
+            *b,
+            BinOp::Plus,
+            span,
+            program,
+            vm,
+        )?),
         (Value::Float(a), Value::Float(b)) => Value::Float(*a + *b),
         (Value::Int(a), Value::Float(b)) => Value::Float(*a as f64 + *b),
         (Value::Float(a), Value::Int(b)) => Value::Float(*a + *b as f64),
@@ -277,7 +310,15 @@ fn minus(
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
-        (Value::Int(a), Value::Int(b)) => Value::Int(*a - *b),
+        (Value::Int(a), Value::Int(b)) => Value::Int(overflow_checked_op(
+            i64::checked_sub,
+            *a,
+            *b,
+            BinOp::Minus,
+            span,
+            program,
+            vm,
+        )?),
         (Value::Float(a), Value::Float(b)) => Value::Float(*a - *b),
         (Value::Int(a), Value::Float(b)) => Value::Float(*a as f64 - *b),
         (Value::Float(a), Value::Int(b)) => Value::Float(*a - *b as f64),
@@ -301,7 +342,15 @@ fn mult(
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
-        (Value::Int(a), Value::Int(b)) => Value::Int(*a * *b),
+        (Value::Int(a), Value::Int(b)) => Value::Int(overflow_checked_op(
+            i64::checked_mul,
+            *a,
+            *b,
+            BinOp::Mult,
+            span,
+            program,
+            vm,
+        )?),
         (Value::Float(a), Value::Float(b)) => Value::Float(*a * *b),
         (Value::Int(a), Value::Float(b)) => Value::Float(*a as f64 * *b),
         (Value::Float(a), Value::Int(b)) => Value::Float(*a * *b as f64),
@@ -345,7 +394,15 @@ fn div(
                     call_stack: vm.get_call_stack(),
                 });
             }
-            Value::Int(*a / *b)
+            Value::Int(overflow_checked_op(
+                i64::checked_div,
+                *a,
+                *b,
+                BinOp::Div,
+                span,
+                program,
+                vm,
+            )?)
         },
         (Value::Float(a), Value::Float(b)) => Value::Float(*a / *b),
         (Value::Int(a), Value::Float(b)) => Value::Float(*a as f64 / *b),
@@ -370,10 +427,18 @@ fn modulo(
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
-        (Value::Int(a), Value::Int(b)) => Value::Int(*a % *b),
-        (Value::Float(a), Value::Float(b)) => Value::Float(*a % *b),
-        (Value::Int(a), Value::Float(b)) => Value::Float(*a as f64 % *b),
-        (Value::Float(a), Value::Int(b)) => Value::Float(*a % *b as f64),
+        (Value::Int(a), Value::Int(b)) => Value::Int(overflow_checked_op(
+            i64::checked_rem_euclid,
+            *a,
+            *b,
+            BinOp::Mod,
+            span,
+            program,
+            vm,
+        )?),
+        (Value::Float(a), Value::Float(b)) => Value::Float(a.rem_euclid(*b)),
+        (Value::Int(a), Value::Float(b)) => Value::Float((*a as f64).rem_euclid(*b)),
+        (Value::Float(a), Value::Int(b)) => Value::Float(a.rem_euclid(*b as f64)),
         _ => {
             return Err(RuntimeError::InvalidOperands {
                 a: (a.value.get_type(), a.area.clone()),
@@ -394,7 +459,15 @@ fn pow(
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
-        (Value::Int(a), Value::Int(b)) => Value::Int(a.pow(*b as u32)),
+        (Value::Int(a), Value::Int(b)) => Value::Int(overflow_checked_op(
+            i64::checked_pow,
+            *a,
+            *b as u32,
+            BinOp::Pow,
+            span,
+            program,
+            vm,
+        )?),
         (Value::Float(a), Value::Float(b)) => Value::Float(a.powf(*b)),
         (Value::Int(a), Value::Float(b)) => Value::Float((*a as f64).powf(*b)),
         (Value::Float(a), Value::Int(b)) => Value::Float(a.powi(*b as i32)),
@@ -552,19 +625,25 @@ fn lte(
 }
 
 fn range(
-    a: &StoredValue,
-    b: &StoredValue,
+    lhs: &StoredValue,
+    rhs: &StoredValue,
     span: CodeSpan,
     vm: &Vm,
     program: &Rc<Program>,
 ) -> RuntimeResult<Value> {
-    Ok(match (&a.value, &b.value) {
+    Ok(match (&lhs.value, &rhs.value) {
         (Value::Int(a), Value::Int(b)) => Value::Range {
             start: *a,
             end: *b,
             step: 1,
         },
         (Value::Range { start, end, step }, Value::Int(b)) => {
+            if *end == 0 {
+                return Err(RuntimeError::RangeStepZero {
+                    area: vm.make_area(lhs.area.span.extend(rhs.area.span), program),
+                });
+            }
+
             if *step == 1 {
                 Value::Range {
                     start: *start,
@@ -586,8 +665,8 @@ fn range(
         // should only allow integer ranges, rounding floats is kinda stinky
         _ => {
             return Err(RuntimeError::InvalidOperands {
-                a: (a.value.get_type(), a.area.clone()),
-                b: (b.value.get_type(), b.area.clone()),
+                a: (lhs.value.get_type(), lhs.area.clone()),
+                b: (rhs.value.get_type(), rhs.area.clone()),
                 op: BinOp::Range,
                 area: vm.make_area(span, program),
                 call_stack: vm.get_call_stack(),

@@ -124,8 +124,11 @@ fn test_lexer() -> LexError<()> {
     let t = lex("unary")?;
     tok!(t, Token::Unary, "unary");
 
-    let t = lex("dbg")?;
-    tok!(t, Token::Dbg, "dbg");
+    #[cfg(debug_assertions)]
+    {
+        let t = lex("dbg")?;
+        tok!(t, Token::Dbg, "dbg");
+    }
 
     let t = lex("private")?;
     tok!(t, Token::Private, "private");

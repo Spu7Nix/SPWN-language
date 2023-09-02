@@ -6,6 +6,7 @@ use super::context::CallInfo;
 use super::value::ValueType;
 use super::vm::Vm;
 use crate::error_maker;
+use crate::gd::object_keys::ObjectKeyValueType;
 use crate::interpreting::vm::ValueRef;
 use crate::parsing::operators::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;
@@ -77,6 +78,33 @@ error_maker! {
             value_area: CodeArea,
             area: CodeArea,
             expected: &'static [ValueType],
+            [call_stack]
+        },
+
+        // ==================================================================
+        #[
+            Message: "Type mismatch", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "Expected {}, found {}": {
+                    let len = expected.len();
+                    expected.iter().enumerate().map(|(i, t)| {
+                        let t: ValueType =  (*t).into();
+                        if len > 1 && i == len - 1 {
+                            format!("or {}", t.runtime_display(vm))
+                        } else {
+                            t.runtime_display(vm)
+                        }
+                    }).join(if len > 2 { ", " } else { " " })
+                }, value_type.runtime_display(vm);
+                value_area => "Value defined as {} here": value_type.runtime_display(vm);
+            ]
+        ]
+        ObjectKeyTypeMismatch {
+            value_type: ValueType,
+            value_area: CodeArea,
+            area: CodeArea,
+            expected: &'static [ObjectKeyValueType],
             [call_stack]
         },
 
@@ -193,21 +221,6 @@ error_maker! {
             [call_stack]
         },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Invalid keyword argument", Note: None;
-        //     Labels: [
-        //         call_area => "Keyword argument `{}` is invalid": arg_name;
-        //         macro_def_area => "Macro defined here";
-        //     ]
-        // ]
-        // InvalidKeywordArgument {
-        //     call_area: CodeArea,
-        //     macro_def_area: CodeArea,
-        //     arg_name: String,
-        //     [call_stack]
-        // },
-
         // ==================================================================
         #[
             Message: "Argument not satisfied", Note: None;
@@ -278,24 +291,6 @@ error_maker! {
             id: usize,
             [call_stack]
         },
-
-        // // ==================================================================
-        // #[
-        //     Message: "Argument pattern mismatch", Note: None;
-        //     Labels: [
-        //         call_area => "Call occurred here";
-        //         macro_def_area => "Argument `{}` was defined as taking {} here": arg_name, pattern.runtime_display(vm);
-        //         v.1 => "This `{}` is not {}": v.0.runtime_display(vm), pattern.runtime_display(vm);
-        //     ]
-        // ]
-        // ArgumentPatternMismatch {
-        //     call_area: CodeArea,
-        //     macro_def_area: CodeArea,
-        //     arg_name: String,
-        //     pattern: ConstPattern,
-        //     v: (ValueType, CodeArea),
-        //     [call_stack]
-        // },
 
         // ==================================================================
         #[
@@ -424,32 +419,6 @@ error_maker! {
             [call_stack]
         },
 
-        // // ==================================================================
-        // #[
-        //     Message: "Assertion failed", Note: None;
-        //     Labels: [
-        //         area => "Assertion happened here";
-        //     ]
-        // ]
-        // AssertionFailed {
-        //     area: CodeArea,
-        //     [call_stack]
-        // },
-
-        // // ==================================================================
-        // #[
-        //     Message: "Equality assertion failed", Note: None;
-        //     Labels: [
-        //         area => "{} is not equal to {}": left, right;
-        //     ]
-        // ]
-        // EqAssertionFailed {
-        //     area: CodeArea,
-        //     left: String,
-        //     right: String,
-        //     [call_stack]
-        // },
-
         // ==================================================================
         #[
             Message: "Added object in runtime context", Note: Some("TODO (link to docs)".into());
@@ -517,6 +486,20 @@ error_maker! {
             [call_stack]
         },
 
+        // ==================================================================
+        #[
+            Message: "Attempted to perform operation with overflow", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "`{}` operation caused overflow here": op.to_str();
+
+            ]
+        ]
+        OperatorOverflow {
+            op: BinOp,
+            area: CodeArea,
+            [call_stack]
+        },
 
         // ==================================================================
         #[
@@ -533,15 +516,14 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: format!("Error `{}` occurred while running an overload", error.to_report(vm).message), Note: None;
-            Main Area: area;
+            Message: format!("Error occurred while running an overload (`{}`)", error.to_report(vm).message), Note: None;
+            Main Area: error.get_main_area();
             Labels: [
-                area => "Call of `{}` occurrs here": builtin;
+                error.get_main_area() => "Call of `{}` occurrs here": builtin;
                 -> error.to_report(vm).labels
             ]
         ]
         WhileCallingOverload {
-            area: CodeArea,
             error: Box<RuntimeError>,
             builtin: &'static str,
         },
@@ -588,6 +570,29 @@ error_maker! {
             builtin: &'static str,
         },
 
+        // ==================================================================
+        #[
+            Message: "Range step cannot be zero", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "Range with a step size of 0 found here";
+            ]
+        ]
+        RangeStepZero {
+            area: CodeArea,
+        },
+
+        // ==================================================================
+        #[
+            Message: "Cannot add objects to the level at runtime", Note: None;
+            Main Area: area;
+            Labels: [
+                area => "Object added here";
+            ]
+        ]
+        AddObjectAtRuntime {
+            area: CodeArea,
+        },
 
         // // ============================ BUILTIN FUNC ERRORS ============================
 

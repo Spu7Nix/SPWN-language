@@ -2,7 +2,9 @@ use ahash::AHashMap;
 use lazy_static::lazy_static;
 use paste::paste;
 
-#[derive(Debug)]
+use crate::interpreting::value::ValueType;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ObjectKeyValueType {
     Int,
     Float,
@@ -15,6 +17,24 @@ pub enum ObjectKeyValueType {
     GroupArray,
     String,
     Epsilon,
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<ValueType> for ObjectKeyValueType {
+    fn into(self) -> ValueType {
+        match self {
+            Self::Int => ValueType::Int,
+            Self::Float => ValueType::Float,
+            Self::Bool => ValueType::Bool,
+            Self::Group => ValueType::Group,
+            Self::Channel => ValueType::Channel,
+            Self::Block => ValueType::Block,
+            Self::Item => ValueType::Item,
+            Self::GroupArray => ValueType::Array,
+            Self::String => ValueType::String,
+            Self::Epsilon => ValueType::Epsilon,
+        }
+    }
 }
 
 macro_rules! object_keys {

@@ -158,6 +158,7 @@ const _: () = {
         Ex::Import(..) => (),
         Ex::Instance { .. } => (),
         Ex::Obj(..) => (),
+        #[cfg(debug_assertions)]
         Ex::Dbg(..) => (),
         Ex::Match { .. } => (),
         Ex::ExtractImport {..} => (),

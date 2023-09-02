@@ -15,7 +15,8 @@ pub type OptOpcode = Opcode<OptRegister>;
 macro_rules! opcodes {
     (
         $(
-            $(#[$delve:meta])?
+            $(#[cfg($($cfg_tt:tt)*)])?
+            $(#[delve($($delve_tt:tt)*)])*
             $name:ident $({
                 $(
                     $($field:ident: $typ:ty)?
@@ -29,7 +30,8 @@ macro_rules! opcodes {
         #[delve(rename_variants = "screamingsnakecase")]
         pub enum Opcode<R: Copy + std::fmt::Display> {
             $(
-                $(#[$delve])?
+                $(#[cfg($($cfg_tt)*)])?
+                $(#[delve($($delve_tt)*)])*
                 $name $({
                     $(
                         $($field: $typ)?
@@ -46,6 +48,7 @@ macro_rules! opcodes {
             fn try_from(value: Opcode<UnoptRegister>) -> Result<Self, Self::Error> {
                 match value {
                     $(
+                        $(#[cfg($($cfg_tt)*)])?
                         Opcode::$name $({$(
                             $($field)?
                             $($reg_field)?
@@ -64,6 +67,7 @@ macro_rules! opcodes {
                 #[allow(unused_assignments)]
                 match self {
                     $(
+                        $(#[cfg($($cfg_tt)*)])?
                         Self::$name $({
                             $(
                                 $($reg_field,)?
@@ -85,6 +89,7 @@ macro_rules! opcodes {
                 #[allow(unused_assignments)]
                 match self {
                     $(
+                        $(#[cfg($($cfg_tt)*)])?
                         Self::$name $({
                             $(
                                 $($reg_field,)?
@@ -226,8 +231,6 @@ opcodes! {
 
     #[delve(display = |to| format!("to {to}"))]
     Jump { to: OpcodePos },
-    // #[delve(display = |to: &FuncID| format!("jump to {to:?}"))]
-    // FuncJump { to: FuncID },
     #[delve(display = |check, to| format!("if not {check}, to {to}"))]
     JumpIfFalse { [check], to: OpcodePos },
     #[delve(display = |check, to| format!("if {check}, to {to}"))]
@@ -296,7 +299,8 @@ opcodes! {
     #[delve(display = |src, mr: &bool| format!("{} {src}", if *mr { "export" } else { "return" }))]
     Return { [src], module_ret: bool },
 
-    #[delve(display = |reg, s| format!("dbg{} {reg}", if *show_ptr { "*" } else { "" }))]
+    #[cfg(debug_assertions)]
+    #[delve(display = |reg, _s| format!("dbg{} {reg}", if *show_ptr { "*" } else { "" }))]
     Dbg { [reg], show_ptr: bool },
 
     #[delve(display = |reg| format!("throw {reg}"))]

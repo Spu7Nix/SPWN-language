@@ -552,6 +552,7 @@ impl<'a> CodeBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(Opcode::Return { src, module_ret }), span)
     }
 
+    #[cfg(debug_assertions)]
     pub fn dbg(&mut self, reg: UnoptRegister, show_ptr: bool, span: CodeSpan) {
         self.push_opcode(ProtoOpcode::Raw(Opcode::Dbg { reg, show_ptr }), span)
     }

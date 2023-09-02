@@ -283,6 +283,7 @@ impl<'a> Lexer<'a> {
             b'*' => {
                 ret!(match self.read() {
                     Some(b'*') => {
+                        self.bump(1);
                         match self.read() {
                             Some(b'=') => {
                                 self.bump(1);
@@ -484,6 +485,7 @@ impl<'a> Lexer<'a> {
                     "impl" => Token::Impl,
                     "overload" => Token::Overload,
                     "unary" => Token::Unary,
+                    #[cfg(debug_assertions)]
                     "dbg" => Token::Dbg,
                     "private" => Token::Private,
                     "extract" => Token::Extract,

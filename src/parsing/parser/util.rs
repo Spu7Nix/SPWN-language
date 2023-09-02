@@ -21,8 +21,10 @@ use crate::sources::{CodeSpan, Spannable, Spanned};
 use crate::util::remove_quotes;
 
 impl Parser<'_> {
-    pub fn parse_int(&self, s: &str, base: u32) -> i64 {
-        i64::from_str_radix(&s.replace('_', ""), base).unwrap()
+    pub fn parse_int(&self, s: &str, base: u32) -> ParseResult<i64> {
+        i64::from_str_radix(&s.replace('_', ""), base).map_err(|_| SyntaxError::IntegerTooLarge {
+            area: self.make_area(self.span()),
+        })
     }
 
     pub fn parse_golden_float(&self, s: &str) -> f64 {
@@ -319,12 +321,12 @@ impl Parser<'_> {
             };
 
             let key = match self.next()? {
-                Token::Int => self.intern_string(self.parse_int(self.slice(), 10).to_string()),
-                Token::HexInt => self.intern_string(self.parse_int(&self.slice()[2..], 16).to_string()),
-                Token::OctalInt => self.intern_string(self.parse_int(&self.slice()[2..], 8).to_string()),
-                Token::BinaryInt => self.intern_string(self.parse_int(&self.slice()[2..], 2).to_string()),
-                Token::SeximalInt => self.intern_string(self.parse_int(&self.slice()[2..], 6).to_string()),
-                Token::DozenalInt => self.intern_string(self.parse_int(&self.slice()[2..], 12).to_string()),
+                Token::Int => self.intern_string(self.parse_int(self.slice(), 10)?.to_string()),
+                Token::HexInt => self.intern_string(self.parse_int(&self.slice()[2..], 16)?.to_string()),
+                Token::OctalInt => self.intern_string(self.parse_int(&self.slice()[2..], 8)?.to_string()),
+                Token::BinaryInt => self.intern_string(self.parse_int(&self.slice()[2..], 2)?.to_string()),
+                Token::SeximalInt => self.intern_string(self.parse_int(&self.slice()[2..], 6)?.to_string()),
+                Token::DozenalInt => self.intern_string(self.parse_int(&self.slice()[2..], 12)?.to_string()),
                 Token::String => {
                     let s = self.parse_compile_time_string()?;
                     self.intern_string(s)

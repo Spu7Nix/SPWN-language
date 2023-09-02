@@ -2,6 +2,7 @@ use ahash::AHashMap;
 use itertools::Itertools;
 
 use super::{ParseResult, Parser};
+use crate::compiling::deprecated::DeprecatedWarning;
 use crate::lexing::tokens::Token;
 use crate::list_helper;
 use crate::parsing::ast::{AttrArgs, AttrItem, AttrStyle, Attribute, DelimArg};
@@ -29,7 +30,16 @@ impl Parser<'_> {
 
             if let Some(dup) = possible_duplicates.get(&*name) {
                 match dup.value {
-                    Duplicability::Warn => todo!(),
+                    Duplicability::Warn => eprintln!(
+                        "{}",
+                        DeprecatedWarning {
+                            message: "Duplicate attribute".into(),
+                            area: self.make_area(dup.span),
+                            area_message: "Duplicate attribute found here".into(),
+                            note: Some("Remove one of the attributes".into()),
+                        }
+                        .to_report()
+                    ),
                     Duplicability::Err => {
                         return Err(SyntaxError::DuplicateAttribute {
                             attribute: name.into(),
