@@ -40,6 +40,7 @@ pub enum AttributeTarget {
     Impl,
     Overload,
     Throw,
+    Unsafe,
 
     DictItem,
 
@@ -89,6 +90,7 @@ impl Statement {
             Statement::Impl { .. } => AT::Impl,
             Statement::Overload { .. } => AT::Overload,
             Statement::Throw(..) => AT::Throw,
+            Statement::Unsafe(..) => AT::Unsafe,
             _ => AT::Unknown,
         }
     }

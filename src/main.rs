@@ -74,7 +74,11 @@ struct SpwnOutput {
 }
 
 fn main() -> Result<(), SpwnError> {
-    assert_eq!(4, std::mem::size_of::<OptOpcode>());
+    assert_eq!(
+        4,
+        std::mem::size_of::<OptOpcode>(),
+        "BUG: opcodes too large"
+    );
 
     let args = Arguments::parse();
 

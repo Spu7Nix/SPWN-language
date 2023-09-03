@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use itertools::Itertools;
 use semver::Version;
 use slab::Slab;
@@ -77,6 +77,8 @@ struct ProtoFunc {
     spread_arg: Option<u8>,
     captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
     child_funcs: Vec<FuncID>,
+
+    unsafe_opcodes: AHashSet<usize>,
 }
 
 // #[derive(Debug)]
@@ -129,6 +131,7 @@ impl ProtoBytecode {
             spread_arg: args.1,
             captured_regs,
             child_funcs: vec![],
+            unsafe_opcodes: todo!(),
         });
         let func = self.functions.len() - 1;
         f(&mut CodeBuilder {

@@ -119,171 +119,10 @@ impl Parser<'_> {
                     self.next()?;
                     Expression::Epsilon.spanned(start)
                 },
-                Token::Ident | Token::Slf => {
-                    self.next()?;
-                    let var_name = self.slice_interned();
-                    let var_span = self.span();
-
-                    if matches!(self.peek_strict()?, Token::FatArrow | Token::Arrow) {
-                        let ret_type = if self.next_is(Token::Arrow)? {
-                            self.next()?;
-                            let r = Some(self.parse_pattern()?);
-                            self.expect_tok(Token::FatArrow)?;
-                            r
-                        } else {
-                            self.next()?;
-                            None
-                        };
-
-                        let code = MacroCode::Lambda(self.parse_expr(allow_macros)?);
-
-                        Expression::Macro {
-                            args: vec![MacroArg::Single {
-                                pattern: PatternNode {
-                                    pat: Box::new(Pattern::Path {
-                                        var: var_name,
-                                        path: vec![],
-                                    }),
-                                    span: var_span,
-                                },
-                                default: None,
-                            }],
-                            code,
-                            ret_pat: ret_type,
-                        }
-                        .spanned(start.extend(self.span()))
-                    } else {
-                        Expression::Var(var_name).spanned(start)
-                    }
-                },
                 Token::TypeIndicator => {
                     self.next()?;
                     let name = self.slice()[1..].to_string();
                     Expression::Type(self.intern_string(name)).spanned(start)
-                },
-                Token::LParen => {
-                    self.next()?;
-
-                    let mut check = self.clone();
-                    let mut indent = 1;
-
-                    let after_close = loop {
-                        match check.next()? {
-                            Token::LParen => indent += 1,
-                            Token::Eof => {
-                                return Err(SyntaxError::UnmatchedToken {
-                                    not_found: Token::RParen,
-                                    for_char: Token::LParen,
-                                    area: self.make_area(start),
-                                })
-                            },
-                            Token::RParen => {
-                                indent -= 1;
-                                if indent == 0 {
-                                    break check.next()?;
-                                }
-                            },
-                            _ => (),
-                        }
-                    };
-
-                    self.deprecated_features.extend(check.deprecated_features);
-
-                    // println!("spingkla {:?}", after_close);
-
-                    match after_close {
-                        Token::FatArrow | Token::LBracket | Token::Arrow if allow_macros => (),
-                        _ => {
-                            if self.next_is(Token::RParen)? {
-                                self.next()?;
-                                break 'out_expr Expression::Empty
-                                    .spanned(start.extend(self.span()));
-                            }
-                            let mut inner = self.parse_expr(true)?;
-                            // println!("hullub");
-                            self.expect_tok(Token::RParen)?;
-                            inner.span = start.extend(self.span());
-                            return Ok(inner);
-                        },
-                    }
-
-                    let mut args = vec![];
-
-                    let mut first_spread_span = None;
-
-                    let mut index = 0;
-
-                    list_helper!(
-                        self,
-                        is_first,
-                        RParen {
-                            let is_spread = self.skip_tok(Token::Spread)?;
-
-                            if is_spread {
-                                if let Some(prev_s) = first_spread_span {
-                                    return Err(SyntaxError::MultipleSpreadArguments {
-                                        area: self.make_area(self.span()),
-                                        prev_area: self.make_area(prev_s)
-                                    })
-                                } else {
-                                    first_spread_span = Some(self.span());
-                                }
-                            }
-
-                            let pat = self.parse_pattern()?;
-
-                            if pat.pat.is_self(&self.interner) {
-                                if !is_first {
-                                    return Err(SyntaxError::SelfArgumentNotFirst {
-                                        area: self.make_area(self.span()),
-                                        pos: index,
-                                    })
-                                }
-                                if is_spread {
-                                    return Err(SyntaxError::SelfArgumentCannotBeSpread{
-                                        area: self.make_area(self.span())
-                                    })
-                                }
-                            }
-
-
-                            if is_spread {
-                                args.push(MacroArg::Spread { pattern: pat })
-                            } else {
-                                let default = if self.skip_tok(Token::Assign)? {
-                                    Some(self.parse_expr(true)?)
-                                } else {
-                                    None
-                                };
-                                args.push(MacroArg::Single { pattern: pat, default })
-                            }
-                            // println!("fulcrum e");
-
-                            index += 1;
-
-                        }
-                    );
-
-                    let ret_type = if self.next_is(Token::Arrow)? {
-                        self.next()?;
-                        Some(self.parse_pattern()?)
-                    } else {
-                        None
-                    };
-
-                    let code = if self.next_is(Token::FatArrow)? {
-                        self.next()?;
-                        MacroCode::Lambda(self.parse_expr(allow_macros)?)
-                    } else {
-                        MacroCode::Normal(self.parse_block()?)
-                    };
-
-                    Expression::Macro {
-                        args,
-                        code,
-                        ret_pat: ret_type,
-                    }
-                    .spanned(start.extend(self.span()))
                 },
                 Token::LSqBracket => {
                     self.next()?;
@@ -479,6 +318,186 @@ impl Parser<'_> {
 
                     Expression::Dbg(self.parse_expr(true)?, show_ptr)
                         .spanned(start.extend(self.span()))
+                },
+
+                t @ (Token::Unsafe | Token::Ident | Token::Slf | Token::LParen) => {
+                    let is_unsafe = if t == Token::Unsafe {
+                        self.next()?;
+                        true
+                    } else {
+                        false
+                    };
+
+                    let next = if is_unsafe { self.peek()? } else { t };
+
+                    match next {
+                        Token::Ident | Token::Slf => {
+                            self.next()?;
+
+                            let var_name = self.slice_interned();
+                            let var_span = self.span();
+
+                            if is_unsafe {
+                                dbg!(&self.peek()?);
+
+                                let ret_type = if self.next_is(Token::Arrow)? {
+                                    self.next()?;
+                                    let r = Some(self.parse_pattern()?);
+                                    self.expect_tok(Token::FatArrow)?;
+                                    r
+                                } else {
+                                    self.next()?;
+                                    None
+                                };
+
+                                let code = MacroCode::Lambda(self.parse_expr(allow_macros)?);
+
+                                Expression::Macro {
+                                    args: vec![MacroArg::Single {
+                                        pattern: PatternNode {
+                                            pat: Box::new(Pattern::Path {
+                                                var: var_name,
+                                                path: vec![],
+                                            }),
+                                            span: var_span,
+                                        },
+                                        default: None,
+                                    }],
+                                    code,
+                                    ret_pat: ret_type,
+                                    is_unsafe,
+                                }
+                                .spanned(start.extend(self.span()))
+                            } else {
+                                Expression::Var(var_name).spanned(start)
+                            }
+                        },
+                        Token::LParen => {
+                            self.next()?;
+
+                            let mut check = self.clone();
+                            let mut indent = 1;
+
+                            let after_close = loop {
+                                match check.next()? {
+                                    Token::LParen => indent += 1,
+                                    Token::Eof => {
+                                        return Err(SyntaxError::UnmatchedToken {
+                                            not_found: Token::RParen,
+                                            for_char: Token::LParen,
+                                            area: self.make_area(start),
+                                        })
+                                    },
+                                    Token::RParen => {
+                                        indent -= 1;
+                                        if indent == 0 {
+                                            break check.next()?;
+                                        }
+                                    },
+                                    _ => (),
+                                }
+                            };
+
+                            self.deprecated_features.extend(check.deprecated_features);
+
+                            match after_close {
+                                Token::FatArrow | Token::LBracket | Token::Arrow
+                                    if allow_macros => {},
+                                _ => {
+                                    if self.next_is(Token::RParen)? {
+                                        self.next()?;
+                                        break 'out_expr Expression::Empty
+                                            .spanned(start.extend(self.span()));
+                                    }
+                                    let mut inner = self.parse_expr(true)?;
+                                    // println!("hullub");
+                                    self.expect_tok(Token::RParen)?;
+                                    inner.span = start.extend(self.span());
+                                    return Ok(inner);
+                                },
+                            }
+
+                            let mut args = vec![];
+
+                            let mut first_spread_span = None;
+
+                            let mut index = 0;
+
+                            list_helper!(
+                                self,
+                                is_first,
+                                RParen {
+                                    let is_spread = self.skip_tok(Token::Spread)?;
+
+                                    if is_spread {
+                                        if let Some(prev_s) = first_spread_span {
+                                            return Err(SyntaxError::MultipleSpreadArguments {
+                                                area: self.make_area(self.span()),
+                                                prev_area: self.make_area(prev_s)
+                                            })
+                                        } else {
+                                            first_spread_span = Some(self.span());
+                                        }
+                                    }
+
+                                    let pat = self.parse_pattern()?;
+
+                                    if pat.pat.is_self(&self.interner) {
+                                        if !is_first {
+                                            return Err(SyntaxError::SelfArgumentNotFirst {
+                                                area: self.make_area(self.span()),
+                                                pos: index,
+                                            })
+                                        }
+                                        if is_spread {
+                                            return Err(SyntaxError::SelfArgumentCannotBeSpread{
+                                                area: self.make_area(self.span())
+                                            })
+                                        }
+                                    }
+
+
+                                    if is_spread {
+                                        args.push(MacroArg::Spread { pattern: pat })
+                                    } else {
+                                        let default = if self.skip_tok(Token::Assign)? {
+                                            Some(self.parse_expr(true)?)
+                                        } else {
+                                            None
+                                        };
+                                        args.push(MacroArg::Single { pattern: pat, default })
+                                    }
+                                    // println!("fulcrum e");
+
+                                    index += 1;
+
+                                }
+                            );
+
+                            let ret_type = if self.next_is(Token::Arrow)? {
+                                self.next()?;
+                                Some(self.parse_pattern()?)
+                            } else {
+                                None
+                            };
+
+                            let code = if self.next_is(Token::FatArrow)? {
+                                self.next()?;
+                                MacroCode::Lambda(self.parse_expr(allow_macros)?)
+                            } else {
+                                MacroCode::Normal(self.parse_block()?)
+                            };
+
+                            Expression::Macro {
+                                args,
+                                code,
+                                ret_pat: ret_type,
+                                is_unsafe,
+                            }
+                            .spanned(start.extend(self.span()))
+                        },
+                        _ => unreachable!(),
+                    }
                 },
                 unary_op
                     if {

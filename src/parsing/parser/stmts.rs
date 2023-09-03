@@ -206,6 +206,13 @@ impl Parser<'_> {
 
                 Statement::Throw(self.parse_expr(false)?)
             },
+            Token::Unsafe => {
+                self.next()?;
+
+                let stmts = self.parse_block()?;
+
+                Statement::Unsafe(stmts)
+            },
             _ => {
                 let mut check = self.clone();
 

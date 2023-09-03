@@ -10,7 +10,7 @@ use crate::interpreting::value::Value;
 use crate::interpreting::value_ops;
 use crate::interpreting::vm::ValueRef;
 use crate::parsing::ast::ObjectType;
-use crate::util::{Str32, String32};
+use crate::util::String32;
 
 impl_type! {
     impl Builtins {
@@ -57,7 +57,6 @@ impl_type! {
                 params,
                 typ,
             } as "object",
-            Bool(ignore_context) as "ignore_context" = "false",
         ) {
             let typ = *typ.borrow();
 
@@ -68,12 +67,12 @@ impl_type! {
 
             match typ {
                 ObjectType::Object => {
-                    if !*ignore_context.borrow() && ctx.group != Id::Specific(0) {
-                        return Multi::new_single(ctx, Err(RuntimeError::AddObjectInTriggerContext {
-                            area,
-                            call_stack: vm.get_call_stack(),
-                        }));
-                    }
+                    // if !ctx.is_unsafe && ctx.group != Id::Specific(0) {
+                    //     return Multi::new_single(ctx, Err(RuntimeError::AddObjectInTriggerContext {
+                    //         area,
+                    //         call_stack: vm.get_call_stack(),
+                    //     }));
+                    // }
                     vm.objects.push(obj)
                 }
                 ObjectType::Trigger => vm.triggers.push(

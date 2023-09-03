@@ -4,8 +4,8 @@
 */
 
 impl @builtins {
-    
-    	
+
+
 	#[doc("\ng")]
 	print: #[builtin] (
 		self: @builtins,
@@ -13,40 +13,49 @@ impl @builtins {
 		end: @string = "\n",
 		sep: @string = " ",
 	) {},
-	
+
 	#[doc("\nfghfddggfd")]
 	add: #[builtin] (
 		self: @builtins,
 		object: @object,
-		ignore_context: @bool = false,
 	) {},
-	
+
 	#[doc("\ndfdf")]
 	epsilon: #[builtin] (
 		self: @builtins,
 	) -> @epsilon {},
-	
+
 	#[doc("\ndfdf")]
 	trigger_fn_context: #[builtin] (
 		self: @builtins,
 	) -> @group {},
-	
+
 	#[doc("\ndfdf")]
 	assert: #[builtin] (
 		self: @builtins,
 		value: @bool,
 	) {},
-	
+
 	#[doc("\ngg")]
 	assert_eq: #[builtin] (
 		self: @builtins,
 		left: _,
 		right: _,
 	) {},
-	
+
 	#[doc("\ngfg")]
 	hash: #[builtin] (
 		self: @builtins,
-		value: _,
+		&value: _,
 	) -> @int {},
+
+	#[doc("\ngfg")]
+	version: #[builtin] (
+		self: @builtins,
+	) -> [@int, @int, @int, @int?] {},
+
+	#[doc("\ngfg")]
+	args: #[builtin] (
+		self: @builtins,
+	) -> @string[] {},
 }

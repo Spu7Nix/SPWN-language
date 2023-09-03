@@ -20,7 +20,7 @@ impl @group {
             EASING: easing.id,
             EASING_RATE: easing_rate,
         })
-        
+
         wait(duration)
     },
 
@@ -66,7 +66,7 @@ impl @group {
 
         # Args
         `lock_object_rotation`: Only rotate positions of the objects, not the textures.
-        
+
         # Example
         ```spwn
         center = 3g
@@ -152,7 +152,7 @@ impl @group {
 
     #[doc(u"
         Implementation of the 'Move target' feature of the move trigger. Remember that both groups can only contain one object.
-        
+
         # Example
         ```spwn
         10g.move_to(20g)
@@ -171,7 +171,7 @@ impl @group {
             OBJ_ID: @obj_id::triggers.MOVE,
             TARGET: self,
             USE_TARGET: true,
-            
+
             TARGET_POS_AXES: match [x_only, y_only] {
                 [==true, ==true] => 0,
                 [==true, ==false] => 1,
@@ -186,62 +186,62 @@ impl @group {
         })
         wait(duration)
     },
-    
-    // #[doc("
-    //     Moves group to a specific coordinate.
 
-    //     # Example
-    //     ```spwn
-    //     10g.move_to_xy(300, 300)
-    //     10g.move_to_xy(x = 300) // does not move on the y axis
-    //     10g.move_to_xy(y = 300) // does not move on the x axis
-    //     ```
-    // ")]
-    // move_to_coords: (
-    //     self,
-    //     coords:
-    //         { x: @int | @float, y: @int | @float }
-    //         | { x: @int | @float }
-    //         | { y: @int | @float },
-    //     duration: @int | @float = 0,
-    //     easing: @easing = @easing::NONE,
-    //     easing_rate: @int = 2,
-    // ) {
+    #[doc("
+        Moves group to a specific coordinate.
 
-    //     [x, y] = match coords {
-    //         {x, y} => [x?, y?],
-    //         {x} => [x?, ?],
-    //         {y} => [?, x?],
-    //     };
+        # Example
+        ```spwn
+        10g.move_to_xy(300, 300)
+        10g.move_to_xy(x = 300) // does not move on the y axis
+        10g.move_to_xy(y = 300) // does not move on the x axis
+        ```
+    ")]
+    move_to_coords: (
+        self,
+        coords:
+            { x: @int | @float, y: @int | @float }
+            | { x: @int | @float }
+            | { y: @int | @float },
+        duration: @int | @float = 0,
+        easing: @easing = @easing::NONE,
+        easing_rate: @int = 2,
+    ) {
 
-    //     $.add(
-    //         obj {
-    //             OBJ_ID: 1765, // small `x`
-    //             X: x.unwrap_or(0),
-    //             Y: y.unwrap_or(0),
-    //             GROUPS: target,
-    //         }, 
-    //         ignore_context = true
-    //     );
-        
-    //     $.add(
-    //         obj {
-    //             OBJ_ID: @obj_id::triggers.ALPHA,
-    //             X: 0,
-    //             Y: 75 * 30,
-    //         }, 
-    //         ignore_context = true
-    //     );
+        [x, y] = match coords {
+            {x, y} => [x?, y?],
+            {x} => [x?, ?],
+            {y} => [?, x?],
+        };
 
-    //     self.move_to(
-    //         target, 
-    //         duration, 
-    //         x.is_some(),
-    //         x.is_some(),
-    //         easing, 
-    //         easing_rate
-    //     );
-    // },
+        $.add(
+            obj {
+                OBJ_ID: 1765, // small `x`
+                X: x.unwrap_or(0),
+                Y: y.unwrap_or(0),
+                GROUPS: target,
+            },
+            ignore_context = true
+        );
+
+        $.add(
+            obj {
+                OBJ_ID: @obj_id::triggers.ALPHA,
+                X: 0,
+                Y: 75 * 30,
+            },
+            ignore_context = true
+        );
+
+        self.move_to(
+            target,
+            duration,
+            x.is_some(),
+            x.is_some(),
+            easing,
+            easing_rate
+        );
+    },
 
     #[doc(u"
         Implementation of the pulse trigger for groups.
@@ -277,13 +277,13 @@ impl @group {
 
     #[doc(u"
         Implementation of the pulse trigger for groups with hsv..10g
-        
+
         # Example
         ```spwn
         10g.pulse_hsv(180, 1, 1, fade_out = 0.5)
         ```
     ")]
-    pulse_hsv: 
+    pulse_hsv:
     (
         self,
         h: @int,

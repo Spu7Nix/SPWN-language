@@ -343,6 +343,7 @@ impl Compiler<'_> {
                 args,
                 ret_pat,
                 code,
+                is_unsafe,
             } => {
                 let mut spread_arg = None;
 
@@ -380,6 +381,7 @@ impl Compiler<'_> {
 
                 let is_builtin = self.find_builtin_attr(&expr.attributes);
                 if is_builtin && !matches!(&*self.src, SpwnSource::Core(..)) {
+                    // TODO: uncomment
                     // return Err(CompileError::BuiltinAttrOutsideOfCore {
                     //     area: self.make_area(expr.span),
                     // });
@@ -487,6 +489,10 @@ impl Compiler<'_> {
                     },
                     expr.span,
                 );
+
+                if *is_unsafe {
+                    builder.push_raw_opcode(Opcode::MarkMacroUnsafe { reg: macro_reg }, expr.span);
+                }
 
                 for (i, arg) in args.iter().enumerate() {
                     if let MacroArg::Single {

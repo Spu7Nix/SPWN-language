@@ -345,11 +345,13 @@ opcodes! {
     PopTryCatch,
 
     #[delve(display = |i, r| format!("{i}: (...) {{...}} -> {r}"))]
-    CreateMacro { func: FuncID, [dest]},
+    CreateMacro { func: FuncID, [dest] },
     #[delve(display = |to, f, arg| format!("{f} -> {to} default arg {arg}"))]
     PushMacroDefault { [to], [from], arg: u8},
     #[delve(display = |r| format!("mark arg 1 of {r} as `self`"))]
     MarkMacroMethod { [reg] },
+    #[delve(display = |r| format!("mark macro {r} unafe"))]
+    MarkMacroUnsafe { [reg] },
 
     #[delve(display = |base, id| format!("{base}({id})"))]
     Call { [base], call: CallExprID },
@@ -374,4 +376,5 @@ opcodes! {
     AddPrivateOperatorOverload { [from], op: Operator },
     #[delve(display = "<internal>")]
     IncMismatchIdCount,
+
 }

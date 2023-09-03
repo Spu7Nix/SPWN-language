@@ -490,6 +490,7 @@ impl<'a> Lexer<'a> {
                     "private" => Token::Private,
                     "extract" => Token::Extract,
                     "import" => Token::Import,
+                    "unsafe" => Token::Unsafe,
                     "is" => Token::Is,
                     "as" => Token::As,
                     "self" => Token::Slf,

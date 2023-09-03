@@ -179,6 +179,7 @@ const _: () = {
         St::Impl { .. } => (),
         St::Overload { .. } => (),
         St::Throw(..) => (),
+        St::Unsafe(..) => (),
     }
 };
 
@@ -219,10 +220,10 @@ fn test_attrs() -> ParseResult<()> {
     let t = parse(r##"#[doc = r#""#] type @int"##)?;
     stmt_eq!(t, St::TypeDef(Vis::Public(spur!("int"))));
 
-    let t = parse("#[debug_bytecode] () {}")?;
+    let t = parse("#[debug_bytecode] unsafe () {}")?;
     expr_eq!(
         t,
-        Ex::Macro { args: vec![], ret_pat: None, code: MacroCode::Normal(vec![]) },
+        Ex::Macro { args: vec![], ret_pat: None, code: MacroCode::Normal(vec![]), is_unsafe: true },
         attrs: vec![Attribute {
             style: AttrStyle::Outer,
             item: AttrItem {
@@ -249,7 +250,8 @@ fn test_attrs() -> ParseResult<()> {
                     Ex::Macro {
                         args: vec![],
                         ret_pat: None,
-                        code: MacroCode::Normal(vec![])
+                        code: MacroCode::Normal(vec![]),
+                        is_unsafe: false
                     }
                     .node()
                 ),
@@ -281,7 +283,8 @@ fn test_attrs() -> ParseResult<()> {
                     Ex::Macro {
                         args: vec![],
                         ret_pat: None,
-                        code: MacroCode::Normal(vec![])
+                        code: MacroCode::Normal(vec![]),
+                        is_unsafe: false
                     }
                     .node()
                 ),
@@ -1117,11 +1120,12 @@ fn test_macro() -> ParseResult<()> {
                 }
             ],
             ret_pat: None,
-            code: MacroCode::Normal(vec![])
+            code: MacroCode::Normal(vec![]),
+            is_unsafe: false
         }
     );
 
-    let t = parse("(...&b: @int) {}")?;
+    let t = parse("unsafe (...&b: @int) {}")?;
     expr_eq!(
         t,
         Ex::Macro {
@@ -1133,7 +1137,8 @@ fn test_macro() -> ParseResult<()> {
                 .node(),
             }],
             ret_pat: None,
-            code: MacroCode::Normal(vec![])
+            code: MacroCode::Normal(vec![]),
+            is_unsafe: true
         }
     );
 
@@ -1143,7 +1148,8 @@ fn test_macro() -> ParseResult<()> {
         Ex::Macro {
             args: vec![],
             ret_pat: Some(Pt::Type(spur!("string")).node()),
-            code: MacroCode::Normal(vec![])
+            code: MacroCode::Normal(vec![]),
+            is_unsafe: false
         }
     );
 
@@ -1774,7 +1780,8 @@ fn test_overload() -> ParseResult<()> {
                             },
                         ],
                         ret_pat: None,
-                        code: MacroCode::Normal(vec![])
+                        code: MacroCode::Normal(vec![]),
+                        is_unsafe: false
                     }
                     .node()
                 ),
@@ -1807,7 +1814,8 @@ fn test_overload() -> ParseResult<()> {
                             },
                         ],
                         ret_pat: None,
-                        code: MacroCode::Normal(vec![])
+                        code: MacroCode::Normal(vec![]),
+                        is_unsafe: false
                     }
                     .node()
                 )
@@ -1841,7 +1849,8 @@ fn test_overload() -> ParseResult<()> {
                         default: None
                     },],
                     ret_pat: None,
-                    code: MacroCode::Normal(vec![])
+                    code: MacroCode::Normal(vec![]),
+                    is_unsafe: false
                 }
                 .node()
             )]

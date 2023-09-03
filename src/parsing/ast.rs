@@ -252,6 +252,7 @@ pub enum Expression {
         args: Vec<MacroArg>,
         ret_pat: Option<PatternNode>,
         code: MacroCode,
+        is_unsafe: bool,
     },
 
     TriggerFunc {
@@ -339,6 +340,8 @@ pub enum Statement {
     Return(Option<ExprNode>),
     Break,
     Continue,
+
+    Unsafe(Statements),
 
     TypeDef(Vis<Spur>),
 

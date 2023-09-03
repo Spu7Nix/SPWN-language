@@ -8,7 +8,7 @@ use super::{CompileResult, Compiler, CustomTypeID, ScopeID, ScopeType, TypeDef, 
 use crate::compiling::builder::{CodeBuilder, JumpType};
 use crate::compiling::bytecode::UnoptRegister;
 use crate::compiling::error::CompileError;
-use crate::compiling::opcodes::{FuncID, Opcode};
+use crate::compiling::opcodes::{FuncID, Opcode, UnoptOpcode};
 use crate::interpreting::value::ValueType;
 use crate::parsing::ast::{Expression, Pattern, Statement, Statements, StmtNode, Vis, VisTrait};
 use crate::parsing::operators::operators::{AssignOp, Operator};
@@ -413,6 +413,13 @@ impl<'a> Compiler<'a> {
 
                     Ok(())
                 })?;
+            },
+            Statement::Unsafe(stmts) => {
+                // builder.push_raw_opcode(UnoptOpcode::EnterUnsafeBlock, stmt.span);
+
+                self.compile_stmts(stmts, scope, builder)?;
+
+                // builder.push_raw_opcode(UnoptOpcode::ExitUnsafeBlock, stmt.span);
             },
         }
 

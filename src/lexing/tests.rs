@@ -138,6 +138,9 @@ fn test_lexer() -> LexError<()> {
     let t = lex("import")?;
     tok!(t, Token::Import, "import");
 
+    let t = lex("unsafe")?;
+    tok!(t, Token::Unsafe, "unsafe");
+
     let t = lex("$")?;
     tok!(t, Token::Dollar, "$");
 

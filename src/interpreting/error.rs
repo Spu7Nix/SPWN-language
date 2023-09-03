@@ -584,13 +584,13 @@ error_maker! {
 
         // ==================================================================
         #[
-            Message: "Cannot add objects to the level at runtime", Note: None;
+            Message: "Unsafe macro call outside an unsafe block", Note: Some("Wrap the macro call in an unsafe block (`unsafe { ... }`)".into());
             Main Area: area;
             Labels: [
-                area => "Object added here";
+                area => "Macro call occurs here";
             ]
         ]
-        AddObjectAtRuntime {
+        UnsafeMacroCall {
             area: CodeArea,
         },
 

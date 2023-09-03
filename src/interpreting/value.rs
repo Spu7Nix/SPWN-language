@@ -464,6 +464,7 @@ pub struct MacroData {
     pub self_arg: Option<ValueRef>,
 
     pub is_method: bool,
+    pub is_unsafe: bool,
 }
 
 value! {

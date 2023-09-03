@@ -577,7 +577,7 @@ impl Vm {
             // }
 
             // MaybeUninit
-            let mut run_opcode = |opcode| -> RuntimeResult<LoopFlow> {
+            let run_opcode = |opcode| -> RuntimeResult<LoopFlow> {
                 // println!(
                 //     "{}    {:<10}{:<6}{}",
                 //     self.context_stack.last().contexts.len(),
@@ -1016,23 +1016,16 @@ impl Vm {
                         mem::drop(base);
                         self.change_reg(dest, Value::Instance { typ: t, items }.into_stored(area))
                     },
-
-                    Opcode::AllocObject { dest, capacity } => {
-                        if self.context_stack.current().group != Id::Specific(0) {
-                            return Err(RuntimeError::AddObjectAtRuntime { area });
-                        }
-
-                        self.change_reg(
-                            dest,
-                            StoredValue {
-                                value: Value::Object {
-                                    params: AHashMap::with_capacity(capacity as usize),
-                                    typ: ObjectType::Object,
-                                },
-                                area,
+                    Opcode::AllocObject { dest, capacity } => self.change_reg(
+                        dest,
+                        StoredValue {
+                            value: Value::Object {
+                                params: AHashMap::with_capacity(capacity as usize),
+                                typ: ObjectType::Object,
                             },
-                        )
-                    },
+                            area,
+                        },
+                    ),
                     Opcode::AllocTrigger { dest, capacity } => self.change_reg(
                         dest,
                         StoredValue {
@@ -1767,6 +1760,7 @@ impl Vm {
                             defaults: defaults.into(),
                             self_arg: None,
                             is_method: false,
+                            is_unsafe: false,
                         });
 
                         self.change_reg(dest, value.into_stored(area));
@@ -1782,6 +1776,12 @@ impl Vm {
                     Opcode::MarkMacroMethod { reg } => {
                         match &mut self.get_reg_ref(reg).borrow_mut().value {
                             Value::Macro(data) => data.is_method = true,
+                            _ => unreachable!(),
+                        }
+                    },
+                    Opcode::MarkMacroUnsafe { reg } => {
+                        match &mut self.get_reg_ref(reg).borrow_mut().value {
+                            Value::Macro(data) => data.is_unsafe = true,
                             _ => unreachable!(),
                         }
                     },
@@ -2102,6 +2102,13 @@ impl Vm {
 
         match &base_ref.value {
             Value::Macro(data) | Value::Iterator(data) => {
+                // if data.is_unsafe && !ctx.is_unsafe {
+                //     return Multi::new_single(
+                //         ctx,
+                //         Err(RuntimeError::UnsafeMacroCall { area: call_area }),
+                //     );
+                // }
+
                 let (args, spread_arg): (
                     Box<dyn Iterator<Item = (Option<&ImmutStr>, Mutability)>>,
                     _,
@@ -2872,6 +2879,7 @@ impl Vm {
                     defaults,
                     self_arg,
                     is_method,
+                    is_unsafe,
                 } = data;
 
                 match target {
@@ -2898,6 +2906,7 @@ impl Vm {
                 }
 
                 is_method.hash(state);
+                is_unsafe.hash(state);
 
                 for r in defaults.iter().flatten() {
                     self.hash_value(r, state)
@@ -3229,6 +3238,7 @@ impl Vm {
                     self_arg: None,
 
                     is_method: false,
+                    is_unsafe: false,
                 }
             },
             Value::Dict(map) => {
@@ -3268,6 +3278,7 @@ impl Vm {
                     self_arg: None,
 
                     is_method: false,
+                    is_unsafe: false,
                 }
             },
             Value::Range { start, end, step } => {
@@ -3298,6 +3309,7 @@ impl Vm {
                     self_arg: None,
 
                     is_method: false,
+                    is_unsafe: false,
                 }
             },
             v => {
@@ -3342,76 +3354,3 @@ impl Vm {
         Multi::new_single(ctx, Ok(data))
     }
 }
-
-// mod x {
-//     use super::*;
-
-//     // Recursive expansion of raw_macro! macro
-//     // ========================================
-
-//     #[allow(non_camel_case_types)]
-//     #[derive(Clone, Debug)]
-//     pub struct _randsym_874987d57ee54f48ba2d0b2c7529a018 {
-//         pub arr: Vec<ValueRef>,
-//         pub n: usize,
-//         __fn: fn(
-//             Vec<ValueRef>,
-//             Context,
-//             &mut Vm,
-//             &std::rc::Rc<Program>,
-//             CodeArea,
-//             &mut _randsym_874987d57ee54f48ba2d0b2c7529a018,
-//         ) -> Multi<RuntimeResult<ValueRef>>,
-//     }
-//     impl BuiltinClosure for _randsym_874987d57ee54f48ba2d0b2c7529a018 {
-//         fn shallow_clone(&self) -> Rc<RefCell<dyn BuiltinClosure>> {
-//             Rc::new(RefCell::new(self.clone()))
-//         }
-
-//         fn get_mut_refs<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut ValueRef> + 'a> {
-//             let iter = [].into_iter().chain((self.arr.iter_mut()));
-//             Box::new(iter)
-//         }
-
-//         fn call(
-//             &mut self,
-//             args: Vec<ValueRef>,
-//             context: Context,
-//             vm: &mut Vm,
-//             program: &Rc<Program>,
-//             area: CodeArea,
-//         ) -> Multi<RuntimeResult<ValueRef>> {
-//             (self.__fn)(args, context, vm, program, area, &mut self)
-//         }
-//     }
-
-//     fn x() {
-//         #[allow(unused)]
-//         let next = {
-//             #[allow(unused)]
-//             fn temp(
-//                 mut args: Vec<ValueRef>,
-//                 ctx: Context,
-//                 vm: &mut Vm,
-//                 program: &std::rc::Rc<Program>,
-//                 area: CodeArea,
-//                 _randsym_874987d57ee54f48ba2d0b2c7529a018 {
-//                     ref mut arr,
-//                     ref mut n,
-//                     ..
-//                 }: &mut _randsym_874987d57ee54f48ba2d0b2c7529a018,
-//             ) -> Multi<RuntimeResult<ValueRef>> {
-//                 use crate::interpreting::value::value_structs::*;
-//                 let ret = if n >= arr.len() {
-//                     Value::Maybe(None)
-//                 } else {
-//                     let n = arr[*n].clone();
-//                     Value::Maybe(Some(n))
-//                 };
-//                 *n += 1;
-//                 Multi::new_single(ctx, Ok(ret.into_value_ref(area)))
-//             }
-//             _randsym_874987d57ee54f48ba2d0b2c7529a018 { arr, n, __fn: temp }
-//         };
-//     }
-// }

@@ -116,7 +116,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             } => vec![check_reg, value_reg],
             Opcode::PushTryCatch { reg, to } => vec![reg],
             Opcode::PopTryCatch => vec![],
-            Opcode::CreateMacro { func, dest } => code.functions[*func as usize]
+            Opcode::CreateMacro { func, dest, .. } => code.functions[*func as usize]
                 .captured_regs
                 .iter()
                 .map(|(r, _)| *r)
@@ -141,6 +141,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             Opcode::AddOperatorOverload { from, op } => vec![from],
             Opcode::AddPrivateOperatorOverload { from, op } => vec![from],
             Opcode::IncMismatchIdCount => vec![],
+            Opcode::MarkMacroUnsafe { reg } => vec![reg],
         }
     }
 
@@ -243,7 +244,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             } => vec![],
             Opcode::PushTryCatch { reg, to } => vec![],
             Opcode::PopTryCatch => vec![],
-            Opcode::CreateMacro { func, dest } => vec![dest],
+            Opcode::CreateMacro { func, dest, .. } => vec![dest],
             Opcode::PushMacroDefault { to, from, arg } => vec![to],
             Opcode::MarkMacroMethod { reg } => vec![reg],
             Opcode::Call { base, call } => code.call_exprs[*call as usize]
@@ -259,6 +260,7 @@ impl<T: RegNum> Opcode<Register<T>> {
             Opcode::AddOperatorOverload { from, op } => vec![],
             Opcode::AddPrivateOperatorOverload { from, op } => vec![],
             Opcode::IncMismatchIdCount => vec![],
+            Opcode::MarkMacroUnsafe { reg } => vec![reg],
         }
     }
 }
