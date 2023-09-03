@@ -31,7 +31,7 @@ impl_type! {
 
             for elem in args {
                 ret = ret.try_flat_map(|ctx, v| {
-                    let g = vm.runtime_display(ctx, elem, &area, program);
+                    let g = vm.runtime_display(ctx, elem, &area, program, in_unsafe);
 
                     g.try_map(|ctx, new_elem| {
                         let mut v = v.clone();
@@ -65,14 +65,16 @@ impl_type! {
                 mode: typ,
             };
 
+            println!("pizza {}", in_unsafe);
+            if !in_unsafe && ctx.group != Id::Specific(0) {
+                return Multi::new_single(ctx, Err(RuntimeError::AddObjectInTriggerContext {
+                    area,
+                    call_stack: vm.get_call_stack(),
+                }));
+            }
+
             match typ {
                 ObjectType::Object => {
-                    // if !ctx.is_unsafe && ctx.group != Id::Specific(0) {
-                    //     return Multi::new_single(ctx, Err(RuntimeError::AddObjectInTriggerContext {
-                    //         area,
-                    //         call_stack: vm.get_call_stack(),
-                    //     }));
-                    // }
                     vm.objects.push(obj)
                 }
                 ObjectType::Trigger => vm.triggers.push(

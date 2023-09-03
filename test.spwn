@@ -1,21 +1,14 @@
 import core
-import std
 
-wait = (duration: @int | @float | @epsilon) {
-    if duration is @epsilon || duration > 0.0 {
-        unsafe {
-            // 😀
-            $.add(trigger {
-                OBJ_ID: 1268,
-                SPAWN_DURATION: duration,
-                TARGET: !{
-                    -> return
-                },
-            })
-        }
+
+
+a = () {
+    unsafe {
+
     }
 }
 
-$.add(obj {})
-wait(1)
-$.add(obj {})
+
+unsafe {
+    $.add()
+}

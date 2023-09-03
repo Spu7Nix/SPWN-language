@@ -31,6 +31,7 @@ pub struct BuiltinFn(
         &mut Vm,
         &Rc<Program>,
         CodeArea,
+        bool,
     ) -> Multi<RuntimeResult<ValueRef>>,
 );
 

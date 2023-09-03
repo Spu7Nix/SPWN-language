@@ -293,6 +293,7 @@ impl Compiler<'_> {
                             .map(|&(a, b)| (a.try_into().unwrap(), b.try_into().unwrap()))
                             .collect_vec(),
                         child_funcs: f.child_funcs.clone(),
+                        unsafe_opcodes: f.unsafe_opcodes.clone(),
                     };
                     opt_func
                 })

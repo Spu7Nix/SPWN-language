@@ -59,7 +59,7 @@ enum ProtoOpcode {
 
 #[derive(Debug)]
 enum BlockContent {
-    Opcode(Spanned<ProtoOpcode>),
+    Opcode(Spanned<ProtoOpcode>, bool),
     Block(BlockID),
 }
 
@@ -78,7 +78,7 @@ struct ProtoFunc {
     captured_regs: Vec<(UnoptRegister, UnoptRegister)>,
     child_funcs: Vec<FuncID>,
 
-    unsafe_opcodes: AHashSet<usize>,
+    unsafe_level: usize,
 }
 
 // #[derive(Debug)]
@@ -131,7 +131,7 @@ impl ProtoBytecode {
             spread_arg: args.1,
             captured_regs,
             child_funcs: vec![],
-            unsafe_opcodes: todo!(),
+            unsafe_level: 0,
         });
         let func = self.functions.len() - 1;
         f(&mut CodeBuilder {
@@ -154,6 +154,7 @@ impl ProtoBytecode {
             let mut code_len = 0;
 
             let mut opcodes: Vec<Spanned<UnoptOpcode>> = vec![];
+            let mut unsafe_opcodes = AHashSet::new();
 
             fn get_block_pos(
                 code: &ProtoBytecode,
@@ -164,7 +165,7 @@ impl ProtoBytecode {
                 let start = *length;
                 for c in &code.blocks[block].content {
                     match c {
-                        BlockContent::Opcode(_) => {
+                        BlockContent::Opcode(..) => {
                             *length += 1;
                         },
                         BlockContent::Block(b) => get_block_pos(code, *b, length, positions),
@@ -178,6 +179,7 @@ impl ProtoBytecode {
                 code: &ProtoBytecode,
                 block: BlockID,
                 opcodes: &mut Vec<Spanned<UnoptOpcode>>,
+                unsafe_opcodes: &mut AHashSet<usize>,
                 positions: &AHashMap<BlockID, BlockPos>,
             ) -> Result<(), ()> {
                 let get_jump_pos = |jump: JumpTo| -> u16 {
@@ -189,7 +191,7 @@ impl ProtoBytecode {
 
                 for content in &code.blocks[block].content {
                     match content {
-                        BlockContent::Opcode(o) => {
+                        BlockContent::Opcode(o, in_unsafe) => {
                             let opcode = o.map(|v| match v {
                                 ProtoOpcode::Raw(o) => o,
                                 ProtoOpcode::Jump(to) => UnoptOpcode::Jump {
@@ -220,16 +222,27 @@ impl ProtoBytecode {
                             opcodes.push(Spanned {
                                 value: opcode.value,
                                 span: opcode.span,
-                            })
+                            });
+                            if *in_unsafe {
+                                unsafe_opcodes.insert(opcodes.len());
+                            }
                         },
-                        BlockContent::Block(b) => build_block(code, *b, opcodes, positions)?,
+                        BlockContent::Block(b) => {
+                            build_block(code, *b, opcodes, unsafe_opcodes, positions)?
+                        },
                     }
                 }
                 Ok(())
             }
 
             get_block_pos(&self, func.code, &mut code_len, &mut block_positions);
-            build_block(&self, func.code, &mut opcodes, &block_positions)?;
+            build_block(
+                &self,
+                func.code,
+                &mut opcodes,
+                &mut unsafe_opcodes,
+                &block_positions,
+            )?;
 
             funcs.push(Function {
                 regs_used: func.regs_used,
@@ -239,6 +252,7 @@ impl ProtoBytecode {
                 spread_arg: func.spread_arg,
                 captured_regs: func.captured_regs.clone().into(),
                 child_funcs: func.child_funcs.clone().into(),
+                unsafe_opcodes,
             })
         }
 
@@ -361,6 +375,14 @@ impl<'a> CodeBuilder<'a> {
         &mut self.proto_bytecode.blocks[self.block]
     }
 
+    pub fn enter_unsafe(&mut self) {
+        self.proto_bytecode.functions[self.func].unsafe_level += 1
+    }
+
+    pub fn exit_unsafe(&mut self) {
+        self.proto_bytecode.functions[self.func].unsafe_level -= 1
+    }
+
     pub fn next_reg(&mut self) -> UnoptRegister {
         let r = Register(self.proto_bytecode.functions[self.func].regs_used);
         self.proto_bytecode.functions[self.func].regs_used += 1;
@@ -402,9 +424,10 @@ impl<'a> CodeBuilder<'a> {
     }
 
     fn push_opcode(&mut self, opcode: ProtoOpcode, span: CodeSpan) {
+        let in_unsafe = self.proto_bytecode.functions[self.func].unsafe_level > 0;
         self.current_block()
             .content
-            .push(BlockContent::Opcode(opcode.spanned(span)))
+            .push(BlockContent::Opcode(opcode.spanned(span), in_unsafe))
     }
 
     pub fn mark_func_debug(&mut self, f: FuncID) {

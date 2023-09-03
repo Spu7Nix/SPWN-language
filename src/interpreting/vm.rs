@@ -149,6 +149,10 @@ impl FuncCoord {
     pub fn get_func(&self) -> &OptFunction {
         self.program.get_function(self.func)
     }
+
+    pub fn in_unsafe(&self, t: usize) -> bool {
+        self.get_func().unsafe_opcodes.contains(&t)
+    }
 }
 
 pub struct Vm {
@@ -482,6 +486,7 @@ impl Vm {
         let original_ip = context.ip;
         context.ip = 0;
 
+        let func_coord = call_info.func.clone();
         self.context_stack
             .push(FullContext::new(context, call_info));
 
@@ -604,6 +609,7 @@ impl Vm {
                             top,
                             &mut out_contexts,
                             opcode_span,
+                            func_coord.in_unsafe(ip),
                         );
                         return Ok(LoopFlow::ContinueLoop);
                     }};
@@ -622,6 +628,7 @@ impl Vm {
                             top,
                             &mut out_contexts,
                             opcode_span,
+                            func_coord.in_unsafe(ip),
                         );
                         return Ok(LoopFlow::ContinueLoop);
                     }};
@@ -638,6 +645,7 @@ impl Vm {
                             top,
                             &mut out_contexts,
                             opcode_span,
+                            func_coord.in_unsafe(ip),
                         );
                         return Ok(LoopFlow::ContinueLoop);
                     }};
@@ -655,6 +663,7 @@ impl Vm {
                             top,
                             &mut out_contexts,
                             opcode_span,
+                            func_coord.in_unsafe(ip),
                         );
                         return Ok(LoopFlow::ContinueLoop);
                     }};
@@ -787,7 +796,14 @@ impl Vm {
                             let mut top = self.context_stack.last_mut().yeet_current().unwrap();
                             top.ip += 1;
 
-                            let out = self.convert_type(top, &a, typ, opcode_span, &program);
+                            let out = self.convert_type(
+                                top,
+                                &a,
+                                typ,
+                                opcode_span,
+                                &program,
+                                func_coord.in_unsafe(ip),
+                            );
 
                             mem::drop(a);
 
@@ -912,9 +928,13 @@ impl Vm {
                         let mut top = self.context_stack.last_mut().yeet_current().unwrap();
                         top.ip += 1;
 
-                        let area = area;
-
-                        let s = self.value_to_iterator(top, &src, &area, &program);
+                        let s = self.value_to_iterator(
+                            top,
+                            &src,
+                            &area,
+                            &program,
+                            func_coord.in_unsafe(ip),
+                        );
 
                         self.change_reg_multi(
                             dest,
@@ -932,7 +952,15 @@ impl Vm {
                         let mut top = self.context_stack.last_mut().yeet_current().unwrap();
                         top.ip += 1;
 
-                        let out = self.call_value(top, src, &[], &[], area, &program);
+                        let out = self.call_value(
+                            top,
+                            src,
+                            &[],
+                            &[],
+                            area,
+                            &program,
+                            func_coord.in_unsafe(ip),
+                        );
 
                         self.change_reg_multi(dest, out, &mut out_contexts);
 
@@ -1140,8 +1168,6 @@ impl Vm {
                         self.change_reg(dest, StoredValue { value: v, area })
                     },
                     Opcode::ApplyStringFlag { flag, reg } => {
-                        let area = area;
-
                         let val = match &self.get_reg_ref(reg).borrow().value {
                             Value::String(s) => {
                                 let mut v = vec![];
@@ -1228,12 +1254,13 @@ impl Vm {
                     },
                     #[cfg(debug_assertions)]
                     Opcode::Dbg { reg, .. } => {
+                        let in_unsafe = func_coord.in_unsafe(ip);
                         let r = self.get_reg_ref(reg).clone();
 
                         let mut top = self.context_stack.last_mut().yeet_current().unwrap();
                         top.ip += 1;
 
-                        let s = self.runtime_display(top, &r, &area, &program);
+                        let s = self.runtime_display(top, &r, &area, &program, in_unsafe);
 
                         let gog = self
                             .context_stack
@@ -1245,13 +1272,18 @@ impl Vm {
                             s,
                             |ctx, v| {
                                 println!(
-                                    "{} {} {} {} {} {}",
+                                    "{} {} {} {} {} {} {}",
                                     v,
                                     "::".dimmed(),
                                     ctx.unique_id.to_string().bright_blue(),
                                     ctx.group.fmt("g").green(),
                                     format!("{:?}", r.as_ptr()).dimmed(),
-                                    gog // ctx.stack.len(),
+                                    gog, // ctx.stack.len(),
+                                    if in_unsafe {
+                                        "!".bright_red().bold().to_string()
+                                    } else {
+                                        "".into()
+                                    }
                                 );
                             },
                             &mut out_contexts,
@@ -1266,7 +1298,13 @@ impl Vm {
                         top.ip += 1;
 
                         let value_str: Multi<Result<(), RuntimeError>> = self
-                            .runtime_display(top, &value, &value.borrow().area, &program)
+                            .runtime_display(
+                                top,
+                                &value,
+                                &value.borrow().area,
+                                &program,
+                                func_coord.in_unsafe(ip),
+                            )
                             .try_map(|ctx, v| {
                                 (
                                     ctx,
@@ -1347,9 +1385,13 @@ impl Vm {
                         let mut top = self.context_stack.last_mut().yeet_current().unwrap();
                         top.ip += 1;
 
-                        let area = area;
-
-                        let s = self.runtime_display(top, &r, &area, &program);
+                        let s = self.runtime_display(
+                            top,
+                            &r,
+                            &area,
+                            &program,
+                            func_coord.in_unsafe(ip),
+                        );
 
                         self.change_reg_multi(
                             dest,
@@ -1372,7 +1414,14 @@ impl Vm {
                         let mut top = self.context_stack.last_mut().yeet_current().unwrap();
                         top.ip += 1;
 
-                        let ret = self.index_value(top, &base, &index, &area, &program);
+                        let ret = self.index_value(
+                            top,
+                            &base,
+                            &index,
+                            &area,
+                            &program,
+                            func_coord.in_unsafe(ip),
+                        );
 
                         self.change_reg_multi(dest, ret, &mut out_contexts);
 
@@ -1786,6 +1835,7 @@ impl Vm {
                         }
                     },
                     Opcode::Call { base, call } => {
+                        let in_unsafe = dbg!(func_coord.in_unsafe(ip));
                         // println!("spumcock {}", self.context_stack.current().unique_id);
                         let call = program.get_call_expr(call);
                         let call = CallExpr {
@@ -1816,6 +1866,7 @@ impl Vm {
                             &call.named,
                             area,
                             &program,
+                            in_unsafe,
                         );
                         if let Some(dest) = call.dest {
                             self.change_reg_multi(dest, ret, &mut out_contexts);
@@ -1878,6 +1929,7 @@ impl Vm {
                                 self,
                                 &program,
                                 area,
+                                func_coord.in_unsafe(ip),
                             );
 
                             self.change_reg_multi(dest, ret, &mut out_contexts);
@@ -2096,18 +2148,19 @@ impl Vm {
         named_args: &[(ImmutStr, ValueRef, Mutability)],
         call_area: CodeArea,
         program: &Rc<Program>,
+        in_unsafe: bool,
     ) -> Multi<RuntimeResult<ValueRef>> {
         let base_ref = base.borrow();
         let base_area = base_ref.area.clone();
 
         match &base_ref.value {
             Value::Macro(data) | Value::Iterator(data) => {
-                // if data.is_unsafe && !ctx.is_unsafe {
-                //     return Multi::new_single(
-                //         ctx,
-                //         Err(RuntimeError::UnsafeMacroCall { area: call_area }),
-                //     );
-                // }
+                if data.is_unsafe && !in_unsafe {
+                    return Multi::new_single(
+                        ctx,
+                        Err(RuntimeError::UnsafeMacroCall { area: call_area }),
+                    );
+                }
 
                 let (args, spread_arg): (
                     Box<dyn Iterator<Item = (Option<&ImmutStr>, Mutability)>>,
@@ -2370,6 +2423,7 @@ impl Vm {
                         named_args,
                         call_area.clone(),
                         program,
+                        in_unsafe,
                     );
                 }
 
@@ -2396,6 +2450,7 @@ impl Vm {
         ctx: Context,
         out_contexts: &mut Vec<Context>,
         span: CodeSpan,
+        is_unsafe: bool,
     ) {
         // TOODO: overloads // no longer toodo you absolute fucking fuckwit, you fucking dumbass, you are so fucking dumb holy fucking shit, i wish i was an egirl
 
@@ -2418,6 +2473,7 @@ impl Vm {
                             &[],
                             self.make_area(span, program),
                             program,
+                            is_unsafe,
                         )
                         .map(|ctx, v| match v {
                             Ok(v) => (ctx, Some(Ok(v))),
@@ -2502,6 +2558,7 @@ impl Vm {
         mut ctx: Context,
         out_contexts: &mut Vec<Context>,
         span: CodeSpan,
+        is_unsafe: bool,
     ) {
         if let Either::Right(true) = op {
             let v = ctx.stack.last().unwrap().registers[*right as usize].clone();
@@ -2535,6 +2592,7 @@ impl Vm {
                             &[],
                             self.make_area(span, program),
                             program,
+                            is_unsafe,
                         )
                         .map(|ctx, v| match v {
                             Ok(_) => (ctx, Some(Ok(()))),
@@ -2646,6 +2704,7 @@ impl Vm {
         ctx: Context,
         out_contexts: &mut Vec<Context>,
         span: CodeSpan,
+        is_unsafe: bool,
     ) {
         let mut out = Multi::new_single(ctx, None);
 
@@ -2665,6 +2724,7 @@ impl Vm {
                             &[],
                             self.make_area(span, program),
                             program,
+                            is_unsafe,
                         )
                         .map(|ctx, v| match v {
                             Ok(v) => (ctx, Some(Ok(v))),
@@ -2712,6 +2772,7 @@ impl Vm {
         to: ValueType,
         span: CodeSpan, // ✍️
         program: &Rc<Program>,
+        in_unsafe: bool,
     ) -> Multi<RuntimeResult<Value>> {
         if value.borrow().value.get_type() == to {
             return Multi::new_single(ctx, Ok(value.borrow().value.clone()));
@@ -2806,7 +2867,13 @@ impl Vm {
 
             (_, ValueType::String) => {
                 return self
-                    .runtime_display(ctx, value, &self.make_area(span, program), program)
+                    .runtime_display(
+                        ctx,
+                        value,
+                        &self.make_area(span, program),
+                        program,
+                        in_unsafe,
+                    )
                     .try_map(|ctx, v| (ctx, Ok(Value::String(String32::from_str(&v).into()))))
             },
             (v, ValueType::Type) => Value::Type(v.get_type()),
@@ -2944,6 +3011,7 @@ impl Vm {
         value: &ValueRef,
         area: &CodeArea,
         program: &Rc<Program>,
+        in_unsafe: bool,
     ) -> Multi<RuntimeResult<String>> {
         let s = match &value.borrow().value {
             Value::Int(v) => v.to_string(),
@@ -2955,7 +3023,7 @@ impl Vm {
 
                 for elem in arr {
                     ret = ret.try_flat_map(|ctx, v| {
-                        let g = self.runtime_display(ctx, elem, area, program);
+                        let g = self.runtime_display(ctx, elem, area, program, in_unsafe);
 
                         g.try_map(|ctx, new_elem| {
                             let mut v = v.clone();
@@ -2972,7 +3040,7 @@ impl Vm {
 
                 for (key, elem) in map {
                     ret = ret.try_flat_map(|ctx, v| {
-                        let g = self.runtime_display(ctx, elem.value(), area, program);
+                        let g = self.runtime_display(ctx, elem.value(), area, program, in_unsafe);
 
                         g.try_map(|ctx, new_elem| {
                             let mut v = v.clone();
@@ -2999,7 +3067,7 @@ impl Vm {
             Value::Maybe(None) => "?".into(),
             Value::Maybe(Some(v)) => {
                 return self
-                    .runtime_display(ctx, v, area, program)
+                    .runtime_display(ctx, v, area, program, in_unsafe)
                     .try_map(|ctx, v| (ctx, Ok(format!("({v})?"))))
             },
             Value::Empty => "()".into(),
@@ -3026,7 +3094,7 @@ impl Vm {
 
                 for (key, elem) in exports {
                     ret = ret.try_flat_map(|ctx, v| {
-                        let g = self.runtime_display(ctx, elem, area, program);
+                        let g = self.runtime_display(ctx, elem, area, program, in_unsafe);
 
                         g.try_map(|ctx, new_elem| {
                             let mut v = v.clone();
@@ -3059,6 +3127,7 @@ impl Vm {
                         &[],
                         area.clone(),
                         program,
+                        in_unsafe,
                     );
 
                     return ret.try_map(|ctx, v| match &v.borrow().value {
@@ -3084,7 +3153,7 @@ impl Vm {
 
                 for (key, elem) in items {
                     ret = ret.try_flat_map(|ctx, v| {
-                        let g = self.runtime_display(ctx, elem.value(), area, program);
+                        let g = self.runtime_display(ctx, elem.value(), area, program, in_unsafe);
 
                         g.try_map(|ctx, new_elem| {
                             let mut v = v.clone();
@@ -3115,6 +3184,7 @@ impl Vm {
         index: &ValueRef,
         area: &CodeArea,
         program: &Rc<Program>,
+        in_unsafe: bool,
     ) -> Multi<RuntimeResult<ValueRef>> {
         let base_ref = base.borrow();
         let index_ref = index.borrow();
@@ -3179,6 +3249,7 @@ impl Vm {
                         &[],
                         area.clone(),
                         program,
+                        in_unsafe,
                     );
 
                     return ret;
@@ -3203,6 +3274,7 @@ impl Vm {
         value: &ValueRef,
         area: &CodeArea,
         program: &Rc<Program>,
+        in_unsafe: bool,
     ) -> Multi<RuntimeResult<MacroData>> {
         let data = match &value.borrow().value {
             Value::Array(arr) => {
@@ -3321,6 +3393,7 @@ impl Vm {
                         &[],
                         area.clone(),
                         program,
+                        in_unsafe,
                     );
 
                     return ret.try_map(|ctx, v| match &v.borrow().value {

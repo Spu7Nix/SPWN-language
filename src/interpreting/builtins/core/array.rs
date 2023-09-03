@@ -98,7 +98,8 @@ impl_type! {
                         &[(elem.clone(), false)],
                         &[],
                         area.clone(),
-                        program
+                        program,
+                        in_unsafe
                     );
 
                     r.try_map(|ctx, new_elem| {
@@ -130,7 +131,8 @@ impl_type! {
                         &[(elem.clone(), false)],
                         &[],
                         area.clone(),
-                        program
+                        program,
+                        in_unsafe
                     );
 
                     result.try_map(|ctx, v| {
@@ -176,7 +178,8 @@ impl_type! {
                         &[(elem.clone(), false)],
                         &[],
                         area.clone(),
-                        program
+                        program,
+                        in_unsafe
                     );
 
                     result.try_map(|ctx, v| {
@@ -220,7 +223,8 @@ impl_type! {
                         &[(elem.clone(), false)],
                         &[],
                         area.clone(),
-                        program
+                        program,
+                        in_unsafe
                     );
 
                     result.try_map(|ctx, v| {

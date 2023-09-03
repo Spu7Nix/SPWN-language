@@ -13,6 +13,7 @@ macro_rules! raw_macro {
             vm: &mut $crate::Vm,
             program: &std::rc::Rc<$crate::Program>,
             area: $crate::sources::CodeArea,
+            in_unsafe: bool,
         ) -> $crate::interpreting::multi::Multi<
             $crate::interpreting::vm::RuntimeResult<
                 $crate::interpreting::vm::ValueRef

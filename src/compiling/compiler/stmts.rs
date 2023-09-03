@@ -415,9 +415,9 @@ impl<'a> Compiler<'a> {
                 })?;
             },
             Statement::Unsafe(stmts) => {
-                // builder.push_raw_opcode(UnoptOpcode::EnterUnsafeBlock, stmt.span);
-
+                builder.enter_unsafe();
                 self.compile_stmts(stmts, scope, builder)?;
+                builder.exit_unsafe();
 
                 // builder.push_raw_opcode(UnoptOpcode::ExitUnsafeBlock, stmt.span);
             },

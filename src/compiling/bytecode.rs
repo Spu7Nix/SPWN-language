@@ -4,7 +4,7 @@ use std::hash::Hash;
 use std::ops::Index;
 use std::rc::Rc;
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use allow_until::AllowUntil;
 use colored::Colorize;
 use delve::{EnumDisplay, VariantNames};
@@ -220,6 +220,8 @@ pub struct Function<T: RegNum> {
     pub captured_regs: Vec<(Register<T>, Register<T>)>,
 
     pub child_funcs: ImmutVec<FuncID>,
+
+    pub unsafe_opcodes: AHashSet<usize>,
 }
 
 pub type OptFunction = Function<u8>;
@@ -264,6 +266,7 @@ mod debug_bytecode {
     #[derive(Debug)]
     struct TableRow {
         idx: String,
+        in_unsafe: String,
         opcode_name: String,
         opcode_str: String,
         span: String,
@@ -274,6 +277,7 @@ mod debug_bytecode {
     #[derive(Default, Debug)]
     struct TableRowMax {
         idx: usize,
+        in_unsafe: usize,
         opcode_name: usize,
         opcode_str: usize,
         span: usize,
@@ -355,6 +359,7 @@ mod debug_bytecode {
                 }
                 let mut max = TableRowMax {
                     idx: 2,
+                    in_unsafe: 2,
                     opcode_name: 5,
                     opcode_str: 5,
                     span: 0,
@@ -371,6 +376,11 @@ mod debug_bytecode {
                 {
                     let row = TableRow {
                         idx: i.to_string().bright_blue().to_string(),
+                        in_unsafe: if func.unsafe_opcodes.contains(&i) {
+                            "! ".bright_red().bold().to_string()
+                        } else {
+                            "  ".into()
+                        },
                         opcode_name: Into::<&str>::into(opcode).bright_white().to_string(),
                         opcode_str: {
                             let c: Cow<'_, str> = format!("{opcode}").into();
@@ -453,8 +463,9 @@ mod debug_bytecode {
                 }
 
                 let top = format!(
-                    "╭─{}────{}──{}─┬─{}─{}─╮",
+                    "╭─{}───{}{}──{}─┬─{}─{}─╮",
                     "─".repeat(max.idx),
+                    "─".repeat(max.in_unsafe),
                     "─".repeat(max.opcode_name),
                     "─".repeat(max.opcode_str),
                     "─".repeat(max.span),
@@ -476,13 +487,15 @@ mod debug_bytecode {
                     }
 
                     let s = format!(
-                        "│ {:>idx$}    {:>opcode_name$}  {:opcode_str$} │ {:>span$} {:snippet$} │",
+                        "│ {:>idx$}   {:>in_unsafe$}{:>opcode_name$}  {:opcode_str$} │ {:>span$} {:snippet$} │",
                         row.idx,
+                        row.in_unsafe,
                         row.opcode_name,
                         row.opcode_str,
                         row.span,
                         row.snippet,
                         idx = calc!(idx),
+                        in_unsafe = calc!(in_unsafe),
                         opcode_name = calc!(opcode_name),
                         opcode_str = calc!(opcode_str),
                         span = calc!(span),
@@ -493,8 +506,9 @@ mod debug_bytecode {
                 println!(
                     "{}",
                     format!(
-                        "├─{}────{}──{}─┴─{}─{}─╯",
+                        "├─{}───{}{}──{}─┴─{}─{}─╯",
                         "─".repeat(max.idx),
+                        "─".repeat(max.in_unsafe),
                         "─".repeat(max.opcode_name),
                         "─".repeat(max.opcode_str),
                         "─".repeat(max.span),
