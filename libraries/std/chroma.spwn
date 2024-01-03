@@ -387,7 +387,7 @@ impl @chroma {
     },
 
     hsv2: (self) -> [@number] {
-        return [self._h, self._s, self._v]
+        return [self._h360, self._s100, self._v100]
     },
     hsva2: (self) -> [@number] {
         return [self._h360, self._s100, self._v100, self._a100]
