@@ -291,7 +291,7 @@ pub fn append_objects(
         AHashMap::default(),
     ];
 
-    const ID_MAX: u16 = 999;
+    const ID_MAX: u16 = 9999;
 
     for obj in &mut objects {
         for prop in obj.params.values_mut() {
