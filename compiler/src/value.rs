@@ -3804,6 +3804,7 @@ impl VariableFuncs for ast::Variable {
                         UnaryOperator::MoreOrEqPattern => Builtin::MoreOrEqPatternOp,
                         UnaryOperator::LessOrEqPattern => Builtin::LessOrEqPatternOp,
                         UnaryOperator::InPattern => Builtin::InPatternOp,
+                        UnaryOperator::BitNot => Builtin::BitNotOp,
                     },
                     full_context,
                     globals,

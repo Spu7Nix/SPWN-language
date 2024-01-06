@@ -2387,6 +2387,22 @@ $.assert($.call(m, [1, 2]) == 3)
         (*globals.stored_values.map.get_mut(arguments[0]).unwrap()).def_area = info.position;
         Value::Null
     }
+    [RightShiftOp] #[safe = true, desc = "Default implementation of the `>>` operator", example = "$._right_shift_(10, 2)"]
+    fn _right_shift_((a): Number, (b): Number) {
+        Value::Number(((a as i128) >> (b as i128)) as f64)
+    }
+    [LeftShiftOp] #[safe = true, desc = "Default implementation of the `<<` operator", example = "$._left_shift_(3, 1)"]
+    fn _left_shift_((a): Number, (b): Number) { 
+        Value::Number(((a as i128) << (b as i128)) as f64)
+    }
+    [BitNotOp] #[safe = true, desc = "Default implementation of the `~n` operator", example = "$._bit_not_(4)"]
+    fn _bit_not_((a): Number) {
+        Value::Number((!(a as i128)) as f64)
+    }
+    [BitXorOp] #[safe = true, desc = "Default implementation of the `~?` operator", example = "$._bit_xor_(4, 9)"]
+    fn _bit_xor_((a): Number, (b): Number) {
+        Value::Number(((a as i128) ^ (b as i128)) as f64)
+    }
     [SwapOp] #[safe = true, desc = "Default implementation of the `<=>` operator", example = "let a = 10\nlet b = 5\n$._swap_(a, b)\n$.assert(a == 5)\n$.assert(b == 10)"]
     fn _swap_(mut (a), mut (b)) {
 
@@ -2621,36 +2637,56 @@ $.assert($.call(m, [1, 2]) == 3)
         Value::Null
     }
 
+    [LeftShiftAssignOp] #[safe = true, desc = "Default implementation of the `<<=` operator", example = "let val = 8\n$._left_shift_assign_(val, 5)\n$.assert(val == 256)"]
+    fn _left_shift_assign_(mut (a): Number, (b): Number) {a = ((a as i128) << (b as i128)) as f64; Value::Null}
+
+    [RightShiftAssignOp] #[safe = true, desc = "Default implementation of the `>>=` operator", example = "let val = 32\n$._right_shift_assign_(val, 2)\n$.assert(val == 8)"]
+    fn _right_shift_assign_(mut (a): Number, (b): Number) {a = ((a as i128) >> (b as i128)) as f64; Value::Null}
+
     [EitherOp] #[safe = true, desc = "Default implementation of the `|` operator", example = "$._either_(@number, @counter)"]
     fn _either_((a), (b)) {
-        Value::Pattern(Pattern::Either(
-            if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
-                Box::new(p)
-            } else {
-                unreachable!()
+        match (a.clone(), b.clone()) {
+            (Value::Number(a), Value::Number(b)) => {
+                Value::Number(((a as i128) | (b as i128)) as f64)
             },
-            if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
-                Box::new(p)
-            } else {
-                unreachable!()
-            },
-        ))
+            _ => {
+                Value::Pattern(Pattern::Either(
+                    if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
+                        Box::new(p)
+                    } else {
+                        unreachable!()
+                    },
+                    if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
+                        Box::new(p)
+                    } else {
+                        unreachable!()
+                    },
+                ))
+            }
+        }
     }
 
     [BothOp] #[safe = true, desc = "Default implementation of the `&` operator", example = "$._both_(@number, @counter)"]
     fn _both_((a), (b)) {
-        Value::Pattern(Pattern::Both(
-            if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
-                Box::new(p)
-            } else {
-                unreachable!()
+        match (a.clone(), b.clone()) {
+            (Value::Number(a), Value::Number(b)) => {
+                Value::Number(((a as i128) & (b as i128)) as f64)
             },
-            if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
-                Box::new(p)
-            } else {
-                unreachable!()
-            },
-        ))
+            _ => {
+                Value::Pattern(Pattern::Both(
+                    if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
+                        Box::new(p)
+                    } else {
+                        unreachable!()
+                    },
+                    if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
+                        Box::new(p)
+                    } else {
+                        unreachable!()
+                    },
+                ))
+            }
+        }
     }
 
     [DisplayOp] #[safe = true, desc = "returns the default value display string for the given value", example = "$._display_(counter()) // \"@counter::{ item: ?i, bits: 16 }\""] fn _display_((a)) {
