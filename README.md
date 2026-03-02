@@ -33,7 +33,8 @@ SPWN is a programming language that compiles to Geometry Dash levels. What that 
 | [Official SPWN documentation](https://spu7nix.net/spwn/#/)
 | [Documentation Repository](https://github.com/Spu7Nix/spwn_docs)
 | [Official SPWN Discord server](https://discord.gg/qKZAhKXqgw)
-| [SPWN Playground](https://spu7nix.net/spwn/try/)
+| [SPWN Playground (Old)](https://spu7nix.net/spwn/try/)
+| [SPWN Playground (New)](https://spu7nix.net/spwn/playground/)
 
 ## Installing - How To Install
 
@@ -131,7 +132,9 @@ Let it compile and you're good to go.
 
 ### SPWN Playground
 
-SPWN Playground is a SPWN compiler built into your browser. You can use it to [try out SPWN](https://spu7nix.net/spwn/try/) before you decide to install it.
+SPWN Playground is a SPWN compiler built into your browser. You can use it to [try out SPWN](https://spu7nix.net/spwn/try/) before you decide to install it. 
+
+You can also try the new SPWN Playground [here](https://spu7nix.net/spwn/playground), which includes a view of all objects and triggers from your browser.
 
 ### Setup
 
